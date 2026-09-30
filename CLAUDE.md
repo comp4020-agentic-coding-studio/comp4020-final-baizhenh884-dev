@@ -1,8 +1,7 @@
 # Harness
 
-Process rules for this repo. The app concept isn't chosen yet, so nothing here
-is a design rule; those are added deliberately once `README.md` argues what
-"good" means for this app (see "Definition of good").
+Process rules for this repo, plus the product contract for Theseus, derived
+from what `README.md` argues "good" means (see "Product contract").
 
 ## Sources of truth
 
@@ -126,10 +125,49 @@ UTC). No app timezone is chosen yet; add one here only when the app needs it.
 
 ## Definition of good
 
-`README.md` will argue what "good" means for this app, from sources. Until the
-concept and those sources are chosen, add no design rules here, and never
-generic ones ("intuitive", "beautiful", "user-friendly", "responsive"). Rules
-derived from the README's argument come in a later, deliberate update.
+`README.md` argues what "good" means for Theseus; the product contract below is
+derived from it. When a README claim changes, change the contract in the same
+deliberate update. Never add generic rules ("intuitive", "beautiful",
+"user-friendly", "responsive").
+
+## Product contract: Theseus
+
+What the code must hold to. The README says why; don't restate it here.
+
+- One successful replacement per visitor, ever. A visitor is a browser holding
+  the site's visitor cookie. Enforce it atomically in the database (a
+  uniqueness constraint), never by check-then-write and never only in the page.
+- A replacement names the word position and the version of it the visitor saw.
+  If that position has changed since, refuse it. Compare versions, not word
+  text: a position can return to an earlier word.
+- A refused replacement (stale, invalid, or the same as the current word) never
+  uses up the visitor's change.
+- A replacement is one token: trimmed, 1–24 characters, no whitespace or
+  control characters. Store it as plain text and escape it on every output. The
+  sentence's final full stop belongs to the sentence, not to a word.
+- No word is protected: the maker's starting words and every visitor's word can
+  be replaced by any later valid replacement.
+- Never expose who made a change, or when anyone other than the viewer acted.
+  Only the viewer is told which word was theirs and how long it stood.
+- History has exactly two forms, with no author, time or count in either:
+  - by default, beneath each word position, at most the four most recent
+    words it replaced, receding;
+  - on request, earlier whole sentences, reached one step at a time back to the
+    starting sentence, with only one earlier form on screen at once. Never list
+    earlier forms together or as a feed. Earlier forms are read-only:
+    replacement acts only on the current sentence. A visitor may jump straight
+    to the form just after their own change.
+- There is no user-facing moderation. Any recovery path for harmful public
+  content is an exceptional maker action outside the ordinary interaction: it
+  never protects, assigns or adds words, and it needs a recorded decision
+  before it's built.
+- The starting sentence is maker-authored and is the only non-visitor content.
+  Never seed, import or fabricate visitor changes: not in the app, the database,
+  the logs or the evidence.
+- No editing, undo, reactions, profiles, nicknames, feeds, scores or second
+  sentence without an explicit product decision recorded first.
+- Every rule above is enforced on the server. The page may mirror a rule but is
+  never its only enforcement.
 
 ## Stop and ask
 
