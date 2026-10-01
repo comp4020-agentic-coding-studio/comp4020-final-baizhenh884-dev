@@ -1,5 +1,9 @@
 node_modules/
 dist/
+# Astro's generated types, and the local dev database: state on this machine,
+# never in the repo and never copied to production
+.astro/
+.data/
 *.log
 
 # editor and OS junk

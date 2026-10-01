@@ -1,0 +1,29 @@
+---
+import { currentWords } from "../lib/db";
+import { STARTING_WORDS } from "../lib/sentence";
+
+// GET / is the current sentence. GET /?at=0 is the starting sentence,
+// read-only; later earlier forms arrive with the history work.
+const at = Astro.url.searchParams.get("at");
+if (at !== null && at !== "0") {
+  return new Response("Not found", { status: 404 });
+}
+const earlier = at === "0";
+const words: readonly string[] = earlier ? STARTING_WORDS : currentWords();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Theseus</title>
+  </head>
+  <body>
+    <main>
+      {earlier && <p>Where the sentence started (read-only).</p>}
+      <p>{words.join(" ")}.</p>
+      <p><a href="/readme/">What this is</a></p>
+    </main>
+  </body>
+</html>

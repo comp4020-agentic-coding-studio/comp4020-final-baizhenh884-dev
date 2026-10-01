@@ -1,0 +1,21 @@
+---
+// README.md, rendered in full: what this app is and what good means here.
+// spec/invariants.test.ts checks every heading is on this page.
+import * as readme from "../../README.md";
+
+const title = readme.getHeadings().find((h) => h.depth === 1)?.text ?? "README";
+const html = await readme.compiledContent();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <nav aria-label="site"><a href="/">The sentence</a></nav>
+    <main set:html={html} />
+  </body>
+</html>

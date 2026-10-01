@@ -1,9 +1,11 @@
 # What a remote build uploads from your working tree. CI checkouts carry none
 # of this, so it only matters for a deploy run from your own machine; without
-# it, node_modules and any local data ship to the builder.
+# it, node_modules and your local database ship to the builder.
 .git
 node_modules
 dist
+.astro
+.data
 *.log
 .env
 .env.*
