@@ -15,7 +15,8 @@ if (at !== null) {
 }
 const current = earlier ? [] : currentPositions();
 const past = earlier ? new Map<number, string[]>() : recentPast();
-const changes = earlier ? 0 : changeCount();
+const changes = changeCount();
+const n = Number(at);
 const trace = earlier ? null : traceFor(visitor);
 const yours = trace?.standing ? trace.position : null;
 ---
@@ -26,7 +27,11 @@ const yours = trace?.standing ? trace.position : null;
       <>
         <p>An earlier form of the sentence (read-only).</p>
         <p class="sentence">{earlier.join(" ")}.</p>
-        <p><a href="/">Back to the sentence now</a></p>
+        <p>
+          {n > 0 && <a rel="prev" href={`?at=${n - 1}`}>Earlier sentence</a>}
+          {n + 1 < changes && <a rel="next" href={`?at=${n + 1}`}>Later sentence</a>}
+        </p>
+        <p><a rel={n + 1 === changes ? "next" : undefined} href="/">Back to the sentence now</a></p>
       </>
     ) : (
       <>
