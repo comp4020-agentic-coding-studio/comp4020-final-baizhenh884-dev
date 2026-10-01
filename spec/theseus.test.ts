@@ -19,7 +19,9 @@ import { describe, expect, inject, it } from "vitest";
 //                     A version belongs to one position: a change elsewhere in
 //                     the sentence never makes it stale.
 //   GET /?at=N        the whole sentence after N changes (0 is the start),
-//                     read-only.
+//                     read-only. It links one step back with rel="prev"
+//                     (none at the start) and one step forward with
+//                     rel="next", the last earlier form's "next" being now.
 //   Your trace        on GET /, only for a visitor who has made their change:
 //                     a <section> or <aside> holding a role="status" element
 //                     that names their word. If it has since been replaced,
@@ -145,6 +147,20 @@ async function stepBack(v: Visitor, from: Document): Promise<Document> {
   return v.page(new URL(prev!.getAttribute("href")!, new URL("/", baseUrl)).href);
 }
 
+// one step through the sentence's history, by its rel="prev" or rel="next" link
+async function step(v: Visitor, from: Document, rel: "prev" | "next"): Promise<Document> {
+  const link = from.querySelector<HTMLAnchorElement>(`a[rel~="${rel}"]`);
+  expect(link, `no <a rel="${rel}"> link to step through the sentence's history`).not.toBeNull();
+  return v.page(new URL(link!.getAttribute("href")!, new URL("/", baseUrl)).href);
+}
+
+// whether a page shows these words as the sentence: the current page through
+// its word labels, an earlier form through its text
+const reads = (doc: Document, words: string[]) =>
+  doc.querySelector('form[action="/replace"]')
+    ? slots(doc).map((s) => s.word).join(" ") === words.join(" ")
+    : showsSentence(doc, words);
+
 const MARKUP = "<x-theseus>s</x-theseus>"; // 24 characters: a valid word that looks like an element
 
 // the visitor's own trace on GET /, if the page shows one
@@ -262,6 +278,31 @@ describe("Theseus", () => {
       "the step before now doesn't show the sentence as it was before the change",
     ).toBe(true);
     expect(previous.querySelectorAll('form[action="/replace"]').length).toBe(0);
+  });
+
+  changesTheSentence("steps through earlier sentence forms one at a time, back and forward, read-only", async () => {
+    const alice = await arrive();
+    const bob = await arrive();
+    const before = await alice.sentence();
+    expect(await alice.replace(before[0], unused(before))).toBe(303);
+    const middle = await bob.sentence();
+    expect(await bob.replace(middle[1], unused(middle))).toBe(303);
+    const now = await bob.sentence();
+    const words = (all: Slot[]) => all.map((s) => s.word);
+
+    const back1 = await step(bob, await bob.page("/"), "prev");
+    expect(reads(back1, words(middle)), "one step back isn't the sentence before the latest change").toBe(true);
+    const back2 = await step(bob, back1, "prev");
+    expect(reads(back2, words(before)), "two steps back isn't the sentence before that").toBe(true);
+    expect(reads(await step(bob, back2, "next"), words(middle)), "a step forward doesn't return").toBe(true);
+    expect(reads(await step(bob, back1, "next"), words(now)), "the last earlier form doesn't lead to now").toBe(true);
+    for (const earlier of [back1, back2]) {
+      expect(earlier.querySelectorAll('form[action="/replace"]').length, "an earlier form can be edited").toBe(0);
+    }
+
+    const start = await bob.page("/?at=0");
+    expect(start.querySelector('a[rel~="prev"]'), "the starting sentence links to something before it").toBeNull();
+    expect(start.querySelector('a[rel~="next"]'), "the starting sentence doesn't link forward").not.toBeNull();
   });
 
   changesTheSentence("shows a replacement word as text, never as markup, wherever it appears", async () => {
