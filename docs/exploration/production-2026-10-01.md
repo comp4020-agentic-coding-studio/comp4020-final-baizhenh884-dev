@@ -55,6 +55,25 @@ Live URL: https://comp4020-final-baizhenh884-dev.fly.dev
 exactly 1 change. This was still the `0d61ca7` deploy; the history-navigation
 commits were not deployed.
 
+## Final Crit 8 deploy (07:16, agent, read-only)
+
+Commit `0e54e7e`, which includes the history navigation, was deployed as image
+`deployment-01M3V5094AWXJTA59WG5SE6894` to the same machine and volume. The
+volume wasn't recreated, and no replacement was made. Verified with GETs only
+at 07:16:25:
+
+- `/` read "Keep a website that people would miss if it disappeared." and
+  linked back (`rel="prev"`) to `?at=0`;
+- `/?at=0` showed the maker's sentence and stepped forward (`rel="next"`) to
+  `/`;
+- `/?at=1` showed the Keep sentence, linked Earlier to `?at=0`, and linked
+  back to now;
+- `/?at=2` returned 404, so the change count was still exactly 1;
+- neither earlier page had a replacement form, and `/readme/` returned 200;
+- the log showed `[theseus] database: /data/theseus.db`, and `/data` was still
+  the volume mount, holding the same database file created at 05:42;
+- production `pnpm check`: 4 passed, 11 skipped by design.
+
 ## Not recorded here
 
 The visitor cookie value and visitor id, tokens and secrets, and account
