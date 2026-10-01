@@ -20,6 +20,11 @@ import { describe, expect, inject, it } from "vitest";
 //                     the sentence never makes it stale.
 //   GET /?at=N        the whole sentence after N changes (0 is the start),
 //                     read-only.
+//   Your trace        on GET /, only for a visitor who has made their change:
+//                     a <section> or <aside> holding a role="status" element
+//                     that names their word. If it has since been replaced,
+//                     their word is marked removed with <del>, and the word
+//                     now in its place is named.
 //
 // There is one shared sentence and no reset, so no check assumes what earlier
 // checks left behind. Each builds its scenario from the state it observes, with
@@ -141,6 +146,9 @@ async function stepBack(v: Visitor, from: Document): Promise<Document> {
 }
 
 const MARKUP = "<x-theseus>s</x-theseus>"; // 24 characters: a valid word that looks like an element
+
+// the visitor's own trace on GET /, if the page shows one
+const traceStatus = (doc: Document) => doc.querySelector('section [role="status"], aside [role="status"]');
 
 describe("Theseus", () => {
   it("starts from the maker's sentence: the earliest form shows the starting sentence", async () => {
@@ -273,5 +281,40 @@ describe("Theseus", () => {
     const earlier = await stepBack(alice, after);
     expect(earlier.body.textContent).toContain(MARKUP);
     expect(earlier.querySelector("x-theseus"), "the word became an element in the earlier form").toBeNull();
+  });
+
+  changesTheSentence("tells a returning visitor their word still stands", async () => {
+    const alice = await arrive();
+    const before = await alice.page("/");
+    expect(traceStatus(before), "a visitor who hasn't changed anything is shown a trace").toBeNull();
+    const slot = slots(before)[0];
+    const word = unused(slots(before));
+    expect(await alice.replace(slot, word)).toBe(303);
+
+    const back = await alice.page("/");
+    const status = traceStatus(back);
+    expect(status, 'no <section>/<aside> with a role="status" trace on return').not.toBeNull();
+    expect(status!.textContent).toContain(word);
+    expect(status!.querySelector("del"), "a word that still stands is shown as removed").toBeNull();
+    expect(at(slots(back), slot.position).word).toBe(word);
+  });
+
+  changesTheSentence("tells a returning visitor their word was replaced, and by what", async () => {
+    const alice = await arrive();
+    const bob = await arrive();
+    const slot = (await alice.sentence())[0];
+
+    const alices = unused(await alice.sentence());
+    expect(await alice.replace(slot, alices)).toBe(303);
+    const bobs = unused(await bob.sentence());
+    expect(await bob.replace(at(await bob.sentence(), slot.position), bobs)).toBe(303);
+
+    const back = await alice.page("/");
+    const status = traceStatus(back);
+    expect(status, 'no <section>/<aside> with a role="status" trace on return').not.toBeNull();
+    expect(status!.querySelector("del")?.textContent?.trim(), "the replaced word isn't marked removed").toBe(alices);
+    expect(status!.textContent).toContain(bobs);
+    expect(status!.closest("section, aside")!.querySelector("form"), "the trace offers a way to edit").toBeNull();
+    expect(at(slots(back), slot.position).word).toBe(bobs);
   });
 });
