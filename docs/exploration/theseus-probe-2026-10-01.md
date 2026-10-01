@@ -4,6 +4,7 @@
 five people on one laptop running a throwaway local prototype of the Theseus
 mechanic. One of the five was also the facilitator and the project's maker, so
 it isn't independent, and it doesn't support claims about users in general.
+Which of P1–P5 was the maker wasn't recorded.
 
 The prototype was a single local HTML file, outside the app, with the rule
 "replace one word, once". It started with no history. The starting sentence,
@@ -59,9 +60,15 @@ the participant's first `turn_start`.
 | P4 | 6.7s | 12.3s | website | website → sentence |
 | P5 | — | — | — | none |
 
-P1 has three `turn_start` events. The commit came 10 seconds after the second
-one. The log alone doesn't say why the turn was restarted, and no reason is
-assumed here.
+P1 has three `turn_start` events. The 172.5s in the summary is measured from
+the first. In that first stretch P1 selected four different words (two in the
+same second), and opened the input for "people". No replacement was submitted
+there: the prototype logs a draft only when Enter is pressed, and there's
+none.
+After the second `turn_start`, P1 selected "people", typed "strangers" and
+committed within 10 seconds. The third `turn_start` came after P1's commit.
+The log alone doesn't say why the turn was restarted, and no reason is assumed
+here.
 
 ## Direct facts
 
@@ -69,7 +76,6 @@ assumed here.
 - P5 had not committed when the exported log ends.
 - All four changes replaced an original word. No participant replaced another
   participant's word, so reactions to being overwritten were not tested.
-- No questionnaire answers or observation notes were recorded with this run.
 
 The whole sentence at each step, replayed from the log's positions. At every
 commit, the `old` word matched the word at that position at the time:
@@ -80,6 +86,19 @@ commit, the `old` word matched the word at that position at the time:
 3. `Keep a website that strangers would miss when it disappeared.` (P3)
 4. `Keep a sentence that strangers would miss when it disappeared.` (P4)
 
+## What did not happen
+
+The probe plan had three more steps after the turns, and none of them was run:
+
+- **a return round,** in which each participant would see what had become of
+  their word;
+- **a group reveal** of the final sentence and its history;
+- **six written questions.**
+
+The log contains no `return_view` or `reveal` events, and there are no answers
+or observation notes. So nothing here tests how people respond to seeing what
+became of their word, or to any form of history.
+
 ## Against the criteria set before the probe
 
 The probe plan defined "deliberation" in advance: at least one of selecting
@@ -88,9 +107,11 @@ leaving a word unchanged, saying alternatives aloud, or taking 20 seconds or
 more between the first selection and committing. It set "lock the concept" as
 requiring, among other things, that a clear majority deliberated.
 
-Under that fixed definition only P1 deliberated, by selecting four different
-words. P2, P3 and P4 each selected one word and committed within about 10
-seconds of selecting it. **So this run did not meet the pre-set lock
+Under that fixed definition only P1 counts, by selecting four different words.
+But those selections came in a turn that was later restarted, so the log can't
+say whether they were deliberation, exploring the interface, an interruption,
+or something else. P2, P3 and P4 each selected one word and committed within
+about 10 seconds of selecting it. **So this run did not meet the pre-set lock
 criterion.** It is recorded as inconclusive.
 
 **A weakness in the criterion.** It counted long hesitation after selecting a
@@ -103,21 +124,32 @@ probe, not a reason to change this one.
 
 These are readings of the record above, not further observations.
 
-- The one-change rule can produce visible deliberation in at least some cases
-  (P1).
-- Grammar constrained every change into a like-for-like swap: noun for noun,
-  verb for verb, conjunction for conjunction. In this run that kept the sentence
-  coherent.
-- The sentence drifted towards describing itself ("a sentence", "strangers").
-- Each change altered what the other words meant. After P4, P1's "strangers"
-  would miss a sentence, not a website. Looking at one position at a time shows
-  which words a slot has held, but not what the whole sentence said at each
-  step.
+- **This probe doesn't establish that the one-change rule causes
+  deliberation.** P1 is the only participant who meets the pre-set definition,
+  and P1's selections can't be told apart from exploring the interface.
+- **All four successful replacements were like-for-like.** In this small run,
+  each was a grammatical substitution (noun for noun, verb for verb,
+  conjunction for conjunction), and the sentence stayed grammatical. This run
+  can't say whether that generalises: the participants weren't strangers, and
+  the prototype accepted only a single word of letters, apostrophes and
+  hyphens.
+- **One change made the sentence refer to itself** (website → sentence). One
+  word isn't a trend.
+- **A design limitation, found by inspecting the real sequence.** The
+  per-position history could show which words had occupied a slot, but not
+  rebuild the complete sentence a contribution appeared in. After P4, P1's
+  "strangers" would miss a sentence, not a website. The hybrid history that
+  followed, adding earlier whole sentences, is design reasoning prompted by
+  inspecting the probe's state. It is not a user-research finding: no
+  participant was shown any history or asked about it.
 
 ## Not established
 
 - Why P5 did not commit.
-- How anyone reacts when overwritten.
+- That the one-change rule causes deliberation.
+- How anyone reacts when overwritten, or when they see what became of their
+  word.
+- Whether visitors need, or use, whole-sentence history.
 - That people generally care about their word, or that most people deliberate.
 - What happens after much deeper history.
 - Whether coherence would survive more participants.

@@ -1,0 +1,19 @@
+# Output of 'python3 experiments.py' then 'python3 render_all.py', run from this directory
+# (Python 3.14.6, numpy 2.4.6, Pillow 12.3.0). Seeds are fixed, so a re-run reproduces it.
+
+NO RULE (pure noise): {'vert': 0.494, 'horiz': 0.496, 'diag': 0.494, 'comp': 1.055, 'longest_diag': 9, 'distinct_rows': 100}
+k=2 random   dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 5.0, 14) free=(2, 11.0, 16) legal_min=3 legal_med=180.0 near_paralysis(free<=4)=0.008 | vert=0.34 horiz=0.29 diag=0.61 comp=0.99 longest_diag=14.10 distinct_rows=97.75
+k=2 continue dead_runs=0/40 dead_at=[] forced(min,med,max)=(2, 4.0, 8) free=(8, 12.0, 14) legal_min=9 legal_med=237.0 near_paralysis(free<=4)=0.000 | vert=0.29 horiz=0.29 diag=1.00 comp=0.23 longest_diag=16.00 distinct_rows=16.80
+k=2 disrupt  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 0.0, 0) free=(16, 16.0, 16) legal_min=3194 legal_med=3194.0 near_paralysis(free<=4)=0.000 | vert=0.00 horiz=0.30 diag=0.70 comp=0.07 longest_diag=5.60 distinct_rows=2.00
+k=2 default  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 5.0, 16) free=(0, 11.0, 16) legal_min=1 legal_med=233.0 near_paralysis(free<=4)=0.008 | vert=0.34 horiz=0.33 diag=0.99 comp=0.12 longest_diag=16.00 distinct_rows=6.15
+k=3 random   dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 2.0, 11) free=(5, 14.0, 16) legal_min=32 legal_med=5308.0 near_paralysis(free<=4)=0.000 | vert=0.43 horiz=0.39 diag=0.53 comp=1.05 longest_diag=11.55 distinct_rows=99.80
+k=3 continue dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 2.0, 5) free=(11, 14.0, 16) legal_min=677 legal_med=5408.0 near_paralysis(free<=4)=0.000 | vert=0.38 horiz=0.38 diag=1.00 comp=0.23 longest_diag=16.00 distinct_rows=16.52
+k=3 disrupt  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 0.0, 0) free=(16, 16.0, 16) legal_min=21218 legal_med=21218.0 near_paralysis(free<=4)=0.000 | vert=0.00 horiz=0.38 diag=0.62 comp=0.07 longest_diag=4.90 distinct_rows=2.00
+k=3 default  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 4.0, 14) free=(2, 12.0, 16) legal_min=3 legal_med=1705.0 near_paralysis(free<=4)=0.001 | vert=0.49 horiz=0.48 diag=0.70 comp=0.34 longest_diag=15.85 distinct_rows=19.38
+k=4 random   dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 1.0, 7) free=(9, 15.0, 16) legal_min=464 legal_med=20569.0 near_paralysis(free<=4)=0.000 | vert=0.46 horiz=0.44 diag=0.52 comp=1.05 longest_diag=11.10 distinct_rows=99.95
+k=4 continue dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 1.0, 3) free=(13, 15.0, 16) legal_min=5142 legal_med=20569.0 near_paralysis(free<=4)=0.000 | vert=0.44 horiz=0.44 diag=1.00 comp=0.22 longest_diag=16.00 distinct_rows=15.88
+k=4 disrupt  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 0.0, 0) free=(16, 16.0, 16) legal_min=41138 legal_med=41138.0 near_paralysis(free<=4)=0.000 | vert=0.00 horiz=0.44 diag=0.56 comp=0.07 longest_diag=5.08 distinct_rows=2.00
+k=4 default  dead_runs=0/40 dead_at=[] forced(min,med,max)=(0, 3.0, 14) free=(2, 13.0, 16) legal_min=3 legal_med=5536.0 near_paralysis(free<=4)=0.001 | vert=0.59 horiz=0.60 diag=0.74 comp=0.33 longest_diag=15.93 distinct_rows=17.30
+mixed k=2 {'vert': 0.3, 'horiz': 0.3, 'diag': 0.71, 'comp': 0.93, 'longest_diag': 15.85, 'distinct_rows': 80.5}
+mixed k=3 {'vert': 0.39, 'horiz': 0.42, 'diag': 0.64, 'comp': 1.05, 'longest_diag': 14.53, 'distinct_rows': 87.88}
+saved

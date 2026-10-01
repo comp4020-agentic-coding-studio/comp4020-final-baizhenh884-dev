@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Theseus — pre-build test</title>
+<!-- THROWAWAY TEST PROTOTYPE. Starts empty: every word shown during a session was placed by a participant. -->
+<style>
+:root{--paper:#f5f1e8;--ink:#1d1b18;--muted:#6f685d;--mine:#b4441f;--rule:#d9d1c2}
+*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:"Iowan Old Style","Palatino","Georgia",serif;min-height:100vh}
+main{padding:10vh 7vw 6vh;max-width:1200px}
+.s{font-size:clamp(34px,5vw,72px);line-height:1;display:flex;flex-wrap:wrap;column-gap:.32em;row-gap:.35em;align-items:flex-start;margin:0 0 .8em}
+.pos{display:flex;flex-direction:column}
+.w{all:unset;cursor:pointer;line-height:1.05;border-radius:.06em}
+.w:focus-visible,.w.sel{outline:3px solid var(--mine)!important;outline-offset:.08em}
+.w.mine{color:var(--mine)}
+.w[disabled]{cursor:default}
+.under{font-size:max(14px,.26em);line-height:1.25;margin-top:.3em;display:flex;flex-direction:column;white-space:nowrap;color:var(--muted)}
+.under span:nth-child(n+2){font-size:.92em}.under span:nth-child(n+3){font-size:.85em}.under span:nth-child(n+4){font-size:.78em}
+.under .mine{color:var(--mine)}
+input.edit{font:inherit;color:var(--mine);background:transparent;border:0;border-bottom:.05em solid var(--mine);width:5em;padding:0;outline:none}
+.status{font:18px/1.5 -apple-system,Helvetica,sans-serif;color:var(--muted);max-width:42ch;min-height:3em}
+.status b{color:var(--ink)}.status .m{color:var(--mine);font-weight:600}
+.panel{font:18px/1.5 -apple-system,Helvetica,sans-serif;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.btn{font:600 17px/1 -apple-system,Helvetica,sans-serif;padding:12px 18px;border-radius:6px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+.err{color:var(--mine);font:16px -apple-system,Helvetica,sans-serif}
+.handover{min-height:100vh;display:flex;align-items:center;justify-content:center;font:28px -apple-system,Helvetica,sans-serif;color:var(--muted);text-align:center;padding:24px}
+#fac{position:fixed;left:0;right:0;bottom:0;background:#2b2926;color:#eee;font:13px -apple-system,Helvetica,sans-serif;padding:8px 12px;display:none;gap:8px;align-items:center;flex-wrap:wrap}
+#fac.open{display:flex}#fac button,#fac select{font:13px -apple-system,Helvetica,sans-serif}
+#facToggle{position:fixed;right:8px;bottom:8px;font:11px -apple-system,Helvetica,sans-serif;color:#b9b1a4;background:none;border:0;cursor:pointer}
+#log{position:fixed;inset:10vh 10vw;background:#fff;border:1px solid #999;padding:12px;display:none;font:12px/1.4 Menlo,monospace;white-space:pre-wrap;overflow:auto;z-index:5}
+</style>
+<body>
+<div id="app"></div>
+<button id="facToggle" type="button">facilitator</button>
+<div id="fac">
+  <label>Participant <select id="who"></select></label>
+  <button id="bTurn" type="button">Start turn</button>
+  <button id="bReturn" type="button">Return view</button>
+  <button id="bHand" type="button">Hand-over screen</button>
+  <button id="bReveal" type="button">Reveal all</button>
+  <button id="bLog" type="button">Show log</button>
+  <label>Sentence <select id="sent"></select></label>
+  <button id="bReset" type="button">Reset</button>
+</div>
+<div id="log"></div>
+<script>
+const SENTENCES = [
+  "Make a website that people would miss if it disappeared.",
+  "The best part of any day is the first hour.",
+  "We should always keep the promises we make to strangers.",
+];
+const KEY = "theseus-test-v1";
+const now = () => Date.now();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function tokens(sentence) {
+  return sentence.split(" ").map(t => { const m = t.match(/^(.*?)([.,!?;:]*)$/); return { word: m[1], punct: m[2] }; });
+}
+function fresh(si = 0) {
+  return { si, pos: tokens(SENTENCES[si]).map(t => ({ punct: t.punct, hist: [{ word: t.word, by: null, at: null }] })),
+           spent: {}, log: [], mode: "hand", who: "P1", ui: {} };
+}
+let S;
+try { S = JSON.parse(sessionStorage.getItem(KEY)) || fresh(); } catch { S = fresh(); }
+const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+const log = (event, detail = {}) => { S.log.push({ t: now(), p: S.who, event, ...detail }); save(); };
+const cur = i => S.pos[i].hist[S.pos[i].hist.length - 1];
+
+function sentenceHTML({ interactive, full, mineOf }) {
+  const depth = full ? Infinity : 4;
+  const maxDepth = Math.min(depth, Math.max(0, ...S.pos.map(p => p.hist.length - 1)));
+  return S.pos.map((p, i) => {
+    const c = cur(i);
+    const under = p.hist.slice(0, -1).reverse().slice(0, depth)
+      .map(h => `<span class="${mineOf && h.by === mineOf ? "mine" : ""}">${esc(h.word)}</span>`).join("");
+    let head;
+    if (S.ui.editing === i) {
+      head = `<input class="edit" id="edit" autocomplete="off" spellcheck="false" aria-label="Replace ${esc(c.word)}" value="${esc(S.ui.draft || "")}">`;
+    } else {
+      const cls = "w" + (mineOf && c.by === mineOf ? " mine" : "") + (S.ui.sel === i ? " sel" : "");
+      head = `<button class="${cls}" data-i="${i}" ${interactive ? "" : "disabled"}>${esc(c.word)}</button>`;
+    }
+    const lines = maxDepth ? `<span class="under" style="height:${(maxDepth * 1.25).toFixed(2)}em" aria-hidden="true">${S.ui.editing === i ? `<span>${esc(c.word)}</span>` : ""}${under}</span>` : "";
+    return `<span class="pos">${head}${p.punct ? "" : ""}${lines}</span>${p.punct ? `<span aria-hidden="true" style="margin-left:-.3em">${esc(p.punct)}</span>` : ""}`;
+  }).join("");
+}
+
+function statusHTML(p) {
+  const mine = S.spent[p];
+  if (S.ui.confirming) {
+    return `<div class="panel"><span><b>This is your only change.</b> Replace <b>${esc(cur(S.ui.editing).word)}</b> with <span class="m">${esc(S.ui.draft)}</span>?</span>
+      <button class="btn" id="bYes" type="button">Replace it</button><button class="btn ghost" id="bNo" type="button">Not yet</button></div>`;
+  }
+  if (S.ui.editing != null) {
+    return `<div class="panel"><span>Type one word to replace <b>${esc(cur(S.ui.editing).word)}</b>, then press Enter. Esc to leave it.</span></div>${S.ui.err ? `<p class="err">${esc(S.ui.err)}</p>` : ""}`;
+  }
+  if (!mine) {
+    if (S.ui.sel != null) return `<p class="status">Press Enter or click again to replace <b>${esc(cur(S.ui.sel).word)}</b>. Esc to leave it.</p>`;
+    return `<p class="status">You may change one word of this sentence. <b>Once.</b> Anyone may change it after you.</p>`;
+  }
+  const p0 = S.pos[mine.i], idx = p0.hist.findIndex(h => h.by === p && h.at === mine.at);
+  const next = p0.hist[idx + 1];
+  const mins = t => { if (t < 60000) return "less than a minute"; const m = Math.round(t / 60000); return `${m} minute${m === 1 ? "" : "s"}`; };
+  if (!next) return `<p class="status">You changed <span class="m">${esc(mine.old)}</span> to <span class="m">${esc(mine.word)}</span>. It stands.</p>`;
+  return `<p class="status">Your word <span class="m">${esc(mine.word)}</span> stood for <b>${mins(next.at - mine.at)}</b>. Someone replaced it with <b>${esc(next.word)}</b>.</p>`;
+}
+
+function render() {
+  const app = document.getElementById("app");
+  if (S.mode === "hand") { app.innerHTML = `<div class="handover">Please hand the laptop back.</div>`; return; }
+  const interactive = S.mode === "turn" && !S.spent[S.who];
+  const mineOf = S.mode === "reveal" ? null : S.who;
+  const status = S.mode === "reveal" ? "" : statusHTML(S.who);
+  app.innerHTML = `<main><div class="s">${sentenceHTML({ interactive, full: S.mode === "reveal", mineOf })}</div>${status}</main>`;
+  const ed = document.getElementById("edit");
+  if (ed) { ed.focus(); ed.setSelectionRange(ed.value.length, ed.value.length); if (S.ui.confirming) ed.disabled = true; }
+  if (S.ui.sel != null && S.ui.editing == null) document.querySelector(`.w[data-i="${S.ui.sel}"]`)?.focus();
+  if (S.ui.confirming) document.getElementById("bYes")?.focus();
+}
+
+function select(i) {
+  if (S.ui.editing != null) return;
+  if (S.ui.sel === i) return openEdit(i);
+  S.ui.sel = i; log("select", { i, word: cur(i).word }); render();
+}
+function openEdit(i) { S.ui = { sel: i, editing: i, draft: "" }; log("open_input", { i, word: cur(i).word }); render(); }
+function leave() { if (S.ui.editing != null || S.ui.sel != null) log("leave", { i: S.ui.sel }); S.ui = {}; render(); }
+function submitDraft(v) {
+  const word = v.trim();
+  log("draft", { value: word });
+  if (!/^[A-Za-z][A-Za-z'’-]{0,23}$/.test(word)) { S.ui.draft = v; S.ui.err = "One word, letters only."; return render(); }
+  if (word.toLowerCase() === cur(S.ui.editing).word.toLowerCase()) { S.ui.draft = v; S.ui.err = "That’s the word already there."; return render(); }
+  S.ui.draft = word; S.ui.err = null; S.ui.confirming = true; render();
+}
+function commit() {
+  const i = S.ui.editing, old = cur(i), at = now();
+  S.pos[i].hist.push({ word: S.ui.draft, by: S.who, at });
+  S.spent[S.who] = { i, word: S.ui.draft, old: old.word, at };
+  log("commit", { i, old: old.word, new: S.ui.draft, overwrote: old.by || "original" });
+  S.ui = {}; render();
+}
+
+document.addEventListener("click", e => {
+  const w = e.target.closest(".w"); if (w && !w.disabled) return select(+w.dataset.i);
+  if (e.target.id === "bYes") return commit();
+  if (e.target.id === "bNo") { log("not_yet", { value: S.ui.draft }); S.ui.confirming = false; return render(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.id === "edit" && e.key === "Enter") { e.preventDefault(); return submitDraft(e.target.value); }
+  if (e.key === "Escape") { if (S.ui.confirming) { log("not_yet", { value: S.ui.draft }); S.ui.confirming = false; return render(); } return leave(); }
+  if (e.key === "Enter" && e.target.classList?.contains("w") && S.ui.editing == null) { e.preventDefault(); select(+e.target.dataset.i); }
+});
+document.addEventListener("input", e => { if (e.target.id === "edit") S.ui.draft = e.target.value; });
+
+// facilitator controls
+const who = document.getElementById("who"), sent = document.getElementById("sent");
+for (let n = 1; n <= 8; n++) who.add(new Option("P" + n, "P" + n));
+SENTENCES.forEach((s, k) => sent.add(new Option(s.slice(0, 32) + "…", k)));
+who.value = S.who; sent.value = S.si;
+document.getElementById("facToggle").onclick = () => document.getElementById("fac").classList.toggle("open");
+const go = (mode, ev) => { S.who = who.value; S.mode = mode; S.ui = {}; log(ev); render(); document.getElementById("fac").classList.remove("open"); };
+document.getElementById("bTurn").onclick = () => go("turn", "turn_start");
+document.getElementById("bReturn").onclick = () => go("return", "return_view");
+document.getElementById("bHand").onclick = () => { S.mode = "hand"; S.ui = {}; save(); render(); };
+document.getElementById("bReveal").onclick = () => go("reveal", "reveal");
+let armed = false;
+document.getElementById("bReset").onclick = e => {
+  if (!armed) { armed = true; e.target.textContent = "Press again to wipe"; return; }
+  S = fresh(+sent.value); save(); armed = false; e.target.textContent = "Reset"; render();
+};
+document.getElementById("bLog").onclick = () => {
+  const box = document.getElementById("log");
+  if (box.style.display === "block") { box.style.display = "none"; return; }
+  box.textContent = summary(); box.style.display = "block";
+};
+function summary() {
+  const out = [`Sentence: ${SENTENCES[S.si]}`, `Now: ${S.pos.map((p, i) => cur(i).word + p.punct).join(" ")}`, ""];
+  const ps = [...new Set(S.log.map(l => l.p))];
+  for (const p of ps) {
+    const L = S.log.filter(l => l.p === p), start = L.find(l => l.event === "turn_start");
+    if (!start) continue;
+    const s = x => x ? ((x.t - start.t) / 1000).toFixed(1) + "s" : "-";
+    const c = L.find(l => l.event === "commit");
+    out.push(`${p}: first word selected ${s(L.find(l => l.event === "select"))}, committed ${s(c)}`,
+      `   words selected: ${L.filter(l => l.event === "select").map(l => l.word).join(" → ") || "-"}`,
+      `   drafts entered: ${L.filter(l => l.event === "draft").map(l => l.value).join(" → ") || "-"}`,
+      `   "Not yet" pressed: ${L.filter(l => l.event === "not_yet").length}  left a word without changing: ${L.filter(l => l.event === "leave").length}`,
+      `   change: ${c ? `${c.old} → ${c.new} (was ${c.overwrote === "original" ? "an original word" : c.overwrote + "'s word"})` : "none"}`, "");
+  }
+  out.push("History per position (oldest first):");
+  S.pos.forEach((p, i) => out.push(`  ${i + 1}. ` + p.hist.map(h => `${h.word}${h.by ? " [" + h.by + "]" : ""}`).join(" → ")));
+  out.push("", "Raw events:", ...S.log.map(l => `${new Date(l.t).toISOString().slice(11, 19)} ${l.p} ${l.event} ${JSON.stringify(Object.fromEntries(Object.entries(l).filter(([k]) => !["t", "p", "event"].includes(k))))}`));
+  return out.join("\n");
+}
+render();
+</script>
+</body>
+</html>
