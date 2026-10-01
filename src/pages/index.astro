@@ -1,15 +1,19 @@
 ---
-import { currentWords } from "../lib/db";
-import { STARTING_WORDS } from "../lib/sentence";
+import { changeCount, currentPositions, sentenceAt } from "../lib/db";
+import { ensureVisitor } from "../lib/visitor";
 
-// GET / is the current sentence. GET /?at=0 is the starting sentence,
-// read-only; later earlier forms arrive with the history work.
+ensureVisitor(Astro.cookies);
+
+// GET /?at=N: the whole sentence after the first N changes, read-only.
+// GET /: the current sentence, the only one that can be changed.
 const at = Astro.url.searchParams.get("at");
-if (at !== null && at !== "0") {
-  return new Response("Not found", { status: 404 });
+let earlier: string[] | null = null;
+if (at !== null) {
+  earlier = /^[0-9]{1,15}$/.test(at) ? sentenceAt(Number(at)) : null;
+  if (!earlier) return new Response("Not found", { status: 404 });
 }
-const earlier = at === "0";
-const words: readonly string[] = earlier ? STARTING_WORDS : currentWords();
+const current = earlier ? [] : currentPositions();
+const changes = earlier ? 0 : changeCount();
 ---
 
 <!doctype html>
@@ -18,11 +22,40 @@ const words: readonly string[] = earlier ? STARTING_WORDS : currentWords();
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Theseus</title>
+    <style>
+      .sentence form { display: inline; }
+      .sentence label { cursor: text; }
+      .sentence input[name="word"] { width: 0; padding: 0; border: 0; opacity: 0; }
+      .sentence form:focus-within input[name="word"] { width: 8em; opacity: 1; border-bottom: 1px solid; }
+    </style>
   </head>
   <body>
     <main>
-      {earlier && <p>Where the sentence started (read-only).</p>}
-      <p>{words.join(" ")}.</p>
+      {
+        earlier ? (
+          <>
+            <p>An earlier form of the sentence (read-only).</p>
+            <p>{earlier.join(" ")}.</p>
+            <p><a href="/">Back to now</a></p>
+          </>
+        ) : (
+          <>
+            <p class="sentence">
+              {current.map((p) => (
+                <>
+                  <form method="post" action="/replace">
+                    <input type="hidden" name="position" value={p.position} />
+                    <input type="hidden" name="version" value={p.version} />
+                    <label for={`word-${p.position}`}>{p.word}</label>
+                    <input id={`word-${p.position}`} name="word" autocomplete="off" spellcheck="false" required />
+                  </form>{" "}
+                </>
+              ))}.
+            </p>
+            {changes > 0 && <p><a rel="prev" href={`?at=${changes - 1}`}>Earlier</a></p>}
+          </>
+        )
+      }
       <p><a href="/readme/">What this is</a></p>
     </main>
   </body>
