@@ -66,6 +66,43 @@ export function sentenceAt(n: number): string[] | null {
   return words;
 }
 
+// The most recent words each position held before its current one (newest
+// first), for the decorative history beneath each word.
+export function recentPast(limit = 4): Map<number, string[]> {
+  const past = new Map<number, string[]>();
+  const rows = client.prepare("SELECT position, from_word AS word FROM changes ORDER BY id DESC").all() as {
+    position: number;
+    word: string;
+  }[];
+  for (const row of rows) {
+    const list = past.get(row.position) ?? [];
+    if (list.length < limit) past.set(row.position, [...list, row.word]);
+  }
+  return past;
+}
+
+// A visitor's own change, if they've made one: their word, and whether it
+// still stands or what now stands in its place. A later change at the same
+// position means it was replaced, even if the same text came back.
+export type Trace =
+  | { position: number; word: string; standing: true }
+  | { position: number; word: string; standing: false; now: string };
+
+export function traceFor(visitor: string): Trace | null {
+  const mine = client.prepare("SELECT id, position, to_word AS word FROM changes WHERE visitor = ?").get(visitor) as
+    | { id: number; position: number; word: string }
+    | undefined;
+  if (!mine) return null;
+  const later = client.prepare("SELECT 1 FROM changes WHERE position = ? AND id > ?").get(mine.position, mine.id);
+  if (!later) return { position: mine.position, word: mine.word, standing: true };
+  return { position: mine.position, word: mine.word, standing: false, now: wordAt(mine.position) ?? "" };
+}
+
+export function wordAt(position: number): string | null {
+  const row = client.prepare("SELECT word FROM positions WHERE position = ?").get(position) as { word: string } | undefined;
+  return row?.word ?? null;
+}
+
 export type Outcome = "replaced" | "spent" | "stale" | "invalid";
 
 const spentBy = client.prepare("SELECT 1 FROM changes WHERE visitor = ?");

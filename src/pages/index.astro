@@ -1,8 +1,9 @@
 ---
-import { changeCount, currentPositions, sentenceAt } from "../lib/db";
+import Page from "../layouts/Page.astro";
+import { changeCount, currentPositions, recentPast, sentenceAt, traceFor } from "../lib/db";
 import { ensureVisitor } from "../lib/visitor";
 
-ensureVisitor(Astro.cookies);
+const visitor = ensureVisitor(Astro.cookies);
 
 // GET /?at=N: the whole sentence after the first N changes, read-only.
 // GET /: the current sentence, the only one that can be changed.
@@ -13,50 +14,71 @@ if (at !== null) {
   if (!earlier) return new Response("Not found", { status: 404 });
 }
 const current = earlier ? [] : currentPositions();
+const past = earlier ? new Map<number, string[]>() : recentPast();
 const changes = earlier ? 0 : changeCount();
+const trace = earlier ? null : traceFor(visitor);
+const yours = trace?.standing ? trace.position : null;
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Theseus</title>
-    <style>
-      .sentence form { display: inline; }
-      .sentence label { cursor: text; }
-      .sentence input[name="word"] { width: 0; padding: 0; border: 0; opacity: 0; }
-      .sentence form:focus-within input[name="word"] { width: 8em; opacity: 1; border-bottom: 1px solid; }
-    </style>
-  </head>
-  <body>
-    <main>
-      {
-        earlier ? (
-          <>
-            <p>An earlier form of the sentence (read-only).</p>
-            <p>{earlier.join(" ")}.</p>
-            <p><a href="/">Back to now</a></p>
-          </>
-        ) : (
-          <>
-            <p class="sentence">
-              {current.map((p) => (
+<Page title="Theseus">
+  {
+    earlier ? (
+      <>
+        <p>An earlier form of the sentence (read-only).</p>
+        <p class="sentence">{earlier.join(" ")}.</p>
+        <p><a href="/">Back to the sentence now</a></p>
+      </>
+    ) : (
+      <>
+        <p class="sr-only">The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+        <p id="how">
+          Choose one word of the sentence and type a new one in its place. You get one change, and it can't be
+          undone. Anyone after you can change any word, including yours.
+        </p>
+        <div class="sentence">
+          {current.map((p, i) => (
+            <>
+              <div class="pos">
+                <form method="post" action="/replace">
+                  <input type="hidden" name="position" value={p.position} />
+                  <input type="hidden" name="version" value={p.version} />
+                  <label for={`word-${p.position}`}>{p.position === yours ? <mark>{p.word}</mark> : p.word}</label>
+                  <input
+                    id={`word-${p.position}`}
+                    name="word"
+                    aria-describedby="how"
+                    autocomplete="off"
+                    spellcheck="false"
+                    required
+                  />
+                </form>
+                {(past.get(p.position) ?? []).length > 0 && (
+                  <span class="past" aria-hidden="true">
+                    {(past.get(p.position) ?? []).map((w) => <span>{w}</span>)}
+                  </span>
+                )}
+              </div>
+              {i < current.length - 1 && " "}
+            </>
+          ))}.
+        </div>
+        {trace && (
+          <section aria-labelledby="trace-heading">
+            <h2 id="trace-heading">Your trace</h2>
+            <p role="status">
+              {trace.standing ? (
+                <>Your word “{trace.word}” still stands, underlined in the sentence above.</>
+              ) : (
                 <>
-                  <form method="post" action="/replace">
-                    <input type="hidden" name="position" value={p.position} />
-                    <input type="hidden" name="version" value={p.version} />
-                    <label for={`word-${p.position}`}>{p.word}</label>
-                    <input id={`word-${p.position}`} name="word" autocomplete="off" spellcheck="false" required />
-                  </form>{" "}
+                  Your word “<del>{trace.word}</del>” has since been replaced: “{trace.now}” stands in its place now.
                 </>
-              ))}.
+              )}
             </p>
-            {changes > 0 && <p><a rel="prev" href={`?at=${changes - 1}`}>Earlier</a></p>}
-          </>
-        )
-      }
-      <p><a href="/readme/">What this is</a></p>
-    </main>
-  </body>
-</html>
+          </section>
+        )}
+        {changes > 0 && <p><a rel="prev" href={`?at=${changes - 1}`}>Earlier sentence</a></p>}
+      </>
+    )
+  }
+  <p><a href="/readme/">What this is</a></p>
+</Page>

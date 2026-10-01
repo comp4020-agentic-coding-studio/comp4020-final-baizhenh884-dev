@@ -1,0 +1,62 @@
+---
+import Page from "../layouts/Page.astro";
+import { replaceWord, wordAt } from "../lib/db";
+import { visitorId } from "../lib/visitor";
+import { isValidWord } from "../lib/word";
+
+// POST /replace: position, version, word → 303 replaced · 403 already spent ·
+// 409 stale · 422 invalid. A request without a visitor cookie, or with fields
+// that aren't exactly one well-formed value each, is invalid (422). Refusals
+// are full pages at their real status, never redirects.
+if (Astro.request.method !== "POST") return new Response("Not found", { status: 404 });
+
+function field(form: FormData, name: string): string | null {
+  const values = form.getAll(name);
+  return values.length === 1 && typeof values[0] === "string" ? values[0] : null;
+}
+
+let status = 422;
+let now: string | null = null;
+const visitor = visitorId(Astro.cookies);
+let form: FormData | null = null;
+try {
+  form = await Astro.request.formData();
+} catch {
+  form = null;
+}
+const position = form && field(form, "position");
+const version = form && field(form, "version");
+const raw = form && field(form, "word");
+if (visitor && position !== null && /^[0-9]$/.test(position) && version !== null && /^[0-9]{1,15}$/.test(version) && raw !== null) {
+  const word = raw.trim();
+  const outcome = replaceWord(visitor, Number(position), Number(version), word, isValidWord(word));
+  if (outcome === "replaced") return Astro.redirect("/", 303);
+  status = outcome === "spent" ? 403 : outcome === "stale" ? 409 : 422;
+  if (status === 409) now = wordAt(Number(position));
+}
+Astro.response.status = status;
+
+const title =
+  status === 403 ? "Your change is already used" : status === 409 ? "That word just changed" : "That replacement wasn't valid";
+---
+
+<Page title={`${title} · Theseus`}>
+  <p role="alert">
+    {
+      status === 403 ? (
+        <>You've already made your one change, so this one wasn't applied. You can still read the sentence and watch it change.</>
+      ) : status === 409 ? (
+        <>
+          Someone changed that word while you were deciding: it's “{now}” now. Your change wasn't used; you can still
+          make it.
+        </>
+      ) : (
+        <>
+          That replacement wasn't valid, so nothing changed and your change wasn't used. A replacement is one new word,
+          up to 24 characters, with no spaces, different from the word that's there.
+        </>
+      )
+    }
+  </p>
+  <p><a href="/">Back to the sentence</a></p>
+</Page>
