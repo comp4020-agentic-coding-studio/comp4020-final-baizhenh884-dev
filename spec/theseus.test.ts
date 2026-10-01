@@ -122,11 +122,13 @@ const unused = (all: Slot[], length?: number): string => {
 };
 
 // The sentence as a reader sees it: its words in order, separated by any
-// whitespace HTML formatting produces, ending in its full stop. Missing or
+// whitespace HTML formatting produces, ending in its full stop. It may start
+// right after other text with no whitespace between (adjacent block elements
+// render that way), but never partway through a longer word. Missing or
 // reordered words, or a missing full stop, don't match.
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const sentencePattern = (words: string[]) =>
-  new RegExp(`(^|\\s)${words.map(escapeRegExp).join("\\s+")}\\s*\\.`);
+  new RegExp(`(^|[^\\p{L}\\p{N}])${words.map(escapeRegExp).join("\\s+")}\\s*\\.`, "u");
 const showsSentence = (doc: Document, words: string[]) =>
   sentencePattern(words).test(doc.body.textContent ?? "");
 const startingWords = STARTING_SENTENCE.replace(/\.$/, "").split(" ");
