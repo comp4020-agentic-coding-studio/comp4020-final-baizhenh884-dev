@@ -19,11 +19,25 @@ const { title } = Astro.props;
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .sentence { font-size: clamp(1.75rem, 6vw, 3rem); line-height: 1.2; margin: 1.5rem 0; }
       .sentence .pos { display: inline-flex; flex-direction: column; vertical-align: top; max-width: 100%; }
-      .sentence form { display: inline; }
-      .sentence label { cursor: text; }
-      .sentence input[name="word"] { width: 0; padding: 0; border: 0; opacity: 0; font: inherit; font-size: 1rem; }
-      .sentence form:focus-within input[name="word"] { width: min(12em, 80vw); opacity: 1; border-bottom: 2px solid; }
-      .sentence form:focus-within label { outline: 3px solid; outline-offset: 2px; }
+      /* Each word's label and input share one grid cell, so editing happens in
+         the word's own place. The input contributes no width (width: 0) and
+         fills the cell (min-width: 100%), so the cell is exactly the word:
+         nothing shifts when it's focused. */
+      .sentence form { display: inline-grid; max-width: 100%; }
+      .sentence form > label, .sentence form > input[name="word"] { grid-area: 1 / 1; min-width: 0; }
+      .sentence input[name="word"] {
+        width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 2px solid transparent;
+        font: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
+      }
+      .sentence input[name="word"]::placeholder { color: inherit; opacity: 0.35; }
+      .sentence form:focus-within label { visibility: hidden; }
+      .sentence form:focus-within input[name="word"] {
+        opacity: 1; border-bottom-color: currentColor; outline: 3px solid; outline-offset: 3px;
+      }
+      /* Where supported, grow with what's typed rather than scroll within the word. */
+      @supports (field-sizing: content) {
+        .sentence form:focus-within input[name="word"] { field-sizing: content; width: auto; max-width: 80vw; }
+      }
       .sentence .past { font-size: 0.9rem; opacity: 0.6; display: flex; flex-direction: column; }
       mark { background: none; text-decoration: underline 0.08em; text-underline-offset: 0.15em; }
       a:focus-visible, input:focus-visible { outline: 3px solid; outline-offset: 2px; }
