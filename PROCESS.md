@@ -1,8 +1,7 @@
 # Process overview
 
-This file is rewritten at each crit. At Crit 8 so far it records what to build
-and why. The stack and the agent workflow get their own sections when those
-decisions are made; neither has been made yet.
+This file is rewritten at each crit. At Crit 8 it records what I chose to build,
+the evidence behind it, and the architecture, before any app code exists.
 
 ## The harness came first
 
@@ -10,117 +9,129 @@ Before choosing a concept I set up `CLAUDE.md` with process rules only
 ([`bdeaef5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/bdeaef5)):
 plan before building, name which layer a check verifies, never fake evidence,
 and add no design rules until the README had argued for some. The product
-contract now in `CLAUDE.md` comes from the README.
+contract was derived from the README's argument and committed alongside it
+([`deb738a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/deb738a)).
+It was later split into enforced rules and revisable design
+([`59845b9`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/59845b9)).
 
-## Three kinds of evidence
+The evidence below is of three kinds, labelled where it lives:
 
-This account uses three kinds of evidence, and keeps them apart:
+- one real five-person probe;
+- one agent-generated simulation;
+- generated visual and test artefacts, which say nothing about people.
 
-- **Real user evidence:** one five-person probe, with its raw event log, in
-  [`docs/exploration/theseus-probe-2026-10-01.md`](docs/exploration/theseus-probe-2026-10-01.md).
-- **Agent-generated simulation:** the Loom simulation (throwaway, outside the
-  repo), which tested a rule, not people.
-- **Generated visual exploration:** static layout mocks rendered in a browser.
-  The two history comparison sheets in `docs/exploration/` are exactly that,
-  not user evidence. Each panel is labelled as real probe history or synthetic
-  stress-test content.
-
-## Decision: build Theseus
+## Choosing Theseus
 
 **The question.** What could be multi-user, persistent and, by Crit 9,
 real-time, while being a pointed answer to the brief rather than the median
 one, and small enough to ship reliably?
 
-**How I worked on it.** Concept rounds with Claude Code against the live
-brief, rubric and Crit 8–10 specs. I set each round's constraints (later ones
-banned shared-artwork answers), and the agent generated, critiqued and killed
-candidates against them. Cheap tests replaced argument where they could.
+**How I worked.** Concept rounds with Claude Code against the live brief, rubric
+and Crit 8–10 specs. I set each round's constraints (later ones banned
+shared-artwork answers), and the agent generated, critiqued and killed
+candidates against them. Where a claim could be tested cheaply, we tested it.
 
 **Alternatives seriously considered.**
 
 - _Pass the Pen_: a story written a line at a time, each writer seeing only the
-  line before. Reliable, but it's the exquisite corpse. The idea wasn't mine,
-  which capped how surprising the response could be.
+  line before. Reliable, but it's the exquisite corpse, which capped how
+  surprising it could be.
 - _Loom_: one cloth, a row per visitor, with the rows above constraining the
-  next through a float limit borrowed from weaving, in the hope that richness
-  would come from the rule. _Simulation_ (16 threads, 100 rows, three rule
-  variants, four simulated behaviours) said otherwise. Random weavers made a
-  cloth that compressed like noise, typically only 2 of 16 squares were
-  inherited, and patterns needed deliberate design. Each row's colour
-  dominated, so it read as "everyone adds a stripe". Its defining mechanism
-  didn't support its claim, so I dropped it.
+  next. A reproducible _simulation_ (`docs/exploration/loom/`,
+  [`0672722`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/0672722))
+  showed the proposed rule mostly made noise. Typically only 2 of 16 squares
+  were inherited, and pattern appeared only when simulated weavers designed
+  it. Its defining mechanism didn't support its claim.
 - _Question Toll_: ask a stranger one question after answering one. Strong
-  personal pull, but every exchange is private and one-to-one, with nothing
-  publicly browsable for a crit or a showcase room.
+  personal pull, but private and one-to-one, with nothing publicly browsable
+  for a crit or a showcase room.
 
-**Why Theseus.** One rule a stranger gets in seconds. The whole object is
-public. Its history comes free with the mechanic, because replacing a word
-leaves the old one behind. Crit 8 is tiny. And Crit 9 turns each replacement
-into something other people watch happen.
-
-**What the first mocks showed.** _Visual exploration_ with labelled fake
-history: the "palimpsest", with a few replaced words beneath each position,
-held up at desktop and phone widths after one revision. That shows a layout can
-look intentional, not that anyone will care.
+**Why Theseus.** One rule a stranger gets in seconds, on a public object whose
+history comes free: replacing a word leaves the old one behind. Crit 8 stays
+small, and Crit 9 turns each replacement into something others watch happen.
 
 **A correction before testing.** I'd been treating "people will care about
-their word" as the thing to prove, but the product shouldn't depend on it. The
-position is one small, irreversible act of influence over a public object, then
-loss of control. Attachment is something to watch, not a success condition.
+their word" as the thing to prove. The product shouldn't depend on it. The
+position became: one small, irreversible act of influence over a public object,
+then loss of control.
 
-## The probe, and what it changed
+## The probe
 
-_Real user evidence_, small: five people, one of them me, taking turns on a
-throwaway local prototype. Four changed a word; the fifth hadn't committed when
-the log ends, for reasons not recorded. Every change replaced an original word,
-so overwriting remains untested. "Make a website that people would miss if it
-disappeared." became "Keep a sentence that strangers would miss when it
-disappeared."
+_Real user evidence_, small and not independent: five people, one of them me,
+taking turns on a throwaway prototype (the prototype, raw log and record are
+all in `docs/exploration/`). Four changed a word; the fifth hadn't committed
+when the log ends. Every change replaced an original word, so overwriting was
+never tested. The planned return round, reveal and written questions were not
+run.
 
 **Inconclusive under its own rules.** I fixed a "lock" criterion before the
-test: a clear majority had to deliberate, by a stated definition. Only one of
-five did. Two others waited about 50 seconds before selecting anything, but the
-definition only counted time after selecting, so they don't count, and I
-haven't redefined it after the fact. That's a flaw in the method to fix next
-time, not a reason to change this result.
+test: a clear majority had to deliberate, by a stated definition. Only P1
+qualified, and P1's turn was restarted mid-way, so the log can't separate
+deliberation from exploring the interface. The probe doesn't establish that the
+rule causes deliberation, and I haven't redefined the criterion after the fact.
+A review of the evidence narrowed my first write-up of these claims
+([`0672722`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/0672722)).
 
-**What it exposed.** Two things I hadn't focused on:
-
-- Grammar channels every change: all four were like-for-like swaps. That kept
-  the sentence coherent, and it also caps what anyone can say. I'm keeping it
-  as the concept's deliberate cost.
-- Each change altered what the other words meant. After the fourth change, the
-  first person's "strangers" would miss a sentence, not a website. The
-  per-position history showed what each slot had held, but not what the whole
-  sentence said at each step. For "influence, not ownership", that matters:
-  you can only see what your word did if you can read the sentence it was in.
-
-**What changed: the history model.** I mocked three options on the probe's real
-history, plus a labelled synthetic stress test. Time-aligned columns couldn't
-wrap and overflowed at every width. Stacked earlier sentences read clearly with
-four changes but became a changelog of near-identical lines with many. The
-hybrid is now the design: the palimpsest by default, plus stepping back through
-earlier whole sentences, one at a time and read-only (README claim 4, and the
-`CLAUDE.md` contract).
-
-**Reconsidered after the probe.** _Story Bottles_, stories drifting between
-strangers a sentence at a time, would loosen the grammar limit. But it's
-collaborative storytelling again, with private hand-offs, free-text moderation
-and a larger Crit 8. I kept Theseus.
+**What inspecting it prompted.** All four changes in this run were like-for-like
+swaps, which kept the sentence grammatical. That says nothing beyond this run.
+Replaying the sequence also showed a limit in my design: the words beneath each
+position recorded what a slot had held, but not the whole sentence a
+contribution sat in. After the fourth change, the first person's "strangers"
+would miss a sentence, not a website. So I added stepping back through earlier
+whole sentences, compared in mocks that use the probe's real history
+([`2961c2c`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/2961c2c)).
+That is design reasoning prompted by the probe's state, not a user-research
+finding. I then reconsidered a looser alternative, _Story Bottles_, but it was
+collaborative storytelling again, so I kept Theseus.
 
 ## The starting sentence
 
 "Make a website that people would miss if it disappeared." Ten replaceable
-words, readable without knowing the course, and nearly every position flips
-the meaning. It asks the brief's question, what makes a website worth having,
-without the jargon. The brief's own line ("Make a multi-user, real-time
-website that's good") was considered, but its hyphens and contraction make
-"one word" ambiguous.
+words, readable without the course, and nearly every position flips the
+meaning. The brief's own line was considered, but its hyphens and contraction
+make "one word" ambiguous.
+
+## Stack and architecture
+
+**Decision.** The course-taught Week 7 stack: Astro server-rendered pages on
+`@astrojs/node`, SQLite through `better-sqlite3` on the Fly volume, Drizzle for
+the schema and migrations, and the replacement as one raw-SQL transaction.
+Plain HTML forms with Post/Redirect/Get, and no client framework.
+
+**Why.** Its Docker and Fly shape is already proven, so the risk sits in the
+product, not the plumbing. Astro escapes text by default, which matters when
+every word is a stranger's. `/readme/` renders natively. And the Week 7
+server-sent-events pattern gives Crit 9 a path without replacing anything
+built now.
+
+**Alternatives.** A plain Node server had a smaller dependency surface, but
+escaping, cookies and rendering would be mine to hand-write and get right.
+Node's built-in SQLite needs no native build, but isn't yet stable. I chose
+known over small.
+
+**The contract before the stack.** I wrote the HTTP checks before any framework
+code
+([`199ff8c`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/199ff8c)),
+and they fail against the placeholder by design. Writing them forced the
+contract into the open: routes, fields, status codes. Before committing, I had
+the checks themselves tested. A review found that the first draft would pass
+an app with one version for the whole sentence, where any change anywhere
+makes every open form stale. That made per-position versions an explicit
+requirement, with a check of its own. A throwaway stub of the contract passes
+the final checks, and each deliberately broken rule fails the check written
+for it (`docs/exploration/spec-validation/`, in
+[`0672722`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/0672722)).
+
+**Testing production differently.** The checks that change the sentence run
+only against disposable local and CI databases, which are never user evidence.
+Run against the live site, they'd write made-up visitor words into the real
+public sentence. So there they skip themselves, and the same behaviour is
+verified by hand, as a real visitor, and recorded as observation.
 
 ## The trade-off
 
 I accept a minimal interaction, a page that leans on typography and its own
 history, a grammar that limits what each person can say, and a small individual
 act. In return: one mechanic, a public object that visibly changes, low
-implementation risk, and one rule running from README through `CLAUDE.md` and
-`spec/` to the app.
+implementation risk, and one rule running from the README through `CLAUDE.md`
+and `spec/` to the app.

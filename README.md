@@ -44,10 +44,10 @@ claimed.
 
 Replaced words stay beneath their position, a few at a time and fading, so the
 sentence deepens as it's used. You can also step back through its earlier
-whole forms, one at a time. No names, no times for others' changes, no counts,
-no activity stream; only you see which word was yours. `ENFORCED` for what's
-never shown; `JUDGED` for whether the layers read as depth rather than
-clutter.
+whole forms, one at a time. No names, no times for others' changes, no counts
+or scores on the page, no activity stream; only you see which word was yours.
+`ENFORCED` by the server for what's never shown; `JUDGED` for whether the
+layers read as depth rather than clutter.
 
 ## What I looked at
 
@@ -65,9 +65,9 @@ clutter.
   is enough.
 - **A five-person probe**
   ([record](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/exploration/theseus-probe-2026-10-01.md)),
-  small, and I was one of the five. Every change was a like-for-like swap, and
-  the words beneath each position couldn't show what the whole sentence said at
-  each step, which is why earlier forms exist.
+  small, and I was one of the five. Inspecting its state showed the words
+  beneath each position can't recover what the whole sentence said, so earlier
+  forms exist.
 
 These shaped the decisions; they don't prove them.
 
@@ -75,8 +75,7 @@ These shaped the decisions; they don't prove them.
 
 No accounts, profiles or nicknames; no chat, comments, likes or reactions; no
 second sentence or rooms; no scores, feed, editing or undo; no fake visitors;
-no live updates until Crit 9. There's no user-facing moderation in Crit 8.
-Before the public showcase, the project needs a minimal, exceptional recovery
-path for harmful public content, outside the ordinary interaction and giving
-nobody ownership of words. Leaving all this out keeps the one rule the whole
-experience.
+no live updates until Crit 9. There's no user-facing moderation; before the
+public showcase, harmful content will need a minimal, maker-only recovery path
+that gives nobody ownership of words. Leaving all this out keeps the one rule
+the whole experience.
