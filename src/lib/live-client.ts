@@ -127,9 +127,27 @@ export function attach(doc: Document): LivePage {
     else show(slot);
   }
 
+  // the trace GET / renders after the sentence, for a page that loaded
+  // before this visitor had made their change
+  function createTrace(): Element | null {
+    const sentence = slots.values().next().value?.form.closest(".sentence");
+    if (!sentence) return null;
+    const section = doc.createElement("section");
+    section.setAttribute("aria-labelledby", "trace-heading");
+    const heading = doc.createElement("h2");
+    heading.id = "trace-heading";
+    heading.textContent = "Your trace";
+    const status = doc.createElement("p");
+    status.setAttribute("role", "status");
+    section.append(heading, status);
+    sentence.after(section);
+    return status;
+  }
+
   function renderTrace(): void {
-    const status = doc.querySelector('section[aria-labelledby="trace-heading"] [role="status"]');
-    if (!status || !trace || !traceChanged) return;
+    if (!trace || !traceChanged) return;
+    const status = doc.querySelector('section[aria-labelledby="trace-heading"] [role="status"]') ?? createTrace();
+    if (!status) return;
     traceChanged = false;
     if (trace.standing) {
       status.textContent = `Your word “${trace.word}” still stands, underlined in the sentence above.`;
