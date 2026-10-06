@@ -35,7 +35,7 @@ const yours = trace?.standing ? trace.position : null;
       </>
     ) : (
       <>
-        <p class="sr-only">The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+        <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
         <p id="how">
           Choose one word of the sentence and type a new one in its place. You get one change, and it can't be
           undone. Anyone after you can change any word, including yours.
@@ -83,6 +83,21 @@ const yours = trace?.standing ? trace.position : null;
           </section>
         )}
         {changes > 0 && <p><a rel="prev" href={`?at=${changes - 1}`}>Earlier sentence</a></p>}
+        <script>
+          // Only the current sentence goes live; earlier forms never load this.
+          import { attach, parseChange, parseSnapshot } from "../lib/live-client";
+
+          const page = attach(document);
+          const events = new EventSource("/events");
+          events.addEventListener("snapshot", (e) => {
+            const snapshot = parseSnapshot(e.data);
+            if (snapshot) page.applySnapshot(snapshot);
+          });
+          events.addEventListener("change", (e) => {
+            const change = parseChange(e.data);
+            if (change) page.applyChange(change);
+          });
+        </script>
       </>
     )
   }
