@@ -1,6 +1,7 @@
 ---
 import Page from "../layouts/Page.astro";
 import { replaceWord, wordAt } from "../lib/db";
+import { broadcast } from "../lib/live";
 import { visitorId } from "../lib/visitor";
 import { isValidWord } from "../lib/word";
 
@@ -30,7 +31,12 @@ const raw = form && field(form, "word");
 if (visitor && position !== null && /^[0-9]$/.test(position) && version !== null && /^[0-9]{1,15}$/.test(version) && raw !== null) {
   const word = raw.trim();
   const outcome = replaceWord(visitor, Number(position), Number(version), word, isValidWord(word));
-  if (outcome === "replaced") return Astro.redirect("/", 303);
+  if (outcome === "replaced") {
+    // the transaction only succeeds by moving this position from `version` to
+    // `version + 1`; announced in the same turn as the commit
+    broadcast({ position: Number(position), word, version: Number(version) + 1 });
+    return Astro.redirect("/", 303);
+  }
   status = outcome === "spent" ? 403 : outcome === "stale" ? 409 : 422;
   if (status === 409) now = wordAt(Number(position));
 }
