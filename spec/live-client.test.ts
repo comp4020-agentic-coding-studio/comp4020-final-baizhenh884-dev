@@ -312,6 +312,48 @@ describe("live page reconciliation", () => {
       expect(status.textContent, "the trace still names a word that's gone").not.toContain(bobs);
     });
 
+    // The same visitor with two tabs open: they make their change in the other
+    // one, so this page loaded with no trace at all.
+    localOnly("creates the trace when a snapshot first brings one, as GET / would render it", async () => {
+      const ann = await arrive();
+      const doc = await ann.page("/");
+      expect(traceStatus(doc), "a visitor who hasn't changed anything has a trace").toBeNull();
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      expect(traceStatus(doc), "a snapshot with no trace created one").toBeNull();
+
+      const mine = positionsOf(doc)[0];
+      const anns = fresh();
+      expect(await ann.replace(mine, anns)).toBe(303); // in the other tab
+      const positions = positionsOf(doc).map((p) =>
+        p.position === mine.position ? { ...p, word: anns, version: p.version + 1 } : p,
+      );
+      page.applySnapshot({ positions, trace: { position: mine.position, word: anns, standing: true } });
+
+      // what GET / renders for ann now is the model
+      const served = await ann.page("/");
+      const section = (d: Document) => traceStatus(d)?.closest("section, aside") ?? null;
+      const text = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+      expect(section(doc), "the snapshot's trace didn't create a trace on the page").not.toBeNull();
+      expect(text(section(doc))).toBe(text(section(served)));
+      expect(section(doc)!.getAttribute("aria-labelledby")).toBe(section(served)!.getAttribute("aria-labelledby"));
+      expect(slot(doc, mine.position).label.querySelector("mark")?.textContent, "the standing word isn't marked").toBe(anns);
+      const after = (a: Node, b: Node) => (a.compareDocumentPosition(b) & doc.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      expect(after(doc.querySelector(".sentence")!, section(doc)!), "the trace isn't after the sentence").toBe(true);
+      expect(after(section(doc)!, doc.querySelector('a[href="/readme/"]')!), "the trace isn't before the page's links").toBe(true);
+      const earlierLink = doc.querySelector('a[rel~="prev"]');
+      if (earlierLink) expect(after(section(doc)!, earlierLink), "the trace isn't before the Earlier link").toBe(true);
+
+      page.applyChange({ position: mine.position, word: MARKUP, version: mine.version + 2 });
+
+      const status = traceStatus(doc)!;
+      expect(status.querySelector("del")?.textContent?.trim(), "the created trace didn't turn replaced").toBe(anns);
+      expect(status.textContent).toContain(MARKUP);
+      expect(slot(doc, mine.position).label.querySelector("mark")).toBeNull();
+      expect(doc.querySelector("x-theseus"), "a word became markup").toBeNull();
+      expect(doc.querySelectorAll('section [role="status"], aside [role="status"]').length, "more than one trace").toBe(1);
+    });
+
     localOnly("brings the trace up to date from a reconnect snapshot", async () => {
       const ann = await arrive();
       const mine = positionsOf(await ann.page("/"))[0];
