@@ -343,6 +343,64 @@ describe("Theseus realtime", () => {
     });
   });
 
+  // The same visitor in two tabs: change events carry no trace, so an open
+  // stream learns its own visitor's trace from a fresh snapshot, sent only to
+  // that connection whenever its trace changes.
+  localOnly("keeps an open stream's own trace current when it changes elsewhere", async () => {
+    const ann = await arrive();
+    const stream = await connect(ann);
+    expect((await stream.snapshot()).trace, "ann hasn't changed anything yet").toBeNull();
+    const opening = stream.frames[0];
+    const refreshed = (standing: boolean) => (f: Frame) =>
+      f !== opening && f.event === "snapshot" && (f.data as Snapshot)?.trace?.standing === standing;
+
+    // ann's own change, from another tab: same cookie, another request
+    const before = await ann.sentence();
+    const mine = before[0];
+    const anns = unused(before);
+    expect(await ann.replace(mine, anns)).toBe(303);
+    await stream.waitFor(changeAt(mine.position, mine.version + 1), LIVE_MS, "change event for ann's replacement");
+    const standing = asSnapshot(
+      (await stream.waitFor(refreshed(true), LIVE_MS, "snapshot bringing ann's own new trace")).data,
+    );
+    expect(standing.trace).toEqual({ position: mine.position, word: anns, standing: true });
+    expect([...standing.positions].sort((a, b) => a.position - b.position), "the snapshot isn't current truth").toEqual(
+      await ann.sentence(),
+    );
+
+    // someone else replaces ann's word
+    const bob = await arrive();
+    const now = await bob.sentence();
+    const bobs = unused(now);
+    expect(await bob.replace(at(now, mine.position), bobs)).toBe(303);
+    const replaced = asSnapshot(
+      (await stream.waitFor(refreshed(false), LIVE_MS, "snapshot saying ann's word was replaced")).data,
+    );
+    expect(replaced.trace).toEqual({ position: mine.position, word: anns, standing: false, now: bobs });
+    expect(at(replaced.positions, mine.position)).toEqual(at(await ann.sentence(), mine.position));
+  });
+
+  // Passes before and after the refresh exists: it guards against sending
+  // one for every change.
+  localOnly("sends no extra snapshot for a change that leaves the stream's own trace alone", async () => {
+    const ann = await arrive();
+    const before = await ann.sentence();
+    expect(await ann.replace(before[0], unused(before))).toBe(303);
+    const stream = await connect(ann);
+    expect((await stream.snapshot()).trace).not.toBeNull();
+
+    const elsewhere = (await ann.sentence())[1];
+    const carol = await arrive();
+    expect(await carol.replace(elsewhere, unused(await carol.sentence()))).toBe(303);
+    // a later change, so anything sent for carol's would have arrived first
+    const dave = await arrive();
+    const last = at(await dave.sentence(), elsewhere.position);
+    expect(await dave.replace(last, unused(await dave.sentence()))).toBe(303);
+    await stream.waitFor(changeAt(last.position, last.version + 1), LIVE_MS, "dave's change");
+
+    expect(stream.frames.filter((f) => f.event === "snapshot").length, "a change elsewhere sent another snapshot").toBe(1);
+  });
+
   // The proof is the ordering on the server (subscribe, then read SQLite, with
   // nothing in between); these trials only exercise it under whatever
   // interleavings happen to occur.
