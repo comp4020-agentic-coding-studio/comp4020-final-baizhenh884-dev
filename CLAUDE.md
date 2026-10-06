@@ -14,7 +14,7 @@ from what `README.md` argues "good" means (see "Product contract").
   shared-cpu-1x machine with 256 MB, one volume at `/data` (the only storage
   that survives a restart or redeploy), HTTP on `0.0.0.0:$PORT`, and `/readme/`
   publishing all of `README.md` in the HTML the server sends.
-- Current deliverable: Crit 8, "It's alive!". Crits 9 and 10 and the final
+- Current deliverable: Crit 9, "All at once". Crit 10 and the final
   submission run in this same repo.
 
 ## Start of every task
@@ -29,14 +29,17 @@ from what `README.md` argues "good" means (see "Product contract").
   this file: update, generalise or remove what no longer applies (through
   "Maintaining this file").
 
-## Scope (Crit 8)
+## Scope (Crit 9)
 
 - Build the smallest slice that satisfies the current crit's spec — no more.
   Don't add a feature because it's easy to build, and don't add speculative
   ones.
-- Keep a path open to multi-user and real-time (crit 9): don't pick a design,
-  such as state held only in the browser or only in server memory, that would
-  have to be thrown away to add them.
+- Realtime covers only what the current page (`GET /`) shows about the
+  current sentence: the words, the visitor's own trace, and the link to the
+  immediately previous whole sentence. Nothing else goes live: no presence,
+  no online/visitor counts, no activity or change feed, no chat, no rooms.
+  Catch-up after a disconnect is a fresh read from SQLite, never a replay
+  log, a queue, or any durable pub/sub.
 
 ## Stack
 
@@ -47,6 +50,8 @@ from what `README.md` argues "good" means (see "Product contract").
 - Plain HTML forms and Post/Redirect/Get. No React or other SPA, no Hono, no
   WebSockets, no external APIs, and client JavaScript only where a rule needs
   it.
+- Server-Sent Events is the realtime transport from Crit 9 on — still no
+  WebSockets, still no client framework.
 - The database file lives on the volume, at `/data/theseus.db` in production,
   set explicitly rather than by a default. In production the app refuses to
   start if `/data` is missing. Local databases stay in a gitignored directory
@@ -110,10 +115,11 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 
 ## Evidence integrity
 
-- `pnpm check:evidence` starts red (no reflection, template `PROCESS.md`), and
-  CI gates the deploy on it once the repo is public. It goes green only when
-  `reflections/crit-8.md` and `PROCESS.md` hold real accounts of real work.
-  Never create a placeholder or stub to make it, CI or any rubric check pass.
+- CI gates the deploy on `pnpm check:evidence`. It passes once `PROCESS.md`
+  and any one crit reflection exist, so it can't tell which crit's file is
+  there: before each cutoff, confirm that crit's own reflection
+  (`reflections/crit-9.md` now) exists and holds a real account. Never create
+  a placeholder or stub to make it, CI or any rubric check pass.
 - Never fabricate user testing, research, sources, observations, command
   output, failures, deployment results or design rationale. If something
   wasn't done, say so.
@@ -194,8 +200,31 @@ What the code must hold to. The README says why; don't restate it here.
   before it's built.
 - No editing, undo, reactions, profiles, nicknames, feeds, scores or second
   sentence without an explicit product decision recorded first.
-- Every rule above is enforced on the server. The page may mirror a rule but is
-  never its only enforcement.
+- A successful replacement reaches every other connected open view of the
+  current sentence (`GET /`) within about a second, without a reload. After a
+  dropped connection reconnects, that view catches up automatically to
+  current truth without a manual reload. What that view shows about the
+  current sentence stays true: the words, the visitor's own trace, and the
+  link to the immediately previous whole sentence. The one exception is a
+  position holding the visitor's unsubmitted draft: it shows that the word
+  changed, while the draft and the version it was based on stay as they
+  were.
+- Historical `?at=N` views never update live and never subscribe to realtime
+  behaviour.
+- Realtime delivery is presentation only: SQLite remains the sole source of
+  truth, server memory holds no authoritative sentence state, and the
+  existing per-position version/stale-check and one-change-per-visitor rules
+  are never bypassed, weakened, or duplicated by the realtime channel. No
+  automatic event rebases a draft onto a newer version; if it's submitted,
+  the existing stale rule applies exactly as before.
+- No presence, online/visitor counts, visitor identity, or activity/change
+  feed is added for realtime; the existing no-who/when/counts rule extends to
+  whatever the realtime channel carries.
+- The realtime layer never weakens an existing server-enforced product rule.
+  Existing server-side validation, persistence and output-safety guarantees
+  remain authoritative; stale, invalid or second replacements continue to be
+  refused by the server. Realtime presentation and navigation behaviour are
+  page-side only and never override those server guarantees.
 
 ### Current design (revisable)
 
@@ -206,10 +235,15 @@ hold.
   four), receding, hidden from screen readers.
 - Earlier whole sentences, reached one step at a time (Earlier / Later / Now),
   one on screen at once and never listed together.
-- Not in Crit 8: an "as you left it" jump, a client-side confirmation step, and
-  showing how long a word stood. Each change still records when it happened,
-  for logging; that time is never shown to other visitors.
+- Not built (as of Crit 9): an "as you left it" jump, a client-side
+  confirmation step, and showing how long a word stood. Each change still
+  records when it happened, for logging; that time is never shown to other
+  visitors.
 - The visual treatment (fading, layout) is judged, not specified.
+- A position that changed elsewhere while a visitor has an unsubmitted draft
+  there shows an inert notice of the new word, without touching the draft or
+  its expected version; the draft is only reconciled once the visitor clears
+  it themselves or reloads.
 
 ## Stop and ask
 
