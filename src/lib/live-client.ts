@@ -111,7 +111,7 @@ export function attach(doc: Document): LivePage {
       slot.notice.className = "changed";
       slot.form.after(slot.notice);
     }
-    slot.notice.textContent = `now “${slot.latest.word}”`;
+    slot.notice.textContent = `changed to “${slot.latest.word}”`;
   }
 
   // the one rule for every update: only a newer version counts

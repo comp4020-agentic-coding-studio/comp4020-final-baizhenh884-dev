@@ -30,15 +30,15 @@ const yours = trace?.standing ? trace.position : null;
         <nav class="history" aria-label="Earlier forms of the sentence">
           {n > 0 && <a rel="prev" href={`?at=${n - 1}`}>Earlier sentence</a>}
           {n + 1 < changes && <a rel="next" href={`?at=${n + 1}`}>Later sentence</a>}
-          <a rel={n + 1 === changes ? "next" : undefined} href="/">Back to the sentence now</a>
+          <a rel={n + 1 === changes ? "next" : undefined} href="/">Back to now</a>
         </nav>
       </>
     ) : (
       <>
         <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
         <p id="how">
-          Choose one word of the sentence and type a new one in its place. You get one change, and it can't be
-          undone. Anyone after you can change any word, including yours.
+          Choose one word and type one replacement word. Press Enter to send it. You get one change, and it can't
+          be undone. Anyone after you can change any word, including yours.
         </p>
         <div class="sentence">
           {current.map((p, i) => (
@@ -101,5 +101,5 @@ const yours = trace?.standing ? trace.position : null;
       </>
     )
   }
-  <p><a href="/readme/">What this is</a></p>
+  <p><a href="/readme/">About Theseus</a></p>
 </Page>
