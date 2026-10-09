@@ -37,8 +37,8 @@ const yours = trace?.standing ? trace.position : null;
       <>
         <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
         <p id="how">
-          Choose one word and type one replacement word. Press Enter to send it. You get one change, and it can't
-          be undone. Anyone after you can change any word, including yours.
+          Tap or click one word, type its replacement, and press Enter. You get one change, and it can't be
+          undone. Anyone after you can change any word, including yours.
         </p>
         <div class="sentence">
           {current.map((p, i) => (

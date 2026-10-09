@@ -53,8 +53,19 @@ const { title } = Astro.props;
         width: 0; min-width: 100%; margin-top: 0.5rem; /* clears the focus outline */
       }
       .sentence .past > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
-      /* someone else changed this word while you were typing a draft for it */
-      .sentence .changed { font-size: 0.9rem; font-style: italic; margin-top: 0.5rem; } /* clears the focus outline */
+      /* Someone else changed this word while you were typing a draft for it.
+         The notice keeps one line of height in its word's column (so it never
+         covers the row below) but no width, so the sentence never re-flows;
+         its line runs on over neighbouring faded past words, on the page's
+         own colour. The client keeps it inside the sentence's width. */
+      .sentence .changed {
+        font-size: 0.9rem; font-style: italic; margin-top: 0.5rem; /* clears the focus outline */
+        width: 0; min-width: 100%; white-space: nowrap;
+      }
+      .sentence .changed > span {
+        display: inline-block; vertical-align: top; position: relative; z-index: 1;
+        padding-right: 0.4em; background: Canvas; overflow: hidden; text-overflow: ellipsis;
+      }
       mark { background: none; text-decoration: underline 0.08em; text-underline-offset: 0.15em; }
       a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
       a:hover { text-decoration-thickness: 2px; }

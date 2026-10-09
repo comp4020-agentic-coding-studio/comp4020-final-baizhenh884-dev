@@ -109,10 +109,30 @@ export function attach(doc: Document): LivePage {
     if (!slot.notice) {
       slot.notice = doc.createElement("span");
       slot.notice.className = "changed";
+      slot.notice.append(doc.createElement("span"));
       slot.form.after(slot.notice);
     }
-    slot.notice.textContent = `changed to “${slot.latest.word}”`;
+    slot.notice.firstElementChild!.textContent = `changed to “${slot.latest.word}”`;
+    keepInside(slot.notice);
   }
+
+  // The notice's one line starts under its word and may run past it, but
+  // never past the sentence's right edge: near the edge it shifts left.
+  function keepInside(notice: HTMLElement): void {
+    const line = notice.firstElementChild as HTMLElement | null;
+    const bounds = notice.closest(".sentence")?.getBoundingClientRect();
+    if (!line || !bounds || bounds.width === 0) return;
+    line.style.transform = "";
+    line.style.maxWidth = `${bounds.width}px`;
+    const box = line.getBoundingClientRect();
+    const over = Math.min(box.right - bounds.right, box.left - bounds.left);
+    if (over > 0) line.style.transform = `translateX(${-over}px)`;
+  }
+
+  const keepAllInside = () => {
+    for (const slot of slots.values()) if (slot.notice) keepInside(slot.notice);
+  };
+  doc.defaultView?.addEventListener("resize", keepAllInside);
 
   // the one rule for every update: only a newer version counts
   function offer(change: Position): void {
@@ -196,6 +216,7 @@ export function attach(doc: Document): LivePage {
       if (event.target !== slot.input || hasDraft(slot) || !slot.notice) continue;
       if (slot.latest.version > shownVersion(slot)) show(slot);
     }
+    keepAllInside(); // typing can move words, and the notices under them
   });
 
   return {
