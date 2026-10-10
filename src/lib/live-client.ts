@@ -78,7 +78,7 @@ export type Options = {
   onLatest?: (change: Position) => void;
 };
 
-export function attach(doc: Document, _options: Options = {}): LivePage {
+export function attach(doc: Document, options: Options = {}): LivePage {
   const slots = new Map<number, Slot>();
   for (const form of doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')) {
     const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
@@ -145,6 +145,7 @@ export function attach(doc: Document, _options: Options = {}): LivePage {
     const slot = slots.get(change.position);
     if (!slot || change.version <= slot.latest.version) return;
     slot.latest = { ...change };
+    options.onLatest?.({ ...change });
     if (trace && trace.position === change.position) {
       trace = { position: trace.position, word: trace.word, standing: false, now: change.word };
       traceChanged = true;
