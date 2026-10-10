@@ -41,6 +41,30 @@ from what `README.md` argues "good" means (see "Product contract").
   Catch-up after a disconnect is a fresh read from SQLite, never a replay
   log, a queue, or any durable pub/sub.
 
+## Scope (Final Project: House integration)
+
+The Final Project deliberately pivots to the House of Theseus (Prototypes 5–6,
+local evidence in `/tmp/theseus-house/NOTES.md`). On this branch only, until it
+is merged, this section supersedes the Crit 9 "smallest slice" rule above for
+the house itself; the Crit 9 realtime limits still hold.
+
+- The house is a second, deterministic representation of the same sentence:
+  the forms, `/replace`, the HTTP contract and every existing test are
+  unchanged, and the sentence stays usable without the house or without JS.
+- Ten fixed territories, one per position; each word's written form (the
+  frozen features, with length graded continuously and saturating near 14
+  letters) gives its territory's character. Never by meaning.
+- `three` is the one client rendering library, bundled by Vite. Client
+  JavaScript may render, select and animate the house; it never decides a
+  replacement.
+- The house is never stored: SQLite keeps only the sentence and its history,
+  and an earlier form's body is built from that earlier sentence alone.
+- No preview: typing a replacement never changes the house; the new body
+  appears only after the server accepts the change.
+- Red means only "this body is being rebuilt now"; nothing stays red.
+- The canvas is decorative to assistive technology; the sentence is the
+  accessible state.
+
 ## Stack
 
 - Astro server-rendered pages on `@astrojs/node`, SQLite through
