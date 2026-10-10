@@ -35,7 +35,7 @@ export type Roof = { family: string; eave: number; z0: number; z1: number; x0: n
 export type Side = { family: string; sw: number; sh: number; sdp: number; rep: number; open: number; mass: number; r: number; n: number; x0: number; z1: number };
 export type Threshold = {
   family: string; z0: number; zp: number; z1: number; tr: number; hl: number; hr: number; freeL: boolean; freeR: boolean;
-  ch: number; pw: number; tall: number; mass: number; rep: number; steps: number; run: number;
+  ch: number; pw: number; tall: number; mass: number; rep: number; steps: number; run: number; r: number; tiers: number;
 };
 export type Body = {
   d: Territory[]; G: number; bayL: Bay; bayR: Bay; hall: Hall; entry: Entry; upL: Upper; upR: Upper;
@@ -113,6 +113,7 @@ export function planBody(words: readonly string[]): Body {
       ud: Math.min(1.8 + 0.5 * lv(s, "mass"), b.topFront - ZB - 0.3), x0: 0, x1: 0, z0: 0, z1: 0, y0: G + b.h, top: 0, n: 1, rise: 0,
       pw: 0.16 + 0.06 * lv(s, "mass"), open: lv(s, "open"), tall: lv(s, "tall"), rep: lv(s, "rep") };
     u.ux = Math.min(u.ux, b.w);
+    if (b.w - u.ux < 0.4) u.ux = b.w; // it meets the hall rather than stopping a sliver short of it
     u.x0 = b.side < 0 ? b.x0 : b.x1 - u.ux;
     u.x1 = u.x0 + u.ux;
     u.z0 = align === "back" ? ZB : b.topFront - u.ud;
@@ -152,8 +153,15 @@ export function planBody(words: readonly string[]): Body {
     // it clears the portal's head where it can, and always stays under the roof's front edge
     ch: Math.min(Math.max(2.3 + 0.2 * lv(9, "tall"), en.frontH + en.fw + 0.15), eave - G - 0.45, hall.frontH - 0.3),
     pw: 0.16 + 0.07 * lv(9, "mass"), tall: lv(9, "tall"), mass: lv(9, "mass"), rep: lv(9, "rep"),
-    steps: G > 0.3 ? Math.ceil(G / 0.19) - 1 : 0, run: 0.3 };
+    steps: G > 0.3 ? Math.ceil(G / 0.19) - 1 : 0, run: 0.3, r: 0, tiers: 0 };
   thr.z1 = thr.z0 + thr.tr;
+  if (thr.family === "apron") {
+    // rounded tiers stepping down to the ground: each lower one reaches further, never wider than the way in
+    thr.r = Math.min(thr.tr, thr.hl, thr.hr);
+    thr.tiers = clamp(1 + Math.min(3, thr.steps), 1, Math.max(1, Math.floor(G / 0.14)));
+    thr.z1 = thr.z0 + thr.r + (thr.tiers - 1) * 0.35;
+    thr.steps = 0;
+  }
 
   return { d, G, bayL, bayR, hall, entry: en, upL, upR, roof, side, thr };
 }

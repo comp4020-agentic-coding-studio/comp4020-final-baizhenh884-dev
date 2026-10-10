@@ -145,7 +145,7 @@ describe("House body constraints", () => {
     const signature = (words: string[]) => {
       const h = buildBody(words);
       h.root.updateMatrixWorld(true);
-      const boxes = h.groups.map((g) => new THREE.Box3().setFromObject(g, true).toArray().map((x) => x.toFixed(4)).join(","));
+      const boxes = h.groups.map((g) => { const b = new THREE.Box3().setFromObject(g, true); return [...b.min.toArray(), ...b.max.toArray()].map((x) => x.toFixed(4)).join(","); });
       h.dispose();
       return boxes;
     };
