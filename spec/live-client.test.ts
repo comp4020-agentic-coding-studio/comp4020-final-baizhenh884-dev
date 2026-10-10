@@ -377,6 +377,62 @@ describe("live page reconciliation", () => {
     });
   });
 
+  // The house shows the shared truth: every newer version of a position,
+  // including one a draft holds back from the word on screen, while the
+  // draft, its version and the label stay exactly as above.
+  describe("the house's view of the sentence", () => {
+    localOnly("hears every newer version once, and nothing older or repeated", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: Position[] = [];
+      const page = attach(doc, { onLatest: (p) => heard.push(p) });
+      page.applySnapshot(snapshotOf(doc));
+      expect(heard, "an unchanged snapshot announced a change").toEqual([]);
+      const { position, version } = positionsOf(doc)[0];
+      const word = fresh();
+
+      page.applyChange({ position, word, version: version + 1 });
+      page.applyChange({ position, word: fresh(), version: version + 1 }); // duplicate
+      page.applyChange({ position, word: fresh(), version }); // stale
+
+      expect(heard).toEqual([{ position, word, version: version + 1 }]);
+    });
+
+    localOnly("hears a change a draft holds back, without touching the draft", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: Position[] = [];
+      const page = attach(doc, { onLatest: (p) => heard.push(p) });
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version, word: seen } = positionsOf(doc)[0];
+      type(doc, position, "mydraft");
+
+      page.applyChange({ position, word: MARKUP, version: version + 1 });
+
+      expect(heard, "the house wasn't told the shared word changed").toEqual([{ position, word: MARKUP, version: version + 1 }]);
+      const s = slot(doc, position);
+      expect(s.input.value).toBe("mydraft");
+      expect(s.version.value, "telling the house rebased the draft").toBe(String(version));
+      expect(s.label.textContent!.trim()).toBe(seen);
+      expect(notice(doc, position, MARKUP)).not.toBeNull();
+
+      type(doc, position, ""); // clearing applies the word; the house already has it
+      expect(heard.length, "the house was told twice").toBe(1);
+    });
+
+    localOnly("hears what a reconnect snapshot brings that the page didn't have", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: Position[] = [];
+      const page = attach(doc, { onLatest: (p) => heard.push(p) });
+      page.applySnapshot(snapshotOf(doc));
+      const [a] = positionsOf(doc);
+      const word = fresh();
+      const positions = positionsOf(doc).map((p) => (p.position === a.position ? { ...p, word, version: p.version + 1 } : p));
+
+      page.applySnapshot({ positions, trace: null });
+
+      expect(heard).toEqual([{ position: a.position, word, version: a.version + 1 }]);
+    });
+  });
+
   describe("the Earlier link", () => {
     localOnly("stays the sentence just before now, moving once per newer change", async () => {
       const doc = await pageWithHistory();

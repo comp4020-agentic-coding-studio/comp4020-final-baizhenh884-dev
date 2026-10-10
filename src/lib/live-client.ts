@@ -72,7 +72,13 @@ type Slot = {
   notice: HTMLElement | null; // present while a draft holds `latest` back
 };
 
-export function attach(doc: Document): LivePage {
+export type Options = {
+  // told every newer version of a position, held back by a draft or not:
+  // what the house shows is the shared truth
+  onLatest?: (change: Position) => void;
+};
+
+export function attach(doc: Document, _options: Options = {}): LivePage {
   const slots = new Map<number, Slot>();
   for (const form of doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')) {
     const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
