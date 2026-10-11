@@ -16,6 +16,9 @@ from what `README.md` argues "good" means (see "Product contract").
   publishing all of `README.md` in the HTML the server sends.
 - Current deliverable: Crit 9, "All at once". Crit 10 and the final
   submission run in this same repo.
+- `README.md` is the public definition and record of the work; `PROCESS.md` is
+  the process evidence (900–1100 words, rewritten at each crit). Neither stands
+  in for the other.
 
 ## Start of every task
 
@@ -43,17 +46,26 @@ from what `README.md` argues "good" means (see "Product contract").
 
 ## Scope (Final Project: House integration)
 
-The Final Project deliberately pivots to the House of Theseus (Prototypes 5–6,
-local evidence in `/tmp/theseus-house/NOTES.md`). On this branch only, until it
-is merged, this section supersedes the Crit 9 "smallest slice" rule above for
-the house itself; the Crit 9 realtime limits still hold.
+The Final Project deliberately pivots to the House of Theseus. This section
+supersedes the Crit 9 "smallest slice" rule above for the house itself; the
+Crit 9 realtime limits still hold. The prototypes behind the house live outside
+this repo: it holds their result and its specs, not the search.
 
-- The house is a second, deterministic representation of the same sentence:
-  the forms, `/replace`, the HTTP contract and every existing test are
-  unchanged, and the sentence stays usable without the house or without JS.
+- The public object is one shared ten-word sentence and one corresponding
+  house, two forms of the same thing. The house is a deterministic
+  representation of the sentence: the forms, `/replace`, the HTTP contract and
+  every existing test are unchanged, and the sentence stays usable without the
+  house or without JS.
 - Ten fixed territories, one per position; each word's written form (the
   frozen features, with length graded continuously and saturating near 14
   letters) gives its territory's character. Never by meaning.
+- The grammar and the geometry are frozen. Change them only for a correctness
+  blocker found by a check or by hand, with the evidence; not for taste. Do not
+  reopen a deliberately rejected design or grammar direction without new
+  evidence that changes the reason it was rejected.
+- One word primarily changes its own territory. A neighbour may move only
+  through a structural rule that already exists (the threshold clearing the
+  entry), never because a word was given reach into it.
 - `three` is the one client rendering library, bundled by Vite. Client
   JavaScript may render, select and animate the house; it never decides a
   replacement.
@@ -130,6 +142,12 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 
 - Never report a requirement as verified by a check that doesn't test it. Say
   it's unverified and what would verify it.
+- A difference between two houses counts only if it shows in the settled house
+  at page scale. The exchange animation proves nothing about it, and neither
+  does a count that includes a neighbour moving: measure the settled territory
+  itself.
+- Bounding boxes and counts can't judge architecture or equality. Compare real
+  geometry, and judge how the house reads in a rendered browser.
 - Never weaken or skip a local/CI check because production can't run it.
 - New checks go in `spec/*.test.ts` (`spec/README.md` covers the shipped
   ones), assert the contract rather than the implementation, and are written
@@ -147,6 +165,10 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 - Never fabricate user testing, research, sources, observations, command
   output, failures, deployment results or design rationale. If something
   wasn't done, say so.
+- Words staged to exercise a local browser or a spec are test data, never
+  "visitors' changes" in any account. Scratch measurements, prototypes and
+  screenshots kept outside the repo aren't repo evidence: say they weren't
+  kept, and don't cite them as if they were.
 
 ## Keeping decisions explainable
 
@@ -203,18 +225,21 @@ What the code must hold to. The README says why; don't restate it here.
   control characters. Store it as plain text and escape it on every output. The
   sentence's final full stop belongs to the sentence, not to a word.
 - No word is protected: the maker's starting words and every visitor's word can
-  be replaced by any later valid replacement.
+  be replaced by any later valid replacement. No visitor owns a word, or the
+  part of the house it stands for.
 - History keeps every successful replacement, in order, so every earlier whole
   sentence can be rebuilt. `GET /?at=N` is the sentence after N replacements
   (0 is the start). Earlier forms are read-only; only the current sentence can
   be replaced.
 - Public views never show who made a change or when anyone else acted, and no
   counts appear on the page: no totals, no "3 of 12", no popularity or scores.
-  The ordinal in a `?at=N` URL is navigation, not a count shown on the page.
-  (Enforced in code and checked by review; no automated check yet.)
+  The ordinal in a `?at=N` URL is navigation, not a count shown on the page,
+  and so is the part notation ("05 — entry"): it names a position. (Enforced
+  in code and checked by review; no automated check yet.)
 - A visitor who has contributed and comes back can recognise their
   contribution in context: their word if it still stands, or that it has been
-  replaced. (Required for Crit 8; its markup will be fixed by a later spec.)
+  replaced. Its markup is fixed in the HTTP contract at the top of
+  `spec/theseus.test.ts`.
 - The starting sentence is maker-authored and is the only non-visitor content.
   Never seed, import or fabricate visitor changes: not in the app, the database,
   the logs or the evidence.
@@ -222,8 +247,9 @@ What the code must hold to. The README says why; don't restate it here.
   content is an exceptional maker action outside the ordinary interaction: it
   never protects, assigns or adds words, and it needs a recorded decision
   before it's built.
-- No editing, undo, reactions, profiles, nicknames, feeds, scores or second
-  sentence without an explicit product decision recorded first.
+- No editing, undo, accounts, profiles, nicknames, comments, likes or other
+  reactions, rooms, feeds, scores or second sentence without an explicit
+  product decision recorded first.
 - A successful replacement reaches every other connected open view of the
   current sentence (`GET /`) within about a second, without a reload. After a
   dropped connection reconnects, that view catches up automatically to
@@ -234,7 +260,16 @@ What the code must hold to. The README says why; don't restate it here.
   changed, while the draft and the version it was based on stay as they
   were.
 - Historical `?at=N` views never update live and never subscribe to realtime
-  behaviour.
+  behaviour. Their house is built from that earlier sentence alone and is
+  read-only.
+- The house follows authoritative shared state, not a held draft: a newer
+  shared word reaches it once, including at a position where a draft keeps the
+  word on screen back, and the draft, its expected version and the label stay
+  as they were (`spec/live-client.test.ts`).
+- Live equals fresh: after any sequence of live changes, every territory's
+  geometry equals that of a fresh build of the same final sentence
+  (`spec/house-live-body.test.ts`). Whether a standing neighbour is kept is
+  decided on its geometry, never on its outline or a count.
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and one-change-per-visitor rules
@@ -263,7 +298,20 @@ hold.
   confirmation step, and showing how long a word stood. Each change still
   records when it happened, for logging; that time is never shown to other
   visitors.
-- The visual treatment (fading, layout) is judged, not specified.
+- The visual treatment (fading, layout) is judged, not specified. Its
+  direction is Monograph, an architectural-study field: the sentence is the
+  protagonist and the house its body; a standing house stays restrained; red
+  is only a part being rebuilt now.
+- Word and house as one selection (settled; change only with a recorded
+  reason). Pointing at a word, or at a territory on a fine pointer, marks both
+  by paired emphasis, with no line. A focused or selected word gets a thin
+  line to its territory and the part notation ("05 — entry"). An accepted
+  change draws that line red while exactly that part is exchanged, then
+  everything returns to neutral. A phone has no line. Under the house: "Ten
+  words. Ten parts of one house. Change a word, and its part is rebuilt." At
+  the foot beside About: "If every word and every part is replaced, is it
+  still the same thing?" With reduced motion nothing moves and the cue stands
+  still for a moment, then clears.
 - A position that changed elsewhere while a visitor has an unsubmitted draft
   there shows an inert notice of the new word, without touching the draft or
   its expected version; the draft is only reconciled once the visitor clears
