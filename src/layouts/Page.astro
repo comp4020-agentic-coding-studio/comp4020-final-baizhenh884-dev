@@ -76,6 +76,14 @@ const { title } = Astro.props;
         /* until something is typed it lies over its word, which keeps its own width: focus moves nothing */
         .sentence form:focus-within input[name="word"]:placeholder-shown { position: absolute; left: 0; top: 0; }
       }
+      /* Without field-sizing the grid cell is all the field gets, and the rule above that
+         should widen it (min-width: 100%) loses to the shared `min-width: 0` on specificity,
+         so the focused field was 0px wide: focused, taking keystrokes, and invisible, with
+         its word hidden. Here it lies over its word instead: the word's own box (the cell
+         keeps its size, so nothing moves), wider when it needs to be, over what's beside it. */
+      @supports not (field-sizing: content) {
+        .sentence form:focus-within input[name="word"] { position: absolute; left: 0; top: 0; height: 100%; width: max(100%, 3.2em); max-width: 80vw; background: var(--field); z-index: 1; }
+      }
       /* The words a position held before sit beneath it but take no part in
          its width (width: 0, then min-width: 100% of the word), so the
          sentence spaces and wraps by its current words alone; a long one is
