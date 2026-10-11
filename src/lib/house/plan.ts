@@ -133,7 +133,7 @@ export function planBody(words: readonly string[]): Body {
     x0: XL - xoL, x1: XR + xoR, pt: 0.15 + 0.07 * lv(6, "mass"), rise: 0, n: 1, parapet: 0 };
   if (roof.family === "gable") roof.rise = 0.9 + 0.6 * lv(6, "tall");
   if (roof.family === "barrel") roof.rise = Math.min(0.55 + 0.35 * lv(6, "tall"), (roof.x1 - roof.x0) / 2);
-  if (roof.family === "sawtooth") { roof.n = 1 + lv(6, "rep"); roof.rise = 0.45 + 0.2 * lv(6, "tall"); }
+  if (roof.family === "sawtooth") { roof.n = 1 + lv(6, "rep"); roof.rise = 0.6 + 0.2 * lv(6, "tall"); }
   if (roof.family === "flat") roof.parapet = 0.25 + 0.15 * lv(6, "mass");
 
   // 9 side mass, on the open flank

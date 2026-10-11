@@ -209,13 +209,14 @@ function roof(k: Kit, P: Body): void {
     }
     k.slabXY(end, top.z0, top.z1).position.y = RF.eave;
   } else if (RF.family === "sawtooth") {
-    const tz = (top.z1 - top.z0) / RF.n;
+    // the teeth run the deck's whole depth, so the roof is one system ending in a glazed face at its edge
+    const tz = (RF.z1 - top.z0) / RF.n, jamb = 0.3;
     for (let i = 0; i < RF.n; i++) {
-      // in (-z, y): each tooth rises toward the street, its upright face glazed
+      // in (-z, y): each tooth rises toward the street, its upright face glazed between solid jambs over a sill
       const a = top.z0 + i * tz, b = a + tz, sh = new THREE.Shape();
       sh.moveTo(-a, 0); sh.lineTo(-b, 0); sh.lineTo(-b, RF.rise); sh.lineTo(-a, 0);
       k.slabSide(sh, RF.x0, RF.x1).position.y = RF.eave + RF.pt;
-      k.box(RF.x0 + 0.15, RF.x1 - 0.15, RF.eave + RF.pt + 0.08, RF.eave + RF.pt + RF.rise - 0.12, b - 0.02, b + 0.005, "opening");
+      k.box(RF.x0 + jamb, RF.x1 - jamb, RF.eave + RF.pt + 0.14, RF.eave + RF.pt + RF.rise - 0.14, b - 0.02, b + 0.005, "opening");
     }
     k.box(RF.x0, RF.x1, RF.eave, RF.eave + RF.pt, top.z0, RF.z1);
   } else {
