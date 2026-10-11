@@ -14,12 +14,23 @@ export type Exchange = { start: number; kind: Kind; position: number; outgoing: 
 export type Follow = { start: number; outgoing: THREE.Group; incoming: THREE.Group };
 export const FOLLOW_MS = 450;
 
-// a territory's form, for "did this neighbour change?"
+// a territory's whole form, for "did this neighbour change?": every solid's role and its
+// vertices relative to the territory, in build order (the builder is deterministic). An
+// outline and a count weren't enough: a solid can move inside an unchanged outline, and
+// a neighbour kept on that basis stood stale until the page was reloaded.
 const signature = (g: THREE.Group) => {
-  const b = new THREE.Box3().setFromObject(g, true);
-  let n = 0;
-  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) n++; });
-  return b.isEmpty() ? "" : [...b.min.toArray(), ...b.max.toArray()].map((x) => x.toFixed(3)).join(",") + `/${n}`;
+  g.updateMatrixWorld(true);
+  const toGroup = g.matrixWorld.clone().invert(), m = new THREE.Matrix4(), v = new THREE.Vector3(), out: string[] = [];
+  g.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    m.multiplyMatrices(toGroup, mesh.matrixWorld);
+    const p = mesh.geometry.getAttribute("position");
+    let s = `${mesh.userData.role ?? ""}:`;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m); s += `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)};`; }
+    out.push(s);
+  });
+  return out.join("|");
 };
 
 export class LiveBody {

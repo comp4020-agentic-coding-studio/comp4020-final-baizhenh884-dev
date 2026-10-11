@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { LiveBody } from "../src/lib/house/live-body";
+import { TERRITORIES } from "../src/lib/house/territories";
 
 // Which group stands at each position while bodies are exchanged (no renderer:
 // three.js scene graph only). Pure, so it runs the same against any APP_URL.
@@ -25,6 +27,47 @@ function watch(g: THREE.Group) {
   const released = new Set<THREE.BufferGeometry>(); // a geometry may be released more than once; count it once
   for (const geo of geometries) geo.addEventListener("dispose", () => released.add(geo));
   return { all: () => released.size === geometries.size && geometries.size > 0, none: () => released.size === 0 };
+}
+
+// a territory's whole form: every mesh's world-space vertices, in order, so a solid moved inside an unchanged outline still differs
+function form(g: THREE.Group): string {
+  g.updateMatrixWorld(true);
+  const solids: string[] = [], v = new THREE.Vector3();
+  g.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const p = m.geometry.getAttribute("position"), pts: string[] = [];
+    for (let i = 0; i < p.count; i++) pts.push(v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).toArray().map((x) => x.toFixed(4)).join(","));
+    solids.push(`${m.userData.role ?? ""}:${pts.join(";")}`);
+  });
+  return solids.sort().join("|");
+}
+
+// the live path (show, change, settle) against a fresh show of the same final sentence: the territories that differ
+function mismatches(before: string[], position: number, after: string[]): string[] {
+  const live = new LiveBody(false, drawing), fresh = new LiveBody(false, drawing);
+  live.show(before);
+  live.change(position, after, "remote", 0);
+  live.step(1e9, false); // the exchange and any following neighbour end
+  fresh.show(after);
+  const out: string[] = TERRITORIES.filter((_, i) => form(live.groups[i]) !== form(fresh.groups[i])).map((t) => t.id);
+  if (live.groups.length !== 10 || live.animating) out.push("not settled");
+  live.dispose(); fresh.dispose();
+  return out;
+}
+
+// the constraint tests' word pool (the grammar fixture's first 325 words) and seeded generator
+const POOL = (JSON.parse(readFileSync(new URL("./fixtures/house-descriptors.json", import.meta.url), "utf8")) as { rows: [number, string][] }).rows
+  .filter((r) => r[0] === 0).map((r) => r[1]).slice(0, 325);
+function rng(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 describe("House live body", () => {
@@ -75,6 +118,50 @@ describe("House live body", () => {
     const byPosition = [...body.root.children].sort((a, b) => a.userData.position - b.userData.position);
     expect(byPosition).toEqual([...body.groups]);
     body.dispose();
+  });
+
+  it("settles a live change on exactly the body a fresh load of the same sentence shows", () => {
+    // the cases found by hand: each left a stale neighbour standing (a ground ledge, a hall's old cut)
+    const MAKER = "Make a website that people would miss if it disappeared".split(" ");
+    const cases: [string[], number, string][] = [
+      [MAKER, 3, "ox"], // front-right: the ground under it kept its old front
+      [MAKER, 1, "ox"], [MAKER, 2, "ox"], [MAKER, 8, "responsibilities"], [MAKER, 0, "jumping"], [MAKER, 4, "garden"],
+      ["week stone loud autumn appeared window now find internet share".split(" "), 4, "although"], // entry: the hall's cut
+    ];
+    for (const [before, position, word] of cases) {
+      const after = before.map((w, i) => (i === position ? word : w));
+      expect(mismatches(before, position, after), `${before[position]} → ${word} at ${TERRITORIES[position].id}`).toEqual([]);
+    }
+  });
+
+  it("settles every live change on the fresh body, across many sentences and every position", () => {
+    const next = rng(4020), word = () => POOL[Math.floor(next() * POOL.length)];
+    const found: string[] = [];
+    for (let k = 0; k < 40; k++) for (let position = 0; position < 10; position++) {
+      const before = Array.from({ length: 10 }, word), after = before.slice();
+      after[position] = word();
+      if (after[position] !== before[position]) found.push(...mismatches(before, position, after).map((t) => `${t} after ${before[position]} → ${after[position]} at ${TERRITORIES[position].id}`));
+    }
+    expect(found.slice(0, 5), `${found.length} stale territories`).toEqual([]);
+  });
+
+  it("settles a run of live changes, including two at one position, on the fresh body", () => {
+    const next = rng(77), word = () => POOL[Math.floor(next() * POOL.length)];
+    for (let k = 0; k < 12; k++) {
+      const body = new LiveBody(false, drawing), words = Array.from({ length: 10 }, word);
+      body.show(words);
+      for (const position of [2, 0, 3, 3, 8, 4, 1, 1, 9]) {
+        words[position] = word();
+        body.change(position, [...words], "remote", 0); // each change finishes the one before it
+      }
+      body.finishAll();
+      const fresh = new LiveBody(false, drawing);
+      fresh.show(words);
+      expect(body.groups).toHaveLength(10);
+      body.groups.forEach((g, i) => expect(form(g), `${TERRITORIES[i].id} after a run of changes`).toBe(form(fresh.groups[i])));
+      expect([...body.root.children].sort((a, b) => a.userData.position - b.userData.position), "something other than the ten standing groups is left").toEqual([...body.groups]);
+      body.dispose(); fresh.dispose();
+    }
   });
 
   it("refuses to release a standing territory except in a whole-body teardown", () => {
