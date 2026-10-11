@@ -4,9 +4,13 @@
 
 import type { PerspectiveCamera } from "three";
 
-export const VIEW = { fov: 17, yaw: -0.6, pitch: 0.32, target: [-1.8, 4.1, 0.9] as const, distance: 60 };
+export const VIEW = { fov: 17, yaw: -0.6, pitch: 0.32, target: [-1.8, 4.1, 0.9] as const };
 
-export const distanceFor = (aspect: number) => VIEW.distance * Math.max(1, 1.25 / aspect);
+// Far enough that the widest and the tallest bodies the grammar allows both fit,
+// and no further: over the 500-sentence set and the extremes, the half-width
+// needs 66.1 units of distance per unit of aspect and the half-height 47.7,
+// here with about 8% to spare inside the edge.
+export const distanceFor = (aspect: number) => Math.max(72 / aspect, 52);
 
 export function place(cam: PerspectiveCamera, aspect: number): void {
   const [tx, ty, tz] = VIEW.target, d = distanceFor(aspect);

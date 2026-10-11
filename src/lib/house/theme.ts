@@ -23,6 +23,8 @@ const tone = (position: number, role: string, past: boolean) => {
 export function dress(group: THREE.Group, position: number, past: boolean): void {
   const made = new Map<string, THREE.MeshStandardMaterial>();
   const edges: THREE.LineSegments[] = [];
+  // one ink for the whole territory's edges, so it draws, fades and is selected as one
+  const ink = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: past ? EDGE.past : EDGE.present, depthWrite: false });
   group.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -35,23 +37,22 @@ export function dress(group: THREE.Group, position: number, past: boolean): void
     }
     mesh.material = m;
     if (role !== "opening") {
-      const line = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: past ? EDGE.past : EDGE.present, depthWrite: false }));
+      const line = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), ink);
       line.userData.edge = true;
       edges.push(line);
       mesh.add(line);
     }
   });
   group.userData.materials = [...made.values()];
+  group.userData.ink = ink;
   group.userData.edges = edges;
 }
 
 // release what dress() made for one territory (geometries are released by the builder's dispose)
 export function undress(group: THREE.Group): void {
   for (const m of (group.userData.materials as THREE.Material[] | undefined) ?? []) m.dispose();
-  for (const l of (group.userData.edges as THREE.LineSegments[] | undefined) ?? []) {
-    l.geometry.dispose();
-    (l.material as THREE.Material).dispose();
-  }
+  for (const l of (group.userData.edges as THREE.LineSegments[] | undefined) ?? []) l.geometry.dispose();
+  (group.userData.ink as THREE.Material | undefined)?.dispose();
 }
 
 export function lights(scene: THREE.Scene): THREE.DirectionalLight {
