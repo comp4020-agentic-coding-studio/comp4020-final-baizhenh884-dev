@@ -281,12 +281,15 @@ function threshold(k: Kit, P: Body): void {
     for (const x of [-T.hl, T.hr - T.pw]) k.box(x, x + T.pw, y, y + ch, T.z1 - T.pw, T.z1);
     k.box(-T.hl, T.hr, y + ch, y + ch + 0.18 + 0.05 * T.mass, T.z0, T.z1 + 0.15);
   } else if (T.family === "colonnade") {
-    const n = 1 + T.rep;
+    // columns, not slats: a square section and at least three of it between them, so a row reads as a colonnade
+    const cw = 0.26 + 0.05 * T.mass, bh = 0.3 + 0.03 * T.mass, n = Math.max(2, Math.min(1 + T.rep, 1 + Math.floor((T.tr - cw) / (4 * cw))));
     for (let i = 0; i < n; i++) {
-      const z = T.z1 - T.pw - (i * (T.tr - T.pw)) / Math.max(1, n - 1); // the last pair stands against the surround
-      for (const x of [-T.hl, T.hr - T.pw]) k.box(x, x + T.pw, y, y + ch, z, z + T.pw);
+      const z = T.z1 - cw - (i * (T.tr - cw)) / (n - 1); // the last pair stands against the surround
+      for (const x of [-T.hl, T.hr - cw]) k.box(x, x + cw, y, y + ch, z, z + cw);
     }
-    for (const x of [-T.hl, T.hr - T.pw]) k.box(x, x + T.pw, y + ch, y + ch + 0.24, T.z0, T.z1);
+    // one entablature: a beam down each row and a lintel across the front, framing the way in
+    for (const x of [-T.hl, T.hr - cw]) k.box(x, x + cw, y + ch, y + ch + bh, T.z0, T.z1 - cw);
+    k.box(-T.hl, T.hr, y + ch, y + ch + bh, T.z1 - cw, T.z1);
   } else {
     // court: low walls along both sides, open to the street
     const wh = 0.8 + 0.25 * T.mass, wt = 0.2 + 0.06 * T.mass;
