@@ -50,17 +50,18 @@ const { title } = Astro.props;
          the word's own place. The input contributes no width (width: 0) and
          fills the cell (min-width: 100%), so the cell is exactly the word:
          nothing shifts when it's focused. */
-      .sentence form { display: inline-grid; max-width: 100%; }
+      .sentence form { position: relative; display: inline-grid; max-width: 100%; }
       .sentence form > label, .sentence form > input[name="word"] { grid-area: 1 / 1; min-width: 0; }
       .sentence input[name="word"] {
         width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0;
-        font-family: "Instrument Serif", serif; font-style: italic; font-weight: 400; font-size: 1em; line-height: inherit;
-        color: inherit; background: transparent; opacity: 0; cursor: text;
+        /* the label's own face, so the field is exactly the word's width and focusing it moves nothing */
+        font: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
       }
       .sentence input[name="word"]::placeholder { color: var(--faint); opacity: 1; }
       .sentence form:focus-within label { visibility: hidden; }
       .sentence form:focus-within input[name="word"] { opacity: 1; outline: none; }
-      .sentence label { cursor: text; text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 0.11em; transition: color 0.25s; }
+      /* the label carries the field's 1px rule, unseen, so the word and its field are the same size */
+      .sentence label { border-bottom: 1px solid transparent; cursor: text; text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 0.11em; transition: color 0.25s; }
       /* choosing a word: the others recede, the chosen one is drawn in ink */
       body.selecting .sentence .pos:not(.selected) label { color: var(--faint); }
       @media (hover: hover) {
@@ -68,9 +69,12 @@ const { title } = Astro.props;
       }
       /* your word, while it stands: a hairline of dots, no badge */
       mark { background: none; color: inherit; text-decoration: underline dotted 1.5px var(--soft); text-underline-offset: 0.14em; }
-      /* Where supported, grow with what's typed rather than scroll within the word. */
+      /* Where supported, grow with what's typed rather than scroll within the word,
+         sideways only: one line high, so focusing a word doesn't move the sentence. */
       @supports (field-sizing: content) {
-        .sentence form:focus-within input[name="word"] { field-sizing: content; width: auto; max-width: 80vw; }
+        .sentence form:focus-within input[name="word"] { field-sizing: content; width: auto; max-width: 80vw; height: calc(1lh + 1px); /* a line and its rule, as unfocused */ }
+        /* until something is typed it lies over its word, which keeps its own width: focus moves nothing */
+        .sentence form:focus-within input[name="word"]:placeholder-shown { position: absolute; left: 0; top: 0; }
       }
       /* The words a position held before sit beneath it but take no part in
          its width (width: 0, then min-width: 100% of the word), so the
@@ -98,7 +102,9 @@ const { title } = Astro.props;
       }
 
       /* the part a word stands for, only while it's in hand */
-      #part { margin: 0 0 1rem; color: var(--soft); }
+      /* its line is always kept, so choosing a word never moves the centred column */
+      #part { margin: 0 0 1rem; color: var(--soft); min-height: 1.45em; }
+      #part[hidden] { display: block; visibility: hidden; }
       #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
       #house canvas { display: block; width: 100%; height: 100%; }
 
