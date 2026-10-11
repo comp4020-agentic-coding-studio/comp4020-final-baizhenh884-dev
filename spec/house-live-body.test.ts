@@ -143,7 +143,7 @@ describe("House live body", () => {
       if (after[position] !== before[position]) found.push(...mismatches(before, position, after).map((t) => `${t} after ${before[position]} → ${after[position]} at ${TERRITORIES[position].id}`));
     }
     expect(found.slice(0, 5), `${found.length} stale territories`).toEqual([]);
-  });
+  }, 30_000); // 400 live changes: about 4 s here, 8.6 s on the CI runner, against Vitest's 5 s default
 
   it("settles a run of live changes, including two at one position, on the fresh body", () => {
     const next = rng(77), word = () => POOL[Math.floor(next() * POOL.length)];
