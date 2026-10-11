@@ -79,17 +79,7 @@ function frontMass(k: Kit, P: Body, b: Bay): void {
     }
   } else {
     // curved: the outer front corner is rounded, with a glazed band running round it
-    const plan = (inset: number) => {
-      const x0 = b.x0 + (b.side < 0 ? inset : 0), x1 = b.x1 - (b.side > 0 ? inset : 0), z1 = b.zf - inset, r = Math.max(0.1, b.r - inset), sh = new THREE.Shape();
-      if (b.side < 0) {
-        sh.moveTo(x0, -ZB); sh.lineTo(x1, -ZB); sh.lineTo(x1, -z1); sh.lineTo(x0 + r, -z1);
-        sh.absarc(x0 + r, -z1 + r, r, -Math.PI / 2, -Math.PI, true); sh.lineTo(x0, -ZB);
-      } else {
-        sh.moveTo(x0, -ZB); sh.lineTo(x1, -ZB); sh.lineTo(x1, -z1 + r);
-        sh.absarc(x1 - r, -z1 + r, r, 0, -Math.PI / 2, true); sh.lineTo(x0, -z1); sh.lineTo(x0, -ZB);
-      }
-      return sh;
-    };
+    const plan = (inset: number) => curvedPlan(b, inset);
     const yb = y0 + 0.85;
     k.slabPlan(plan(0), y0, yb);
     k.slabPlan(plan(0.28), yb, yb + b.band, "opening");
@@ -97,6 +87,26 @@ function frontMass(k: Kit, P: Body, b: Bay): void {
     // the band is carried by its inner wall
     k.box(b.side < 0 ? XL - 0.3 : XR, b.side < 0 ? XL : XR + 0.3, yb, yb + b.band, ZB, b.zf);
   }
+}
+
+// a curved bay's plan in (x, -z), rounded at its outer front corner, inset all round its open sides
+function curvedPlan(b: Bay, inset: number): THREE.Shape {
+  const x0 = b.x0 + (b.side < 0 ? inset : 0), x1 = b.x1 - (b.side > 0 ? inset : 0), z1 = b.zf - inset, r = Math.max(0.1, b.r - inset), sh = new THREE.Shape();
+  if (b.side < 0) {
+    sh.moveTo(x0, -ZB); sh.lineTo(x1, -ZB); sh.lineTo(x1, -z1); sh.lineTo(x0 + r, -z1);
+    sh.absarc(x0 + r, -z1 + r, r, -Math.PI / 2, -Math.PI, true); sh.lineTo(x0, -ZB);
+  } else {
+    sh.moveTo(x0, -ZB); sh.lineTo(x1, -ZB); sh.lineTo(x1, -z1 + r);
+    sh.absarc(x1 - r, -z1 + r, r, 0, -Math.PI / 2, true); sh.lineTo(x0, -z1); sh.lineTo(x0, -ZB);
+  }
+  return sh;
+}
+
+// a drum's half disc in (x, -z), against the left mass
+function drumPlan(S: Body["side"], r: number): THREE.Shape {
+  const zc = ZB + S.r, sh = new THREE.Shape();
+  sh.moveTo(X0, -(zc - r)); sh.absarc(X0, -zc, r, Math.PI / 2, -Math.PI / 2, false); sh.lineTo(X0, -(zc - r));
+  return sh;
 }
 
 // 3: the hall, in tiers; its front face belongs to the entry. Returns where the entry's cut begins.
@@ -223,11 +233,7 @@ function roof(k: Kit, P: Body): void {
 function side(k: Kit, P: Body): void {
   const S = P.side, sy = P.G, sx1 = X0;
   if (S.family === "drum") {
-    const zc = ZB + S.r, disc = (r: number) => {
-      const sh = new THREE.Shape();
-      sh.moveTo(sx1, -(zc - r)); sh.absarc(sx1, -zc, r, Math.PI / 2, -Math.PI / 2, false); sh.lineTo(sx1, -(zc - r));
-      return sh;
-    };
+    const disc = (r: number) => drumPlan(S, r);
     if (S.open > 0) {
       const band = Math.min(0.3 + 0.3 * S.open, S.sh - 1.0), yb = sy + clamp(S.sh - band - 0.5, 0.5, 1.0);
       k.slabPlan(disc(S.r), sy, yb);
@@ -316,16 +322,20 @@ function footprint(P: Body): Footprint[] {
 function ground(k: Kit, P: Body, foot: Footprint[]): void {
   const g = P.d[0], G = P.G;
   if (g.family === "stilts") {
-    const cs = 0.22 + 0.1 * g.levels.mass, nx = 2 + g.levels.rep;
-    for (const { x0, x1, z0, z1, bay } of foot) {
-      const inset = 0.3, cornerIn = bay?.family === "curved" ? bay.r * 0.35 : 0, nz = z1 - z0 > 4 ? 3 : 2, nxx = x1 - x0 < 1.6 ? 2 : nx;
+    // each mass stands on a floor deck carried by pilotis set in from its edge, so the deck reads as lifted
+    const cs = 0.28 + 0.08 * g.levels.mass, nx = 2 + g.levels.rep, deck = 0.2;
+    for (const [fi, { x0, x1, z0, z1, bay }] of foot.entries()) {
+      if (bay?.family === "curved") k.slabPlan(curvedPlan(bay, 0), G - deck, G);
+      else if (fi === 3 && P.side.family === "drum") k.slabPlan(drumPlan(P.side, P.side.r), G - deck, G);
+      else k.box(x0, x1, G - deck, G, z0, z1);
+      const inset = 0.45, cornerIn = bay?.family === "curved" ? bay.r * 0.35 : 0, nz = z1 - z0 > 4 ? 3 : 2, nxx = x1 - x0 < 1.6 ? 2 : nx;
       for (let i = 0; i < nxx; i++) for (let j = 0; j < nz; j++) {
         let x = x0 + inset + (i * (x1 - x0 - 2 * inset - cs)) / (nxx - 1), z = z0 + inset + (j * (z1 - z0 - 2 * inset - cs)) / (nz - 1);
         if (bay?.family === "curved" && j === nz - 1 && (bay.side < 0 ? i === 0 : i === nxx - 1)) {
           x += bay.side < 0 ? cornerIn : -cornerIn;
           z -= cornerIn;
         }
-        k.box(x, x + cs, 0, G, z, z + cs);
+        k.box(x, x + cs, 0, G, z, z + cs); // through the deck to the mass it carries
       }
     }
   } else if (g.family === "plinth") {
