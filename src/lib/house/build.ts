@@ -9,6 +9,8 @@ import { nestedOuter, planBody, X0, XL, XR, ZB, type Bay, type Body, type Upper 
 import { TERRITORIES } from "./territories";
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
+// the floor deck a lifted body (and its threshold) stands on
+const DECK = 0.2;
 
 export type Footprint = { x0: number; x1: number; z0: number; z1: number; bay: Bay | null };
 export type BuiltBody = {
@@ -285,10 +287,17 @@ function threshold(k: Kit, P: Body): void {
     }
     return;
   }
-  k.box(-T.hl, T.hr, 0, G, T.zp, T.z1);
+  // on stilts the platform is the body's own floor deck, carried like it, and only the stair comes down solid to the ground
+  const lifted = P.d[0].family === "stilts", yp = lifted ? G - DECK : 0;
+  k.box(-T.hl, T.hr, yp, G, T.zp, T.z1);
   // where it spreads in front of a mass set behind the hall, it runs back to that mass's face
-  if (T.freeL && T.hl > -XL + 0.05 && P.bayL.zf < T.zp - 0.01) k.box(-T.hl, XL, 0, G, Math.min(P.bayL.zf, T.zp - 0.15), T.zp);
-  if (T.freeR && T.hr > XR + 0.05 && P.bayR.zf < T.zp - 0.01) k.box(XR, T.hr, 0, G, Math.min(P.bayR.zf, T.zp - 0.15), T.zp);
+  if (T.freeL && T.hl > -XL + 0.05 && P.bayL.zf < T.zp - 0.01) k.box(-T.hl, XL, yp, G, Math.min(P.bayL.zf, T.zp - 0.15), T.zp);
+  if (T.freeR && T.hr > XR + 0.05 && P.bayR.zf < T.zp - 0.01) k.box(XR, T.hr, yp, G, Math.min(P.bayR.zf, T.zp - 0.15), T.zp);
+  if (lifted) {
+    // columns of the stilts' section at its outer corners, and halfway back when it runs deep
+    const cs = 0.28 + 0.08 * P.d[0].levels.mass, zs = T.z1 - T.zp > 2 ? [T.z1 - cs, (T.zp + T.z1 - cs) / 2] : [T.z1 - cs];
+    for (const z of zs) for (const x of [-T.hl, T.hr - cs]) k.box(x, x + cs, 0, G, z, z + cs);
+  }
   const sw = Math.min(T.hl, T.hr, 1.6) * 2;
   for (let i = 0; i < T.steps; i++) k.box(-sw / 2, sw / 2, 0, (G * (T.steps - i)) / (T.steps + 1), T.z1 + i * T.run, T.z1 + (i + 1) * T.run);
   const y = G, ch = T.ch;
@@ -329,7 +338,7 @@ function ground(k: Kit, P: Body, foot: Footprint[]): void {
   const g = P.d[0], G = P.G;
   if (g.family === "stilts") {
     // each mass stands on a floor deck carried by pilotis set in from its edge, so the deck reads as lifted
-    const cs = 0.28 + 0.08 * g.levels.mass, nx = 2 + g.levels.rep, deck = 0.2;
+    const cs = 0.28 + 0.08 * g.levels.mass, nx = 2 + g.levels.rep, deck = DECK;
     for (const [fi, { x0, x1, z0, z1, bay }] of foot.entries()) {
       if (bay?.family === "curved") k.slabPlan(curvedPlan(bay, 0), G - deck, G);
       else if (fi === 3 && P.side.family === "drum") k.slabPlan(drumPlan(P.side, P.side.r), G - deck, G);
