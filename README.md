@@ -72,8 +72,9 @@ An open page listens on a server-sent events stream: a fresh SQLite snapshot on
 every connect or reconnect, then each change as position, word and version. The
 page applies only newer versions; the server decides every replacement. No
 event log, replay or presence registry. Words are form fields, a screen-reader
-summary stays current, and words are always text. Deployed behaviour on Fly.io
-is unchecked so far.
+summary stays current, and words are always text. On Fly.io the stream, a
+dropped connection and the frozen history pages have been checked in Chrome;
+Safari has not.
 
 The house is a second reading of the same sentence, never a second record: ten
 fixed parts, one per position, built in the browser from the written form of

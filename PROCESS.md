@@ -121,14 +121,17 @@ without `field-sizing`
 
 ## Evidence, and what isn't verified
 
-On the final tree, locally, with a throwaway database, `pnpm check` passes 71
-of 71 and typecheck is clean. I also checked the page in local
-headless Chrome with staged words: test data, not visitors' changes. The
-motion spec was written after its code and pins it
+Locally, `pnpm check` passes 71 of 71 and typecheck is clean. Headless Chrome
+checks used staged words: test data, not visitors' changes. The motion spec was
+written after its code and pins it
 ([`72e865d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/72e865d)).
-Nothing from Crit 9 or the house is pushed or deployed, so Fly's handling of
-long-lived connections, propagation between real sessions and the house on real
-devices are unverified, and I have no participant evidence.
+Crit 9 is deployed
+([`85cfccb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/85cfccb)).
+On Fly, `/events` streamed: an observer saw a change in about 350 ms, a cut
+connection caught up in 916 ms, history stayed frozen, and the three genuine
+earlier changes survived. My added change, _many_ to _every_, was verification,
+not participant evidence. Safari and the house with real participants are
+unverified.
 
 ## The trade-off
 

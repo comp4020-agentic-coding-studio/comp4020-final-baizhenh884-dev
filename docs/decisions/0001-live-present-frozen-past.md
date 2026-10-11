@@ -105,5 +105,6 @@ architecture choice for carrying out this decision, not part of it.
   central, and deliberately gives up the extra awareness of other people
   those designs could provide.
 
-This records the decision before implementation. Nothing here has been built
-or verified yet.
+This records the decision before implementation. Status: implemented for
+Crit 9 and verified in production on Fly.io; the decision above is retained as
+the original rationale.

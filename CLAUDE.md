@@ -169,6 +169,8 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
   "visitors' changes" in any account. Scratch measurements, prototypes and
   screenshots kept outside the repo aren't repo evidence: say they weren't
   kept, and don't cite them as if they were.
+- Deliberate production verification changes require explicit user approval and
+  must be disclosed as verification activity, never participant evidence.
 
 ## Keeping decisions explainable
 
