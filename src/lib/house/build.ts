@@ -66,16 +66,21 @@ function frontMass(k: Kit, P: Body, b: Bay): void {
     const cw = 0.22 + 0.05 * lv.mass;
     for (const x of row(b.cols, b.x0 + b.t, b.x1 - b.t, cw)) k.box(x, x + cw, y0, y1 - b.slab, b.zf - cw - 0.05, b.zf - 0.05);
   } else if (b.family === "split") {
-    const ws = (b.w - (b.n - 1) * b.gap) / b.n, zb = b.zf - (b.n - 1) * b.st - Math.max(0.6, b.t + 0.4);
+    const ws = (b.w - (b.n - 1) * b.gap) / b.n, zb = b.zf - (b.n - 1) * b.st - Math.max(0.6, b.t + 0.4), cap = 0.18, ov = 0.08;
     k.box(b.x0, b.x1, y0, y1, ZB, zb);
     for (let i = 0; i < b.n; i++) {
       const xo = b.side < 0 ? b.x0 + i * (ws + b.gap) : b.x1 - i * (ws + b.gap) - ws, zf = b.zf - i * b.st, sw = ws * (0.3 + 0.1 * lv.open);
-      k.pierced(xo, xo + ws, y0, y1, zb, zf, b.t, [[xo + (ws - sw) / 2, xo + (ws + sw) / 2, y0 + 0.6, y1 - 0.6]]);
+      // a window per storey, not one slot the bay's whole height: a tall bay reads as floors, not a plate
+      const wx: [number, number] = [xo + (ws - sw) / 2, xo + (ws + sw) / 2], wb = y0 + 0.6, wt = y1 - 0.6, mid = (wb + wt) / 2;
+      const holes: Hole[] = wt - wb >= 2.2 ? [[...wx, wb, mid - 0.25], [...wx, mid + 0.25, wt]] : [[...wx, wb, wt]];
+      k.pierced(xo, xo + ws, y0, y1 - cap, zb, zf, b.t, holes);
+      // each bay's roof slab, a little proud of its face
+      k.box(xo, xo + ws, y1 - cap, y1, zb, zf + ov);
     }
-    // the joints between bays are recessed, never open: a web fills each gap at the back
+    // the joints are recessed, never open: solid to just behind the face of the bay set further back, and under the same slab
     for (let i = 1; i < b.n; i++) {
-      const xg = b.side < 0 ? b.x0 + i * (ws + b.gap) - b.gap : b.x1 - i * (ws + b.gap);
-      k.box(xg, xg + b.gap, y0, y1, zb, zb + 0.4);
+      const xg = b.side < 0 ? b.x0 + i * (ws + b.gap) - b.gap : b.x1 - i * (ws + b.gap), zj = b.zf - i * b.st - 0.12;
+      k.box(xg, xg + b.gap, y0, y1, zb, zj);
     }
   } else {
     // curved: the outer front corner is rounded, with a glazed band running round it
