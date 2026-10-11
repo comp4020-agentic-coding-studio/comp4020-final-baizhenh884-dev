@@ -40,7 +40,9 @@ const { title } = Astro.props;
       .mast .sub { color: var(--soft); }
       /* the sentence sits in the middle of the page's height, level with the house */
       .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
-      #how { margin: 0 0 1.5rem; color: var(--soft); max-width: 40ch; }
+      /* the current sentence is read first, with its rules beneath it */
+      .text.current { display: flex; flex-direction: column; }
+      #how { margin: 1.3rem 0 0; font-size: 0.8rem; color: var(--soft); max-width: 46ch; }
 
       /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
       .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
@@ -127,7 +129,28 @@ const { title } = Astro.props;
       section[aria-labelledby="trace-heading"] del { font: italic 400 1.1rem/1 "Instrument Serif", serif; color: var(--ink); text-decoration-thickness: 1px; }
       [role="alert"] { font: 400 1.6rem/1.25 "Instrument Serif", serif; max-width: 30ch; }
 
+      /* ---- word and territory as one selection ---- */
+      /* pointing at a word, the house or your trace: the other words step back, as when one is chosen */
+      body.pointing .sentence .pos:not(.pointed) label { color: var(--faint); }
+      @media (hover: hover) {
+        .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.7); }
+      }
+      /* the one hairline from the chosen word to its territory; red is only the rebuilding of that territory */
+      .thread { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 0.18s; }
+      .thread.on { opacity: 1; }
+      .thread path { fill: none; stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 1; vector-effect: non-scaling-stroke; }
+      .thread circle { fill: var(--ink); fill-opacity: 0.7; }
+      .thread.red path { stroke: #c3331c; stroke-opacity: 0.85; }
+      .thread.red circle { fill: #c3331c; fill-opacity: 0.9; }
+
+      /* the plate's caption, under the house; and the question, at the foot beside About */
+      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; position: fixed; left: 57vw; top: 77vh; z-index: 1; }
+      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: auto 0 0; padding-top: 1.6rem; max-width: 34ch; }
+
       @media (max-width: 900px) {
+        /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
+        .thread { display: none; }
+        .plate-note { position: static; margin: 0.4rem 0 0; }
         main { padding: 1.1rem 1rem 1.4rem; }
         .mast, .text { max-width: none; }
         .text { margin: 0; padding: 0; }
@@ -144,6 +167,7 @@ const { title } = Astro.props;
       }
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }
+        .thread { transition: none; }
       }
     </style>
   </head>

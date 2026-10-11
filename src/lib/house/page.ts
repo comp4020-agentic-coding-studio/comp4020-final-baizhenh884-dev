@@ -6,7 +6,7 @@
 
 import { TERRITORIES } from "./territories";
 import { HouseView } from "./view";
-import type { Kind } from "./motion";
+import { TIMING, type Kind } from "./motion";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -40,7 +40,6 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
   if (slots.length !== 10) return null;
   const view = viewIn(doc.getElementById("house"), false);
   if (!view) return null;
-  doc.querySelector<HTMLElement>("[data-house-note]")?.removeAttribute("hidden");
   // the words the house shows: the shared truth, held drafts or not
   const words = slots.map((s) => s.label.textContent!.trim());
   const part = doc.getElementById("part");
@@ -70,8 +69,11 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
 
   // ---- the sentence's word leaves and the new one arrives with its body ----
   function arrive(s: Slot, old: string, kind: Kind): void {
-    if (reduced()) return;
     const dur = kind === "own" ? 900 : 1300;
+    // the word and its territory are singled out together: the line stands while the part is exchanged, the emphasis until it has settled
+    const T = reduced() ? TIMING.reduced : TIMING[kind];
+    hold(s.position, T.exchange || T.hold, T.exchange + T.hold);
+    if (reduced()) return;
     const ghost = doc.createElement("span");
     ghost.className = "leaving";
     ghost.setAttribute("aria-hidden", "true");
@@ -89,18 +91,73 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
 
   // ---- selection: words and territories are one choice, in ink ----
   let selected: number | null = null;
+  let hovered: number | null = null; // pointed at: a word, a territory, or the visitor's own trace
+  let rebuilding: number | null = null; // the territory being exchanged right now
+  let held = false; // the territory is singled out by an accepted change, not by someone at work on the word
   const annotate = (position: number | null) => {
     if (!part) return;
     part.hidden = position === null;
     part.textContent = position === null ? "" : partLabel(position);
   };
-  const select = (position: number | null) => {
+  // the one hairline between the chosen word and its territory (desktop; red only while that territory is rebuilt)
+  const thread = doc.getElementById("thread") as SVGSVGElement | null;
+  const line = thread?.querySelector("path") ?? null, dot = thread?.querySelector("circle") ?? null;
+  let drawn = 0;
+  // the line means "this word is acting on this territory": a word at work, or a part being rebuilt. Pointing alone never draws it.
+  const target = () => rebuilding ?? (selected !== null && !held ? selected : null);
+  const drawThread = () => {
+    drawn = 0;
+    const p = target();
+    if (!thread || !line || !dot || p === null || getComputedStyle(thread).display === "none") { thread?.classList.remove("on", "red"); return; }
+    const a = view.anchor(p), l = slots[p].label.getBoundingClientRect(), first = slots[0].label.getBoundingClientRect();
+    const sentence = doc.querySelector(".sentence")!.getBoundingClientRect(), column = doc.querySelector(".text")!.getBoundingClientRect();
+    if (!a) return;
+    const cx = l.left + l.width / 2, above = l.top - first.top < l.height * 0.6;
+    // out of the word, round the text (above the first line, below the last), then straight to the territory
+    const sy = above ? l.top : l.bottom, gy = above ? first.top - 12 : sentence.bottom + 6, gx = Math.max(cx, Math.min(column.right + 8, a.x - 24));
+    line.setAttribute("d", `M${cx} ${sy}L${cx} ${gy}L${gx} ${gy}L${a.x} ${a.y}`);
+    dot.setAttribute("cx", String(a.x)); dot.setAttribute("cy", String(a.y));
+    thread.classList.add("on");
+    thread.classList.toggle("red", p === rebuilding);
+    drawn = requestAnimationFrame(drawThread); // follows scroll, resize and a word growing as it is typed
+  };
+  const sync = () => {
+    doc.body.classList.toggle("pointing", hovered !== null && selected === null && rebuilding === null);
+    if (!drawn) drawn = requestAnimationFrame(drawThread);
+  };
+  const setHover = (p: number | null) => {
+    hovered = p;
+    view.hover(p);
+    for (const s of slots) s.pos.classList.toggle("pointed", s.position === p); // the word is marked whoever is pointing: the word, the house or the trace
+    sync();
+  };
+  const select = (position: number | null, byChange = false) => {
     selected = position;
+    held = byChange && position !== null;
     view.select(position);
     annotate(position);
     doc.body.classList.toggle("selecting", position !== null);
     for (const s of slots) s.pos.classList.toggle("selected", s.position === position);
+    sync();
   };
+  // A word has just been exchanged: its territory is the one thing singled out, and the line (red) stands for
+  // `lineMs` while it is rebuilt; the emphasis lasts until `ms`, when the body has settled and everything lets go.
+  const hold = (position: number, lineMs: number, ms: number) => {
+    if (selected !== null) return; // someone is already at work on a word; a change elsewhere doesn't take it over
+    rebuilding = position;
+    select(position, true);
+    setTimeout(() => { if (rebuilding === position) { rebuilding = null; sync(); } }, lineMs);
+    setTimeout(() => { if (selected === position && held && doc.activeElement !== slots[position].input) select(null); }, ms);
+  };
+  // the territory this visitor's standing word made, if it still stands
+  const refreshTrace = () => { const i = slots.findIndex((s) => s.label.querySelector("mark")); view.trace(i < 0 ? null : i); return i < 0 ? null : i; };
+  refreshTrace();
+  doc.addEventListener("pointerover", (e) => {
+    const inTrace = (e.target as Element).closest?.('section[aria-labelledby="trace-heading"]');
+    const i = inTrace ? refreshTrace() : null;
+    if (inTrace && i !== null) setHover(i);
+  });
+  doc.addEventListener("pointerout", (e) => { if ((e.target as Element).closest?.('section[aria-labelledby="trace-heading"]') && !(e.relatedTarget as Element | null)?.closest?.('section[aria-labelledby="trace-heading"]')) setHover(null); });
   for (const s of slots) {
     s.input.addEventListener("focus", () => select(s.position));
     s.input.addEventListener("blur", () => {
@@ -108,8 +165,8 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
       setTimeout(() => { if (selected === s.position && doc.activeElement !== s.input && s.input.value === "") select(null); }, 0);
     });
     s.input.addEventListener("input", () => { if (s.input.value === "" && doc.activeElement !== s.input) select(null); });
-    s.pos.addEventListener("pointerenter", () => { if (fine()) view.hover(s.position); });
-    s.pos.addEventListener("pointerleave", () => { if (fine()) view.hover(null); });
+    s.pos.addEventListener("pointerenter", () => { if (fine()) setHover(s.position); });
+    s.pos.addEventListener("pointerleave", () => { if (fine()) setHover(null); });
   }
   // On a fine pointer the house can be pointed at; on touch the words are the way in,
   // and the canvas never takes a gesture, so the page scrolls as a page.
@@ -117,11 +174,10 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
   canvas.addEventListener("pointermove", (e) => {
     if (!fine()) return;
     const p = view.pick(e.clientX, e.clientY);
-    view.hover(p);
+    setHover(p);
     canvas.style.cursor = p === null ? "default" : "pointer";
-    for (const s of slots) s.pos.classList.toggle("pointed", s.position === p);
   });
-  canvas.addEventListener("pointerleave", () => { view.hover(null); for (const s of slots) s.pos.classList.remove("pointed"); });
+  canvas.addEventListener("pointerleave", () => setHover(null));
   canvas.addEventListener("click", (e) => {
     if (!fine()) return;
     const p = view.pick(e.clientX, e.clientY);
@@ -136,7 +192,7 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
       if (old === word) return;
       words[position] = word;
       view.change(position, words, "remote");
-      queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, "remote"); });
+      queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, "remote"); refreshTrace(); });
     },
   };
 }

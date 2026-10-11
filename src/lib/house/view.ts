@@ -19,6 +19,7 @@ export class HouseView {
   private body: LiveBody;
   private selected: number | null = null;
   private hovered: number | null = null;
+  private traced: number | null = null;
   private queued = false;
   private observer: ResizeObserver;
   private reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -57,6 +58,18 @@ export class HouseView {
 
   select(position: number | null): void { this.selected = position; this.paint(); }
   hover(position: number | null): void { this.hovered = position; this.paint(); }
+  // the territory this visitor's standing word made: drawn a little firmer than the rest, nothing more
+  trace(position: number | null): void { this.traced = position; this.paint(); }
+
+  // where a territory sits on the page (client pixels): the centre of what is standing there now
+  anchor(position: number): { x: number; y: number } | null {
+    const g = this.body.groups[position];
+    if (!g) return null;
+    g.updateMatrixWorld(true);
+    const c = new THREE.Box3().setFromObject(g, true).getCenter(new THREE.Vector3()).project(this.camera);
+    const r = this.canvas.getBoundingClientRect();
+    return { x: r.left + ((c.x + 1) / 2) * r.width, y: r.top + ((1 - c.y) / 2) * r.height };
+  }
 
   // the territory under a point of the canvas, if any
   pick(clientX: number, clientY: number): number | null {
@@ -138,9 +151,9 @@ export class HouseView {
     const field = new THREE.Color(FIELD), focus = this.selected ?? this.hovered;
     this.body.groups.forEach((g, i) => {
       const other = focus !== null && i !== focus;
-      for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.color.copy(m.userData.base as THREE.Color).lerp(field, other ? 0.5 : 0);
-      const base = this.past ? EDGE.past : EDGE.present;
-      this.edges(g, INK, i === this.selected ? 0.85 : i === this.hovered ? 0.5 : other ? 0.07 : base);
+      for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.color.copy(m.userData.base as THREE.Color).lerp(field, other ? 0.62 : 0);
+      const base = (this.past ? EDGE.past : EDGE.present) + (i === this.traced ? 0.12 : 0);
+      this.edges(g, INK, i === this.selected ? 0.9 : i === this.hovered ? 0.6 : other ? 0.05 : base);
     });
     this.requestFrame();
   }
