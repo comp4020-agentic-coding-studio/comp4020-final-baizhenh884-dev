@@ -152,10 +152,13 @@ function upperVolume(k: Kit, P: Body, u: Upper): void {
     k.box(u.x0, u.x1, yt - 0.2, yt, u.z0, u.z1 + 0.1);
     k.box(u.x0 + u.pw, u.x1 - u.pw, yb + 0.1, yt - 0.3, u.z0 + 0.05, u.z0 + 0.07, "opening");
   } else if (u.family === "cells") {
-    const g = 0.3, cw = (u.ux - (u.n - 1) * g) / u.n;
+    // rooms side by side, each under its own slab; the joints between them are recessed at the front, never open
+    const g = 0.2, cw = (u.ux - (u.n - 1) * g) / u.n, cap = 0.16, ov = 0.08;
     for (let i = 0; i < u.n; i++) {
-      const x = u.x0 + i * (cw + g), ww = cw * 0.45, top = yt - 0.2 * (i % 2);
-      k.pierced(x, x + cw, yb, top, u.z0, u.z1, 0.2, [[x + (cw - ww) / 2, x + (cw + ww) / 2, yb + 0.45, top - 0.4]]);
+      const x = u.x0 + i * (cw + g), ww = cw * 0.5, top = yt - 0.2 * (i % 2);
+      k.pierced(x, x + cw, yb, top - cap, u.z0, u.z1, 0.2, [[x + (cw - ww) / 2, x + (cw + ww) / 2, yb + 0.4, top - cap - 0.35]]);
+      k.box(x - (i > 0 ? ov : 0), x + cw + (i < u.n - 1 ? ov : 0), top - cap, top, u.z0, u.z1);
+      if (i > 0) k.box(x - g, x, yb, yt - 0.2 - cap, u.z0, u.z1 - 0.35);
     }
     if (u.gap > 0) k.box(u.x0, u.x1, yb - 0.15, yb, u.z0, u.z1);
   } else if (u.family === "vault") {

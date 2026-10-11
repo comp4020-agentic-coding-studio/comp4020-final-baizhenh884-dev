@@ -119,7 +119,7 @@ export function planBody(words: readonly string[]): Body {
     u.z0 = align === "back" ? ZB : b.topFront - u.ud;
     u.z1 = u.z0 + u.ud;
     u.top = u.y0 + u.gap + u.uh;
-    if (u.family === "cells") u.n = Math.max(2, Math.min(1 + lv(s, "rep"), Math.floor((u.ux + 0.3) / 0.95)));
+    if (u.family === "cells") u.n = Math.max(2, Math.min(1 + lv(s, "rep"), Math.floor((u.ux + 0.2) / 1.2))); // each cell a room's width, not a fin
     if (u.family === "vault") u.rise = Math.min(u.ux / 2, u.uh * 0.6);
     return u;
   };
