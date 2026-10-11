@@ -7,6 +7,8 @@ const visitor = ensureVisitor(Astro.cookies);
 
 // GET /?at=N: the whole sentence after the first N changes, read-only.
 // GET /: the current sentence, the only one that can be changed.
+// Each has its house: a body built in the browser from these same words,
+// never stored, and beside the sentence rather than instead of it.
 const at = Astro.url.searchParams.get("at");
 let earlier: string[] | null = null;
 if (at !== null) {
@@ -22,72 +24,96 @@ const yours = trace?.standing ? trace.position : null;
 ---
 
 <Page title="Theseus">
+  <header class="mast">
+    <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
+  </header>
   {
     earlier ? (
       <>
-        <p>An earlier form of the sentence (read-only).</p>
-        <p class="sentence">{earlier.join(" ")}.</p>
-        <nav class="history" aria-label="Earlier forms of the sentence">
-          {n > 0 && <a rel="prev" href={`?at=${n - 1}`}>Earlier sentence</a>}
-          {n + 1 < changes && <a rel="next" href={`?at=${n + 1}`}>Later sentence</a>}
-          <a rel={n + 1 === changes ? "next" : undefined} href="/">Back to now</a>
-        </nav>
+        <div class="text">
+          <p class="form-state caps">An earlier form (read-only)</p>
+          <p class="sentence past">
+            {earlier.map((w, i) => (
+              <>
+                <span class="w">{w}</span>
+                {i < earlier.length - 1 ? " " : "."}
+              </>
+            ))}
+          </p>
+          <nav class="history caps" aria-label="Earlier forms of the sentence">
+            {n > 0 && <a rel="prev" href={`?at=${n - 1}`}>Earlier form</a>}
+            {n + 1 < changes && <a rel="next" href={`?at=${n + 1}`}>Later form</a>}
+            <a rel={n + 1 === changes ? "next" : undefined} href="/">Back to now</a>
+          </nav>
+        </div>
+        <div id="house" aria-hidden="true"></div>
+        <script>
+          // An earlier form shows its own body, built from its own words, and never goes live.
+          import { mountEarlier } from "../lib/house/page";
+
+          mountEarlier(document);
+        </script>
       </>
     ) : (
       <>
-        <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
-        <p id="how">
-          Tap or click one word, type its replacement, and press Enter. You get one change, and it can't be
-          undone. Anyone after you can change any word, including yours.
-        </p>
-        <div class="sentence">
-          {current.map((p, i) => (
-            <>
-              <div class="pos">
-                <form method="post" action="/replace">
-                  <input type="hidden" name="position" value={p.position} />
-                  <input type="hidden" name="version" value={p.version} />
-                  <label for={`word-${p.position}`}>{p.position === yours ? <mark>{p.word}</mark> : p.word}</label>
-                  <input
-                    id={`word-${p.position}`}
-                    name="word"
-                    aria-describedby="how"
-                    placeholder={p.word}
-                    autocomplete="off"
-                    spellcheck="false"
-                    required
-                  />
-                </form>
-                {(past.get(p.position) ?? []).length > 0 && (
-                  <span class="past" aria-hidden="true">
-                    {(past.get(p.position) ?? []).map((w) => <span>{w}</span>)}
-                  </span>
+        <div class="text">
+          <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+          <p id="how">
+            Choose a word, type its replacement and press Enter.<span data-house-note hidden> The house is rebuilt where that word stands.</span> You get one change, and it can't be undone. Anyone after you can change any word, including yours.
+          </p>
+          <div class="sentence">
+            {current.map((p, i) => (
+              <>
+                <div class="pos">
+                  <form method="post" action="/replace">
+                    <input type="hidden" name="position" value={p.position} />
+                    <input type="hidden" name="version" value={p.version} />
+                    <label for={`word-${p.position}`}>{p.position === yours ? <mark>{p.word}</mark> : p.word}</label>
+                    <input
+                      id={`word-${p.position}`}
+                      name="word"
+                      aria-describedby="how"
+                      placeholder={p.word}
+                      autocomplete="off"
+                      spellcheck="false"
+                      required
+                    />
+                  </form>
+                  {(past.get(p.position) ?? []).length > 0 && (
+                    <span class="past" aria-hidden="true">
+                      {(past.get(p.position) ?? []).map((w) => <span>{w}</span>)}
+                    </span>
+                  )}
+                </div>
+                {i < current.length - 1 && " "}
+              </>
+            ))}.
+          </div>
+          <p id="part" class="caps" aria-hidden="true" hidden></p>
+          {trace && (
+            <section aria-labelledby="trace-heading">
+              <h2 id="trace-heading">Your trace</h2>
+              <p role="status">
+                {trace.standing ? (
+                  <>Your word “{trace.word}” still stands, marked in the sentence above.</>
+                ) : (
+                  <>
+                    Your word “<del>{trace.word}</del>” has since been replaced: “{trace.now}” stands in its place now.
+                  </>
                 )}
-              </div>
-              {i < current.length - 1 && " "}
-            </>
-          ))}.
+              </p>
+            </section>
+          )}
+          {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
         </div>
-        {trace && (
-          <section aria-labelledby="trace-heading">
-            <h2 id="trace-heading">Your trace</h2>
-            <p role="status">
-              {trace.standing ? (
-                <>Your word “{trace.word}” still stands, underlined in the sentence above.</>
-              ) : (
-                <>
-                  Your word “<del>{trace.word}</del>” has since been replaced: “{trace.now}” stands in its place now.
-                </>
-              )}
-            </p>
-          </section>
-        )}
-        {changes > 0 && <p><a rel="prev" href={`?at=${changes - 1}`}>Earlier sentence</a></p>}
+        <div id="house" aria-hidden="true"></div>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot } from "../lib/live-client";
+          import { mountCurrent } from "../lib/house/page";
 
-          const page = attach(document);
+          const house = mountCurrent(document);
+          const page = attach(document, { onLatest: (change) => house?.latest(change) });
           const events = new EventSource("/events");
           events.addEventListener("snapshot", (e) => {
             const snapshot = parseSnapshot(e.data);
@@ -101,5 +127,5 @@ const yours = trace?.standing ? trace.position : null;
       </>
     )
   }
-  <p><a href="/readme/">About Theseus</a></p>
+  <p class="about caps"><a href="/readme/">About Theseus</a></p>
 </Page>

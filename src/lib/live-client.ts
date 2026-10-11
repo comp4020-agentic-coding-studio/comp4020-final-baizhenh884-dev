@@ -118,7 +118,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       slot.notice.append(doc.createElement("span"));
       slot.form.after(slot.notice);
     }
-    slot.notice.firstElementChild!.textContent = `changed to “${slot.latest.word}”`;
+    slot.notice.firstElementChild!.textContent = `changed while you wrote — now “${slot.latest.word}”`;
     keepInside(slot.notice);
   }
 
@@ -177,7 +177,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     if (!status) return;
     traceChanged = false;
     if (trace.standing) {
-      status.textContent = `Your word “${trace.word}” still stands, underlined in the sentence above.`;
+      status.textContent = `Your word “${trace.word}” still stands, marked in the sentence above.`;
     } else {
       const del = doc.createElement("del");
       del.textContent = trace.word;
@@ -199,9 +199,10 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     let link = doc.querySelector<HTMLAnchorElement>('a[rel~="prev"]');
     if (!link) {
       const p = doc.createElement("p");
+      p.className = "earlier caps";
       link = doc.createElement("a");
       link.rel = "prev";
-      link.textContent = "Earlier sentence";
+      link.textContent = "Earlier form";
       p.append(link);
       const readme = doc.querySelector('a[href="/readme/"]')?.closest("p");
       if (readme) readme.before(p);

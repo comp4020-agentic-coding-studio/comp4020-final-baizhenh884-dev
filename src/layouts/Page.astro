@@ -1,6 +1,13 @@
 ---
-// The one page shell: language, viewport, title and the minimal styles every
-// view shares. Visitor words are only ever interpolated as text.
+// The one page shell: language, viewport, title and the styles every view
+// shares, in Monograph: a light architectural-study field, the sentence set
+// large in Instrument Serif, the house as its body beside it. Visitor words
+// are only ever interpolated as text.
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
+import "@fontsource/instrument-sans/400.css";
+import "@fontsource/instrument-sans/500.css";
+
 interface Props {
   title: string;
 }
@@ -14,11 +21,31 @@ const { title } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <style is:global>
-      body { margin: 0; font-family: Georgia, "Iowan Old Style", serif; line-height: 1.5; }
-      main { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem; overflow-wrap: anywhere; }
+      /* red has one job, a body being rebuilt now; nothing in these styles is red */
+      :root { --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--field); color: var(--ink);
+        font: 400 15px/1.45 "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+      }
+      main { min-height: 100vh; padding: 4.2vh 5.2vw 4.6vh; overflow-wrap: anywhere; display: flex; flex-direction: column; }
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-      .sentence { font-size: clamp(1.75rem, 6vw, 3rem); line-height: 1.2; margin: 1.5rem 0; }
-      .sentence .pos { display: inline-flex; flex-direction: column; vertical-align: top; max-width: 100%; padding-bottom: 0.3em; }
+      .caps { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; }
+      a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+      a:hover { text-decoration-thickness: 2px; }
+      a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+      .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--hair); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
+      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; }
+      .mast .sub { color: var(--soft); }
+      /* the sentence sits in the middle of the page's height, level with the house */
+      .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
+      #how { margin: 0 0 1.5rem; color: var(--soft); max-width: 40ch; }
+
+      /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
+      .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
+      .sentence.past { font-style: italic; color: #3b3630; }
+      .sentence .pos { position: relative; display: inline-flex; flex-direction: column; vertical-align: top; max-width: 100%; padding-bottom: 0.18em; }
       /* Each word's label and input share one grid cell, so editing happens in
          the word's own place. The input contributes no width (width: 0) and
          fills the cell (min-width: 100%), so the cell is exactly the word:
@@ -26,20 +53,21 @@ const { title } = Astro.props;
       .sentence form { display: inline-grid; max-width: 100%; }
       .sentence form > label, .sentence form > input[name="word"] { grid-area: 1 / 1; min-width: 0; }
       .sentence input[name="word"] {
-        width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 2px solid transparent;
-        font: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
+        width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0;
+        font-family: "Instrument Serif", serif; font-style: italic; font-weight: 400; font-size: 1em; line-height: inherit;
+        color: inherit; background: transparent; opacity: 0; cursor: text;
       }
-      .sentence input[name="word"]::placeholder { color: inherit; opacity: 0.6; }
+      .sentence input[name="word"]::placeholder { color: var(--faint); opacity: 1; }
       .sentence form:focus-within label { visibility: hidden; }
-      .sentence form:focus-within input[name="word"] { opacity: 1; outline: 3px solid; outline-offset: 3px; }
-      .sentence label { cursor: text; }
-      /* a quiet cue that a word can be replaced: live page, pointer devices,
-         and never on your own standing word, which keeps its solid underline */
+      .sentence form:focus-within input[name="word"] { opacity: 1; outline: none; }
+      .sentence label { cursor: text; text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 0.11em; transition: color 0.25s; }
+      /* choosing a word: the others recede, the chosen one is drawn in ink */
+      body.selecting .sentence .pos:not(.selected) label { color: var(--faint); }
       @media (hover: hover) {
-        .sentence form:hover label:not(:has(mark)) {
-          text-decoration: underline dotted 1px; text-underline-offset: 0.15em; text-decoration-color: #8a8a8a;
-        }
+        .sentence .pos:hover label:not(:has(mark)), .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.35); }
       }
+      /* your word, while it stands: a hairline of dots, no badge */
+      mark { background: none; color: inherit; text-decoration: underline dotted 1.5px var(--soft); text-underline-offset: 0.14em; }
       /* Where supported, grow with what's typed rather than scroll within the word. */
       @supports (field-sizing: content) {
         .sentence form:focus-within input[name="word"] { field-sizing: content; width: auto; max-width: 80vw; }
@@ -49,35 +77,58 @@ const { title } = Astro.props;
          sentence spaces and wraps by its current words alone; a long one is
          cut short rather than pushing its neighbours apart. */
       .sentence .past {
-        font-size: 0.9rem; opacity: 0.6; display: flex; flex-direction: column;
-        width: 0; min-width: 100%; margin-top: 0.5rem; /* clears the focus outline */
+        font: 400 0.8rem/1.3 "Instrument Sans", sans-serif; color: var(--soft); opacity: 0.75; display: flex; flex-direction: column;
+        width: 0; min-width: 100%; margin-top: 0.35rem; letter-spacing: 0;
       }
       .sentence .past > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+      .sentence .past > span + span { opacity: 0.7; }
+      /* the word leaving as its body is rebuilt (decorative; the label is the word) */
+      .sentence .leaving { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none; }
       /* Someone else changed this word while you were typing a draft for it.
-         The notice keeps one line of height in its word's column (so it never
+         The note keeps one line of height in its word's column (so it never
          covers the row below) but no width, so the sentence never re-flows;
-         its line runs on over neighbouring faded past words, on the page's
-         own colour. The client keeps it inside the sentence's width. */
+         the client keeps it inside the sentence's width. */
       .sentence .changed {
-        font-size: 0.9rem; font-style: italic; margin-top: 0.5rem; /* clears the focus outline */
+        font: italic 400 1rem/1.3 "Instrument Serif", serif; color: var(--soft); margin-top: 0.35rem; letter-spacing: 0;
         width: 0; min-width: 100%; white-space: nowrap;
       }
       .sentence .changed > span {
         display: inline-block; vertical-align: top; position: relative; z-index: 1;
-        padding-right: 0.4em; background: Canvas; overflow: hidden; text-overflow: ellipsis;
+        padding-right: 0.4em; background: var(--field); overflow: hidden; text-overflow: ellipsis;
       }
-      mark { background: none; text-decoration: underline 0.08em; text-underline-offset: 0.15em; }
-      a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
-      a:hover { text-decoration-thickness: 2px; }
-      a:focus-visible, input:focus-visible { outline: 3px solid; outline-offset: 2px; }
-      .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin: 1.5rem 0; }
+
+      /* the part a word stands for, only while it's in hand */
+      #part { margin: 0 0 1rem; color: var(--soft); }
+      #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
+      #house canvas { display: block; width: 100%; height: 100%; }
+
+      .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
+      .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
+      .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
+      .form-state { color: var(--soft); margin: 0 0 1.2rem; }
       /* your trace: a quiet footnote to the shared sentence, not a panel */
-      section[aria-labelledby="trace-heading"] { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #ddd; }
-      #trace-heading {
-        margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: normal; letter-spacing: 0.08em; text-transform: uppercase;
-        color: #595959;
+      section[aria-labelledby="trace-heading"] { margin-top: 2rem; padding-top: 0.8rem; border-top: 1px solid var(--hair); max-width: 36ch; }
+      #trace-heading { margin: 0 0 0.3rem; font-size: 0.66rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+      section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; font-size: 0.9rem; color: var(--soft); }
+      section[aria-labelledby="trace-heading"] del { font: italic 400 1.1rem/1 "Instrument Serif", serif; color: var(--ink); text-decoration-thickness: 1px; }
+      [role="alert"] { font: 400 1.6rem/1.25 "Instrument Serif", serif; max-width: 30ch; }
+
+      @media (max-width: 900px) {
+        main { padding: 1.1rem 1rem 1.4rem; }
+        .mast, .text { max-width: none; }
+        .text { margin: 0; padding: 0; }
+        .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
+        .sentence { font-size: 34px; line-height: 1.32; }
+        /* a short word still gets a 44px target, widened evenly into the space around it */
+        .sentence label { position: relative; }
+        .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: max(100%, 46px); transform: translateX(-50%); }
+        .sentence form { min-height: 44px; }
+        /* the house takes its own band under the sentence; the page scrolls through it as a page */
+        #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
       }
-      section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; }
+      @media (prefers-reduced-motion: reduce) {
+        .sentence label { transition: none; }
+      }
     </style>
   </head>
   <body>

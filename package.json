@@ -29,6 +29,8 @@
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.1",
     "@astrojs/node": "^11.1.6",
+    "@fontsource/instrument-sans": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "astro": "^7.3.5",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.3",
