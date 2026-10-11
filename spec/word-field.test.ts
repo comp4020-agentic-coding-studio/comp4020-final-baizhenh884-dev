@@ -66,9 +66,10 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
   }
 }
 
-type Measure = { i: number; label: number; field: number; formBefore: number[]; formAfter: number[]; clipped: boolean; focused: boolean; value: string };
+type Measure = { i: number; label: number; field: number; formBefore: number[]; formAfter: number[]; clipped: boolean; focused: boolean; value: string; hit: number };
 
 const DESKTOP: [number, number] = [1440, 900];
+const PHONE: [number, number] = [390, 844];
 
 async function measure(withoutFieldSizing: boolean, size: [number, number] = DESKTOP): Promise<Measure[]> {
   const home = await (await fetch(new URL("/", baseUrl))).text();
@@ -108,13 +109,16 @@ async function measure(withoutFieldSizing: boolean, size: [number, number] = DES
       const out = [];
       for (const [i, input] of [...document.querySelectorAll('.sentence input[name="word"]')].entries()) {
         const form = input.closest("form"), label = form.querySelector("label");
+        // what a tap on the middle of the word reaches: that word's own form, or whichever neighbour overlaps it
+        const lr = label.getBoundingClientRect(), under = document.elementFromPoint(lr.left + lr.width / 2, lr.top + lr.height / 2)?.closest("form");
+        const hit = under ? [...document.querySelectorAll('.sentence form')].indexOf(under) : -1;
         input.value = ""; input.blur();
         const formBefore = box(form);
         input.focus();
         const formAfter = box(form); // choosing moves nothing; what is then typed may grow the word
         input.value = "hello";
         out.push({ i, label: label.getBoundingClientRect().width, field: input.getBoundingClientRect().width, formBefore, formAfter,
-          clipped: input.scrollWidth > input.clientWidth + 1, focused: document.activeElement === input, value: input.value });
+          clipped: input.scrollWidth > input.clientWidth + 1, focused: document.activeElement === input, value: input.value, hit });
         input.value = ""; input.blur();
       }
       return out;
@@ -140,6 +144,15 @@ describe("choosing a word", () => {
         // choosing a word does not move it, or change its line's height
         expect(r.formAfter, `word ${r.i}: choosing it moves nothing`).toEqual(r.formBefore);
       }
+    }, 90_000);
+  }
+
+  for (const [name, size] of [["desktop 1440×900", DESKTOP], ["phone 390×844", PHONE]] as const) {
+    it(`reaches the word that was touched, not a neighbour (${name})`, async () => {
+      const rows = await measure(false, size);
+      expect(rows.length).toBe(10);
+      // the middle of every word belongs to that word: neighbouring short words must not cover each other
+      expect(rows.map((r) => r.hit)).toEqual(rows.map((r) => r.i));
     }, 90_000);
   }
 });

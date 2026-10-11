@@ -133,9 +133,11 @@ const { title } = Astro.props;
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         .sentence { font-size: 34px; line-height: 1.32; }
-        /* a short word still gets a 44px target, widened evenly into the space around it */
+        /* a word's target is as tall as its form (44px) and a little wider than the word, into the
+           space beside it and no further: two short words side by side ("if it") used to have 46px
+           targets that overlapped, and a tap on the first went to the second */
         .sentence label { position: relative; }
-        .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: max(100%, 46px); transform: translateX(-50%); }
+        .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: calc(100% + 0.16em); transform: translateX(-50%); }
         .sentence form { min-height: 44px; }
         /* the house takes its own band under the sentence; the page scrolls through it as a page */
         #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
