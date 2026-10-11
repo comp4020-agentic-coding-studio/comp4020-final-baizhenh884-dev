@@ -109,12 +109,14 @@ async function measure(withoutFieldSizing: boolean, size: [number, number] = DES
       const out = [];
       for (const [i, input] of [...document.querySelectorAll('.sentence input[name="word"]')].entries()) {
         const form = input.closest("form"), label = form.querySelector("label");
+        // the sentence may sit below the fold once other visitors have changed it: look at the word, then measure it in place
+        label.scrollIntoView({ block: "center" });
         // what a tap on the middle of the word reaches: that word's own form, or whichever neighbour overlaps it
         const lr = label.getBoundingClientRect(), under = document.elementFromPoint(lr.left + lr.width / 2, lr.top + lr.height / 2)?.closest("form");
         const hit = under ? [...document.querySelectorAll('.sentence form')].indexOf(under) : -1;
         input.value = ""; input.blur();
         const formBefore = box(form);
-        input.focus();
+        input.focus({ preventScroll: true }); // layout is under test, not the page scrolling to a field
         const formAfter = box(form); // choosing moves nothing; what is then typed may grow the word
         input.value = "hello";
         out.push({ i, label: label.getBoundingClientRect().width, field: input.getBoundingClientRect().width, formBefore, formAfter,
