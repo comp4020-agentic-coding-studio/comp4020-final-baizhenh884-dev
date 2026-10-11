@@ -1,12 +1,24 @@
 # Theseus
 
-One sentence of ten words, shared by everyone who visits:
+The Ship of Theseus asks whether something remains the same thing when each of
+its parts has been replaced, one by one.
 
-> Make a website that people would miss if it disappeared.
+Here, that question takes two forms at once: a sentence of ten words, and a
+house of ten parts. Each place in the sentence corresponds to part of the
+house. The position of a word determines where it acts; the way the word is
+written helps determine the architectural character of that part. Its meaning
+does not.
 
-I wrote that; it's the starting condition, not a visitor's change. Strangers
-rewrite it one word at a time, one change each, and can come back, or stay, to
-watch.
+I wrote the first sentence: *Make a website that people would miss if it
+disappeared.* After that, every visitor may replace one word, once. Change a
+word and its part of the house is rebuilt.
+
+Nothing is permanent, and nobody owns what they leave behind. A later stranger
+may replace any word, including yours. The present is shared and changes as
+people act on it; earlier forms remain still, preserving the sentence and the
+house as they were.
+
+*If every word and every part is replaced, is it still the same thing?*
 
 ## The rule
 
@@ -62,6 +74,14 @@ page applies only newer versions; the server decides every replacement. No
 event log, replay or presence registry. Words are form fields, a screen-reader
 summary stays current, and words are always text. Deployed behaviour on Fly.io
 is unchecked so far.
+
+The house is a second reading of the same sentence, never a second record: ten
+fixed parts, one per position, built in the browser from the written form of
+each word. An earlier form's house comes from that earlier sentence alone, and
+nothing about it is stored. Typing never changes the house; a part is rebuilt
+only after the server has accepted the change, and red means only that a part is
+being rebuilt now. The drawing is decorative to assistive technology; the
+sentence is the accessible state.
 
 ## What I looked at
 

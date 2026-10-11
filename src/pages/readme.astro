@@ -1,21 +1,59 @@
 ---
-// README.md, rendered in full: what this app is and what good means here.
-// spec/invariants.test.ts checks every heading is on this page.
+// README.md, rendered in full: the note at its head is the exhibition statement,
+// and everything under the first rule is the record (what good means here, how it
+// works, what I looked at). README.md is the one source: nothing here is written twice.
+// spec/invariants.test.ts checks every heading is on this page, in order.
 import * as readme from "../../README.md";
+import Page from "../layouts/Page.astro";
 
 const title = readme.getHeadings().find((h) => h.depth === 1)?.text ?? "README";
-const html = await readme.compiledContent();
+// ENFORCED / JUDGED are set as quiet tags; the words themselves are unchanged
+const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\/code>/g, '<span class="tag">$1</span>');
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-  </head>
-  <body>
-    <nav aria-label="site"><a href="/">The sentence</a></nav>
-    <main set:html={html} />
-  </body>
-</html>
+<Page title={`About ${title}`}>
+  <div class="readme">
+    <header class="mast">
+      <span class="name">{title}</span><span class="sub caps">About</span>
+      <nav aria-label="site"><a class="caps" href="/">The sentence</a></nav>
+    </header>
+    <article set:html={html} />
+  </div>
+</Page>
+
+<style is:global>
+  /* the note, then the record: one column, in the page's own field and type */
+  .readme { max-width: 36rem; }
+  .readme .mast { max-width: none; margin-bottom: clamp(36px, 9vh, 88px); }
+  .readme .mast nav { margin-left: auto; color: var(--soft); }
+  .readme .mast nav a { text-decoration-color: var(--hair); }
+  .readme article > h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* the note: serif, the first line larger, the question set apart at its foot */
+  .readme article > p { font: 400 clamp(20px, 1.55vw, 24px)/1.4 "Instrument Serif", serif; color: var(--ink); margin: 0 0 1.15em; letter-spacing: -0.003em; }
+  .readme article > h1 + p { font-size: clamp(27px, 2.5vw, 38px); line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1em; }
+  .readme article > p:has(+ h2:first-of-type) { font-style: italic; font-size: clamp(24px, 2vw, 30px); line-height: 1.25; margin-top: 1.9em; }
+  .readme article em { font-style: italic; }
+
+  /* the record: under a hairline and a generous gap, in the quieter sans */
+  .readme article > h2:first-of-type { margin-top: clamp(64px, 14vh, 130px); padding-top: 1.1rem; border-top: 1px solid var(--hair); }
+  .readme article h2, .readme article h3 { font: 400 0.7rem/1.5 "Instrument Sans", system-ui, sans-serif; letter-spacing: 0.17em; text-transform: uppercase; color: var(--soft); }
+  .readme article h2 { margin: 3rem 0 0.9rem; }
+  .readme article h3 { margin: 2.1rem 0 0.4rem; color: var(--ink); letter-spacing: 0.12em; }
+  .readme article h2 ~ p, .readme article h2 ~ ul { font: 400 0.94rem/1.58 "Instrument Sans", system-ui, sans-serif; color: var(--soft); letter-spacing: 0; margin: 0 0 1rem; max-width: 62ch; }
+  .readme article ul { padding-left: 1.1rem; }
+  .readme article li { margin: 0 0 0.55rem; padding-left: 0.2rem; }
+  .readme article li::marker { color: var(--hair); }
+  .readme article li strong { font-weight: 500; color: var(--ink); }
+  .readme article h2 ~ p a, .readme article h2 ~ ul a { text-decoration-color: var(--hair); }
+  .readme article code { font: 400 0.88em "Instrument Sans", system-ui, sans-serif; color: var(--ink); }
+  .readme article .tag { font: 400 0.6rem/1 "Instrument Sans", system-ui, sans-serif; letter-spacing: 0.14em; color: var(--soft); border: 1px solid var(--hair); padding: 0.18em 0.5em 0.15em; margin-right: 0.15em; white-space: nowrap; }
+
+  @media (max-width: 900px) {
+    .readme .mast { margin-bottom: 2.4rem; }
+    .readme article > h1 + p { font-size: 28px; }
+    .readme article > p { font-size: 21px; }
+    .readme article > p:has(+ h2:first-of-type) { font-size: 24px; }
+    .readme article > h2:first-of-type { margin-top: 3.4rem; }
+  }
+</style>
