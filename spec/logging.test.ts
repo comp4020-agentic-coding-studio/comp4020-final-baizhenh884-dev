@@ -56,6 +56,31 @@ const dockerOnly = (name: string, fn: () => Promise<void>, timeout?: number) => 
   return it.skip(`${name} [skipped: docker logs unavailable locally]`, fn);
 };
 
+// freed/settled only ever log under rule mode settle (docs/decisions/0003);
+// RULE_MODE comes from the test runner's own environment, the same way
+// spec/eligibility.test.ts reads it, not from anything the app's responses
+// or logs reveal. In CI, RULE_MODE is always explicit (checks.yml runs both
+// passes), so an unset value there is a real failure, not a skip.
+const settleModeReady = available && process.env.RULE_MODE === "settle";
+const dockerSettleOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn);
+  if (!available) {
+    if (inCI) {
+      return it(`${name} [docker logs unavailable in CI]`, () => {
+        throw new Error("docker inspect app failed: CI's container must be named 'app' and reachable");
+      });
+    }
+    return it.skip(`${name} [skipped: docker logs unavailable locally]`, fn);
+  }
+  if (inCI && !process.env.RULE_MODE) {
+    return it(`${name} [RULE_MODE unset in CI]`, () => {
+      throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+    });
+  }
+  if (settleModeReady) return it(name, fn, timeout);
+  return it.skip(`${name} [skipped: RULE_MODE isn't settle]`, fn);
+};
+
 function logs(): string {
   return execSync("docker logs app", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
@@ -258,4 +283,55 @@ describe("Theseus server-side logging", () => {
     expect(reply, "the /replace response leaks something log-line-shaped").not.toMatch(/\[[0-9a-f]{6}\]/);
     expect(page, "GET / leaks a v= tag").not.toMatch(/\bv=[0-9a-f]{8}\b/);
   });
+
+  dockerSettleOnly("logs who a replacement frees, tagged with the freed visitor's own tag, not the replacer's", async () => {
+    const ann = await arrive();
+    const slot = (await ann.sentence())[0];
+    const annsWord = unique();
+    expect((await ann.replace(slot, annsWord)).status).toBe(303);
+
+    const bea = await arrive();
+    const now = await bea.sentence();
+    const held = now.find((s) => s.word === annsWord)!;
+    const beasWord = unique();
+    expect((await bea.replace(held, beasWord)).status).toBe(303);
+
+    const log = logs();
+    const reqId = requestIdOf(log, beasWord);
+    const freedLine = log.split("\n").find((l) => l.startsWith(`[${reqId}]`) && l.includes("freed"));
+    expect(freedLine, `no freed line shares request id [${reqId}] with bea's replacement`).toBeDefined();
+    expect(freedLine, "the freed line names bea's tag instead of ann's").toContain(`v=${ann.tag()}`);
+    expect(freedLine, "the freed line names the replacer's own tag").not.toContain(`v=${bea.tag()}`);
+  });
+
+  dockerSettleOnly(
+    "logs a settled event, naming the visitor and position, the first time a request observes it",
+    async () => {
+      const settleSeconds = Number(process.env.SETTLE_SECONDS ?? 300);
+      if (settleSeconds > 10) {
+        // mirrors spec/eligibility.test.ts's settleByAgeOnly: this needs a
+        // short SETTLE_SECONDS (checks.yml sets 3) to be practical to wait out
+        throw new Error("SETTLE_SECONDS must be short (checks.yml sets 3) for this check to wait it out");
+      }
+      const ann = await arrive();
+      const before = await ann.sentence();
+      const held = before[0];
+      expect((await ann.replace(held, unique())).status).toBe(303);
+
+      await new Promise((resolve) => setTimeout(resolve, (settleSeconds + 1) * 1000));
+
+      const now = await ann.sentence();
+      const elsewhere = now.find((s) => s.position !== held.position)!;
+      const freedWord = unique();
+      expect((await ann.replace(elsewhere, freedWord)).status, "setup: settling didn't free the visitor").toBe(303);
+
+      const log = logs();
+      const reqId = requestIdOf(log, freedWord);
+      const settledLine = log.split("\n").find((l) => l.startsWith(`[${reqId}]`) && l.includes("settled"));
+      expect(settledLine, `no settled line shares request id [${reqId}] with the request it enabled`).toBeDefined();
+      expect(settledLine, "the settled line doesn't name the visitor's tag").toContain(`v=${ann.tag()}`);
+      expect(settledLine, "the settled line doesn't name the position that settled").toContain(`pos=${held.position}`);
+    },
+    20_000,
+  );
 });
