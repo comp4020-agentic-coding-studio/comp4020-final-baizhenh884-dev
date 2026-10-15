@@ -52,7 +52,7 @@ client.transaction(() => STARTING_WORDS.forEach((word, position) => seed.run(pos
 // `fly secrets set RULE_MODE=settle`, never a deploy-time flag, since a flag
 // would be lost on CI's next automatic redeploy.
 const RULE_MODE = process.env.RULE_MODE === "settle" ? "settle" : "once";
-const SETTLE_SECONDS = Number(process.env.SETTLE_SECONDS ?? 300);
+export const SETTLE_SECONDS = Number(process.env.SETTLE_SECONDS ?? 300);
 client.prepare("UPDATE rules SET mode = ?, settle_seconds = ? WHERE id = 1").run(RULE_MODE, SETTLE_SECONDS);
 console.log(`[theseus] rule mode: ${RULE_MODE} (settle_seconds=${SETTLE_SECONDS})`);
 
@@ -178,6 +178,84 @@ export function settledPosition(visitor: string): number | null {
   if (laterAtPosition.get(last.position, last.id)) return null; // freed by replacement, not settling
   const ageSeconds = (client.prepare("SELECT (julianday('now') - julianday(?)) * 86400 AS s").get(last.createdAt) as { s: number }).s;
   return ageSeconds >= rules.settleSeconds ? last.position : null;
+}
+
+// The richer trace under rule mode `settle` (docs/decisions/0003-settle-and-
+// kept-ships.md, "Your Trace"): the visitor's latest change, plus every other
+// standing word of theirs (always "settled" — only `latest` can ever still be
+// holding) and every other replaced word of theirs, newest first. `latest`'s
+// holding branch carries `settlesInMs`, relative so there's no clock-skew
+// issue: the client schedules a local timer from it and flips the display to
+// settled once it elapses (settling itself has no server event to push a
+// live update with — see src/lib/live-client.ts). It is never rendered as
+// visible or screen-reader text; it exists only to drive that timer.
+export type StandingItem = { position: number; word: string };
+export type ReplacedItem = { position: number; word: string; now: string };
+export type SettleTrace = {
+  latest:
+    | { position: number; word: string; standing: true; settled: true }
+    | { position: number; word: string; standing: true; settled: false; settlesInMs: number }
+    | { position: number; word: string; standing: false; now: string };
+  otherStanding: StandingItem[];
+  otherReplaced: ReplacedItem[];
+};
+
+const allChanges = client.prepare(
+  "SELECT id, position, to_word AS word, created_at AS createdAt FROM changes WHERE visitor = ? ORDER BY id DESC",
+);
+const ageMsOf = client.prepare("SELECT (julianday('now') - julianday(?)) * 86400000 AS ms");
+
+export function settleTraceFor(visitor: string): SettleTrace | null {
+  const rows = allChanges.all(visitor) as { id: number; position: number; word: string; createdAt: string }[];
+  const mine = rows[0];
+  if (!mine) return null;
+
+  const later = laterAtPosition.get(mine.position, mine.id);
+  let latest: SettleTrace["latest"];
+  if (later) {
+    latest = { position: mine.position, word: mine.word, standing: false, now: wordAt(mine.position) ?? "" };
+  } else {
+    const ageMs = (ageMsOf.get(mine.createdAt) as { ms: number }).ms;
+    const settlesInMs = Math.max(0, SETTLE_SECONDS * 1000 - ageMs);
+    latest =
+      settlesInMs > 0
+        ? { position: mine.position, word: mine.word, standing: true, settled: false, settlesInMs }
+        : { position: mine.position, word: mine.word, standing: true, settled: true };
+  }
+
+  // A visitor can have several rows at the same position across the
+  // sentence's history (settle mode allows retaking a position once it's no
+  // longer theirs); only the newest row at each other position matters for
+  // whether it's standing or replaced, so later (older) rows at a position
+  // already seen are skipped. `rows` is already newest-first, so both lists
+  // come out newest-first without a separate sort.
+  const seen = new Set<number>([mine.position]);
+  const otherStanding: StandingItem[] = [];
+  const otherReplaced: ReplacedItem[] = [];
+  for (const row of rows.slice(1)) {
+    if (seen.has(row.position)) continue;
+    seen.add(row.position);
+    if (laterAtPosition.get(row.position, row.id)) {
+      otherReplaced.push({ position: row.position, word: row.word, now: wordAt(row.position) ?? "" });
+    } else {
+      otherStanding.push({ position: row.position, word: row.word });
+    }
+  }
+
+  return { latest, otherStanding, otherReplaced };
+}
+
+// The discriminated wrapper callers (index.astro, events.ts) use: which
+// shape a trace has is itself decided by rules.mode, never guessed from the
+// trace's own content. traceFor/settleTraceFor stay independently callable
+// (traceFor is still exactly Crit 9's once-mode contract) — this only picks
+// between them.
+export type CurrentTrace = { mode: "once"; trace: Trace | null } | { mode: "settle"; trace: SettleTrace | null };
+
+export function currentTrace(visitor: string): CurrentTrace {
+  const rules = rulesRow.get() as Rules;
+  if (rules.mode === "settle") return { mode: "settle", trace: settleTraceFor(visitor) };
+  return { mode: "once", trace: traceFor(visitor) };
 }
 
 export type Outcome = "replaced" | "spent" | "stale" | "invalid" | "holding" | "not-here";
