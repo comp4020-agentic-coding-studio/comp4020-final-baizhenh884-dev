@@ -1,15 +1,18 @@
 ---
 import Page from "../layouts/Page.astro";
-import { replaceWord, wordAt } from "../lib/db";
+import { holderOf, replaceWord, settledPosition, wordAt } from "../lib/db";
 import { broadcast } from "../lib/live";
 import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 import { invalidReason, isValidWord } from "../lib/word";
 
-// POST /replace: position, version, word → 303 replaced · 403 already spent ·
-// 409 stale · 422 invalid. A request without a visitor cookie, or with fields
-// that aren't exactly one well-formed value each, is invalid (422). Refusals
-// are full pages at their real status, never redirects.
+// POST /replace: position, version, word → 303 replaced · 409 stale ·
+// 422 invalid · 403 ineligible (`once`: already spent; `settle`: holding
+// elsewhere, or not-here at the position the visitor's own latest change
+// holds — docs/decisions/0003-settle-and-kept-ships.md). A request without a
+// visitor cookie, or with fields that aren't exactly one well-formed value
+// each, is invalid (422). Refusals are full pages at their real status, never
+// redirects.
 if (Astro.request.method !== "POST") return new Response("Not found", { status: 404 });
 
 function field(form: FormData, name: string): string | null {
@@ -19,6 +22,7 @@ function field(form: FormData, name: string): string | null {
 
 let status = 422;
 let now: string | null = null;
+let eligibility: "spent" | "holding" | "not-here" | null = null;
 const visitor = visitorId(Astro.cookies);
 const reqId = Astro.locals.requestId;
 const v = visitorTag(visitor);
@@ -34,18 +38,24 @@ const raw = form && field(form, "word");
 if (visitor && position !== null && /^[0-9]$/.test(position) && version !== null && /^[0-9]{1,15}$/.test(version) && raw !== null) {
   const word = raw.trim();
   const before = wordAt(Number(position));
+  const freed = holderOf(Number(position)); // who this word currently holds, before it's replaced
+  const settledAt = settledPosition(visitor); // read before the attempt mutates anything
   const outcome = replaceWord(visitor, Number(position), Number(version), word, isValidWord(word));
   if (outcome === "replaced") {
     logLine(reqId, "replaced", { v, pos: position, from: before, to: word, ver: `${version}->${Number(version) + 1}` });
+    if (freed && freed !== visitor) logLine(reqId, "freed", { v: visitorTag(freed) });
+    if (settledAt !== null) logLine(reqId, "settled", { v, pos: settledAt });
     // the transaction only succeeds by moving this position from `version` to
     // `version + 1`; announced in the same turn as the commit
     const delivered = broadcast({ position: Number(position), word, version: Number(version) + 1 });
     logLine(reqId, "broadcast", { pos: position, ver: Number(version) + 1, streams: delivered });
     return Astro.redirect("/", 303);
   }
-  status = outcome === "spent" ? 403 : outcome === "stale" ? 409 : 422;
-  if (status === 403) logLine(reqId, "spent", { v });
-  else if (status === 409) {
+  status = outcome === "spent" || outcome === "holding" || outcome === "not-here" ? 403 : outcome === "stale" ? 409 : 422;
+  if (status === 403) {
+    eligibility = outcome as "spent" | "holding" | "not-here";
+    logLine(reqId, eligibility, { v });
+  } else if (status === 409) {
     now = wordAt(Number(position));
     logLine(reqId, "stale", { v, pos: position, saw: version, now });
   } else {
@@ -55,14 +65,34 @@ if (visitor && position !== null && /^[0-9]$/.test(position) && version !== null
 Astro.response.status = status;
 
 const title =
-  status === 403 ? "Your change is already used" : status === 409 ? "That word just changed" : "That replacement wasn't valid";
+  status === 403
+    ? eligibility === "holding"
+      ? "You're still holding a place"
+      : eligibility === "not-here"
+        ? "Not this word, not yet"
+        : "Your change is already used"
+    : status === 409
+      ? "That word just changed"
+      : "That replacement wasn't valid";
 ---
 
 <Page title={`${title} · Theseus`}>
   <p role="alert">
     {
       status === 403 ? (
-        <>You've already made your one change, so this one wasn't applied. You can still read the sentence and watch it change.</>
+        eligibility === "holding" ? (
+          <>
+            One of your words is still holding your place: until it's replaced or has stood a while, you can't make
+            another. This one wasn't applied. You can still read the sentence and watch it change.
+          </>
+        ) : eligibility === "not-here" ? (
+          <>
+            You can act again, but not here: this is the word you just placed. Your next change has to go somewhere
+            else. This one wasn't applied.
+          </>
+        ) : (
+          <>You've already made your one change, so this one wasn't applied. You can still read the sentence and watch it change.</>
+        )
       ) : status === 409 ? (
         <>
           Someone changed that word while you were deciding: it's “{now}” now. Your change wasn't used; you can still
