@@ -482,7 +482,7 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ positions: positionsOf(doc), trace });
 
       const before = traceStatus(doc)!.textContent;
-      expect(before, "a holding trace shows the settled wording already").toMatch(/entry|still holding|must change elsewhere/i);
+      expect(before, "a holding trace shows the settled wording already").toMatch(/holding/i);
 
       vi.advanceTimersByTime(2999);
       expect(traceStatus(doc)!.textContent, "the trace settled before its timer elapsed").toBe(before);
