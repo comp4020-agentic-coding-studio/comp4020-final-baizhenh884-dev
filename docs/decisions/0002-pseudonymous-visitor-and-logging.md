@@ -159,4 +159,7 @@ this rule, not a limit the project is settling for.
   README's own author.
 - If a later redesign changes the one-change-per-visitor rule, a later ADR
   supersedes this one's "What each person may change" section rather than
-  editing it in place.
+  editing it in place. **Update:** [0003](0003-settle-and-kept-ships.md)
+  does exactly this, for the Final Project redesign; every other section of
+  this ADR (what counts as a person, what's visible, what's logged, the
+  per-browser identity argument) remains in force.
