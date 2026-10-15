@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A · Monograph, sharpened</title>
+<!-- Isolated redesign sketch. Not wired into the app. Words below are staged sketch data, not visitor changes. -->
+<style>
+  :root { --field: #f1eee8; --ink: #191714; --soft: #8a857c; --red: #c3331c; --plaster: #eee9df; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--field); color: var(--ink); font: 16px/1.45 Georgia, "Times New Roman", serif; }
+  .caps { font: 600 11px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--soft); }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 40px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 32px; }
+  header { grid-column: 1 / -1; display: flex; gap: 16px; align-items: baseline; }
+  header b { font-size: 22px; font-weight: 400; font-style: italic; }
+  .sentence { overflow-wrap: anywhere; font-size: clamp(28px, 3.6vw, 46px); line-height: 1.22; margin: 24px 0 8px; }
+  .w { position: relative; display: inline-block; transition: color .3s; }
+  .w.mine { background: linear-gradient(transparent 62%, rgba(195, 51, 28, .16) 62%); }
+  .w.hot { color: var(--red); }
+  .w .gone { position: absolute; left: 0; top: 100%; font-size: 13px; color: var(--soft); white-space: nowrap; opacity: 0; }
+  .removed { margin-top: 26px; font-size: 15px; color: var(--soft); min-height: 1.5em; }
+  .removed span { margin-right: .6em; }
+  .removed span.orig { color: var(--ink); }
+  .trace { margin-top: 28px; border-top: 1px solid #d8d2c6; padding-top: 14px; max-width: 34em; }
+  .trace p { margin: 6px 0; }
+  .trace .state { font-size: 18px; }
+  .plates { display: grid; grid-template-rows: 3fr 2fr; gap: 6px; min-height: 560px; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .plate { position: relative; }
+  .plate .caps { position: absolute; left: 0; top: 0; }
+  .note { margin-top: 10px; font-style: italic; color: var(--soft); }
+  button { font: inherit; font-size: 14px; border: 1px solid var(--ink); background: transparent; padding: 6px 12px; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+  .ctl { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
+  @media (max-width: 760px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 18px 16px 32px; gap: 12px; }
+    header { flex-wrap: wrap; gap: 4px 12px; }
+    .removed span { display: inline-block; }
+    .plates { min-height: 0; grid-template-rows: 280px 170px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header><b>Theseus</b><span class="caps">Sketch A · Monograph, sharpened (evolutionary)</span></header>
+  <section>
+    <div class="sentence" id="sentence"></div>
+    <p class="caps" id="part">&nbsp;</p>
+    <div class="removed caps" aria-hidden="true">Cut away so far: <span id="removed"></span></div>
+    <div class="trace">
+      <p class="caps">Your trace</p>
+      <p class="state" id="state">You can replace a word.</p>
+      <p id="history" class="note"></p>
+    </div>
+  </section>
+  <section class="plates" aria-hidden="true">
+    <div class="plate"><canvas id="now"></canvas><span class="caps">What stands</span></div>
+    <div class="plate"><canvas id="kept"></canvas><span class="caps">What was kept: the first parts, as they come away</span></div>
+  </section>
+  <div class="ctl"><button id="go">Play one replacement</button><span class="caps">or press R · staged words, not visitors</span></div>
+</main>
+<script src="iso.js"></script>
+<script>
+const { STARTING, LABELS, parts, faces, order, grown, fitCanvas, poly, ease, phase, reduced } = ISO;
+const SCRIPT = [[4, "strangers", true], [0, "Keep", false], [7, "when", false], [2, "sentence", true], [4, "neighbours", false], [9, "vanished", false]];
+let words = [...STARTING], kept = Array(10).fill(null), removed = [], step = 0, anim = null, mine = null;
+const SH = { top: "#f6f2ea", left: "#e3ddd1", right: "#d3ccbe" };
+const KEPT = { top: "#fbfaf6", left: "#f0eee8", right: "#e6e3dc" };
+
+function renderSentence(hot = -1) {
+  const el = document.getElementById("sentence");
+  el.innerHTML = words.map((w, i) => `<span class="w${i === mine ? " mine" : ""}${i === hot ? " hot" : ""}">${w}</span>`).join(" ") + ".";
+  document.getElementById("removed").innerHTML = removed.map((r) => `<span class="${r.orig ? "orig" : ""}">${r.w}</span>`).join("");
+}
+
+function drawHouse(canvas, ws, opts) {
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  const s = Math.min(w / 16, h / 12.5), ox = w / 2 + s * 0.6, oy = h * 0.22;
+  const ps = parts(ws);
+  for (const i of order(ps)) {
+    if (opts.skip?.(i)) { if (opts.ghost) for (const f of faces(ps[i])) { poly(ctx, f.pts, ox, oy, s); ctx.setLineDash([3, 4]); ctx.strokeStyle = "rgba(25,23,20,.22)"; ctx.stroke(); ctx.setLineDash([]); } continue; }
+    let part = ps[i], lift = 0, red = false, alpha = 1;
+    if (opts.part === i) ({ part, lift, red, alpha } = opts.fx(part));
+    ctx.globalAlpha = alpha;
+    for (const f of faces(part)) {
+      poly(ctx, f.pts.map(([x, y]) => [x, y - lift]), ox, oy, s);
+      ctx.fillStyle = (opts.palette ?? SH)[f.shade]; ctx.fill();
+      ctx.strokeStyle = red ? "#c3331c" : "rgba(25,23,20,.45)"; ctx.lineWidth = red ? 1.6 : 0.8; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function frame(t) {
+  const now = document.getElementById("now"), keep = document.getElementById("kept");
+  if (!anim) {
+    drawHouse(now, words, {});
+    drawHouse(keep, STARTING, { skip: (i) => !kept[i], ghost: true, palette: KEPT });
+    return;
+  }
+  const { pos, oldWords, newWords, toKept, start } = anim;
+  const u = Math.min(1, (t - start) / (reduced() ? 1 : 3200));
+  // 0–.3 old part lifts away in red · .3–.55 it goes to the kept plate · .55–.9 new part is built · then settles
+  const lift = ease(phase(u, 0, 0.3)) * 1.6;
+  if (u < 0.55) drawHouse(now, oldWords, { part: pos, fx: (p) => ({ part: p, lift, red: true, alpha: 1 - phase(u, 0.3, 0.55) }) });
+  else drawHouse(now, newWords, { part: pos, fx: (p) => ({ part: grown(p, ease(phase(u, 0.55, 0.9))), lift: 0, red: u < 0.97, alpha: 1 }) });
+  const arrive = ease(phase(u, 0.3, 0.6));
+  drawHouse(keep, STARTING, { skip: (i) => !(kept[i] || (toKept && i === pos && arrive > 0)), ghost: true, palette: KEPT,
+    part: toKept ? pos : -1, fx: (p) => ({ part: p, lift: (1 - arrive) * 2, red: arrive < 1, alpha: arrive }) });
+  document.getElementById("part").textContent = u < 0.97 ? `0${pos} — ${LABELS[pos]} · being rebuilt` : " ";
+  if (u >= 1) { if (toKept) kept[pos] = true; anim = null; renderSentence(); frame(t); return; }
+  requestAnimationFrame(frame);
+}
+
+function play() {
+  if (anim) return false;
+  const [pos, word, isMine] = SCRIPT[step++ % SCRIPT.length];
+  const oldWords = [...words], from = words[pos], orig = from === STARTING[pos] && !kept[pos];
+  words[pos] = word;
+  removed.push({ w: from, orig });
+  if (mine === pos && !isMine) {
+    document.getElementById("state").textContent = "Your word was replaced. You can replace a word again (not that one's place).";
+    document.getElementById("history").innerHTML = `“<del>strangers</del>” → “${word}”.`;
+    mine = null;
+  }
+  if (isMine) { mine = pos; document.getElementById("state").textContent = `“${word}” is holding your place. It settles in about 5 minutes, or sooner if someone replaces it.`; }
+  renderSentence(pos);
+  anim = { pos, oldWords, newWords: [...words], toKept: orig, start: performance.now() };
+  requestAnimationFrame(frame);
+  return true;
+}
+document.getElementById("go").onclick = play;
+addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") play(); });
+addEventListener("resize", () => frame(performance.now()));
+renderSentence(); frame(0);
+ISO.demo(play, 6);
+</script>
+</body>
+</html>

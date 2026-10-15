@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>C · Breaker's yard</title>
+<!-- Isolated redesign sketch. Not wired into the app. Words below are staged sketch data, not visitor changes. -->
+<style>
+  :root { --night: #0f0e0d; --ink: #f4efe4; --dim: #6f685d; --red: #ff4122; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--night); color: var(--ink); overflow: hidden; }
+  body { font: 16px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  canvas#yard { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .sentence { position: fixed; left: 0; right: 0; top: 18px; padding: 0 16px; text-align: center; font: 800 clamp(22px, 4.4vw, 64px)/1.02 -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: -.02em; text-transform: uppercase; mix-blend-mode: difference; }
+  .w { display: inline-block; transition: color .2s; }
+  .w.hot { color: var(--red); mix-blend-mode: normal; }
+  .w.orig { -webkit-text-stroke: 0; }
+  .w.mine { text-decoration: underline 4px var(--red); text-underline-offset: 6px; }
+  .tag { position: fixed; left: 16px; bottom: 16px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); max-width: 46ch; }
+  .tag b { color: var(--ink); font-weight: 600; }
+  .trace { position: fixed; left: 16px; bottom: 112px; font-size: 15px; max-width: 40ch; }
+  .event { position: fixed; left: 0; right: 0; top: 42%; text-align: center; font: 900 clamp(28px, 6vw, 88px)/1 -apple-system, sans-serif; text-transform: uppercase; color: var(--red); opacity: 0; transition: opacity .5s; pointer-events: none; padding: 0 16px; }
+  .event.on { opacity: 1; }
+  .ctl { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; }
+  button { font: 700 14px -apple-system, sans-serif; background: var(--ink); color: var(--night); border: 0; padding: 10px 14px; cursor: pointer; text-transform: uppercase; letter-spacing: .06em; }
+  button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  @media (max-width: 760px) { .trace { top: auto; bottom: 70px; right: 16px; font-size: 14px; } .ctl { left: 16px; right: 16px; } .ctl button { flex: 1; } .tag { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="yard" aria-hidden="true"></canvas>
+<div class="sentence" id="sentence"></div>
+<p class="trace" id="trace">You can replace a word.</p>
+<p class="tag"><b>Sketch C · Breaker's yard (bold, risky).</b> The house stands on what it has shed. Every removed part falls into the yard and stays there, stamped with its word. Staged words, not visitors.</p>
+<div class="event" id="event" role="status"></div>
+<div class="ctl"><button id="go">Replace one (R)</button><button id="all">Run twelve</button></div>
+<script src="iso.js"></script>
+<script>
+const { STARTING, LABELS, parts, faces, order, grown, centre, fitCanvas, poly, ease, phase, reduced } = ISO;
+const SCRIPT = [[4, "strangers", true], [0, "Keep", false], [7, "when", false], [2, "sentence", false], [4, "neighbours", false], [9, "vanished", false], [1, "the", false], [3, "everyone", false], [5, "could", false], [6, "find", false], [8, "this", false], [2, "house", false]];
+const HUE = [28, 8, 48, 200, 330, 170, 0, 260, 120, 60];
+let words = [...STARTING], step = 0, anim = null, mine = null, heap = [], allGone = false;
+
+const shade = (i, f, light = 1) => `hsl(${HUE[i]} ${i === 6 ? 70 : 62}% ${(f === "top" ? 62 : f === "left" ? 48 : 36) * light}%)`;
+
+function renderSentence(hot = -1) {
+  document.getElementById("sentence").innerHTML = words.map((w, i) => `<span class="w${i === hot ? " hot" : ""}${w === STARTING[i] ? " orig" : ""}${i === mine ? " mine" : ""}">${w}</span>`).join(" ") + ".";
+}
+
+function layout() { const { ctx, w, h } = fitCanvas(document.getElementById("yard")); const s = Math.min(w / 21, h / 23); return { ctx, w, h, s, ox: w / 2 + s * 0.6, oy: h * 0.33, floor: h * 0.70 }; }
+
+// the heap: a chronological pile at the house's feet, oldest at the bottom
+function heapSlot(n, L) {
+  const perRow = Math.max(4, Math.min(8, Math.floor((L.w - 32) / 66))), row = Math.floor(n / perRow), col = n % perRow;
+  const off = (col % 2 ? -1 : 1) * Math.ceil(col / 2);
+  return [L.w / 2 + off * 66 + (row % 2) * 20, L.floor + 74 - row * 20];
+}
+
+function drawHeap(L, upto = heap.length) {
+  const { ctx } = L;
+  heap.slice(0, upto).forEach((b, n) => {
+    const [x, y] = heapSlot(n, L);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(b.rot);
+    ctx.fillStyle = shade(b.pos, "left", b.orig ? 1 : 0.7); ctx.fillRect(-30, -9, 60, 18);
+    ctx.fillStyle = b.orig ? "#0f0e0d" : "rgba(244,239,228,.85)"; ctx.font = "700 11px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(b.word.toUpperCase().slice(0, 10), 0, 1);
+    ctx.restore();
+  });
+}
+
+function drawHouse(L, ws, fx) {
+  const { ctx, s, ox, oy } = L;
+  const ps = parts(ws);
+  for (const i of order(ps)) {
+    const r = fx?.(i, ps[i]) ?? { part: ps[i] };
+    if (!r.part) continue;
+    for (const f of faces(r.part)) {
+      poly(ctx, f.pts.map(([x, y]) => [x + (r.dx ?? 0), y + (r.dy ?? 0)]), ox, oy, s);
+      ctx.fillStyle = r.red ? (f.shade === "top" ? "#ff8a6e" : f.shade === "left" ? "#ff4122" : "#c22c12") : shade(i, f.shade); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+}
+
+function frame(t) {
+  const L = layout(); const { ctx, w, h } = L;
+  ctx.fillStyle = "#0f0e0d"; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#1b1916"; ctx.fillRect(0, L.floor, w, h - L.floor);
+  if (!anim) { drawHeap(L); drawHouse(L, words); return; }
+  const { pos, oldWords, start, block } = anim;
+  const u = Math.min(1, (t - start) / (reduced() ? 1 : 3000));
+  drawHeap(L, heap.length - 1);
+  // .00–.15 the part shudders red · .15–.55 it drops and smashes into the heap
+  // · .45–.85 the new part is lowered in from above · .85–1 settle
+  const shake = u < 0.15 ? Math.sin(u * 220) * 0.12 : 0;
+  const [cx, cy] = centre(parts(oldWords)[pos]);
+  const fall = ease(phase(u, 0.15, 0.55));
+  const [hx, hy] = heapSlot(heap.length - 1, L);
+  const drop = (1 - ease(phase(u, 0.45, 0.85))) * -9;
+  drawHouse(L, u < 0.45 ? oldWords : words, (i, p) => {
+    if (i !== pos) return { part: p };
+    if (u < 0.15) return { part: p, red: true, dx: shake };
+    if (u < 0.45) return { part: null };
+    return { part: p, dy: drop, red: u < 0.95 };
+  });
+  if (u >= 0.15 && u < 0.6) {
+    const sx = L.ox + cx * L.s, sy = L.oy + cy * L.s;
+    const x = sx + (hx - sx) * fall, y = sy + (hy - sy) * fall * fall;
+    for (let j = 0; j < 9; j++) { const a = j * 0.7 + pos, r = 18 * (1 - fall) + 4; ctx.fillStyle = j % 2 ? "#ff4122" : shade(pos, "left"); ctx.fillRect(x + Math.cos(a) * r * 2 - 6, y + Math.sin(a) * r - 5, 12, 10); }
+    ctx.font = "800 18px -apple-system, sans-serif"; ctx.fillStyle = "#f4efe4"; ctx.textAlign = "center"; ctx.fillText(block.word.toUpperCase(), x, y - 22);
+  }
+  if (u >= 0.55) drawHeap(L, heap.length);
+  if (u >= 1) { anim = null; renderSentence(); frame(t); return; }
+  requestAnimationFrame(frame);
+}
+
+function play() {
+  if (anim || step >= SCRIPT.length) return false;
+  const [pos, word, isMine] = SCRIPT[step++];
+  const oldWords = [...words], from = words[pos];
+  const block = { pos, word: from, orig: from === STARTING[pos], rot: (Math.sin(step * 9.1) * 0.18) };
+  heap.push(block);
+  words[pos] = word;
+  const tr = document.getElementById("trace");
+  if (mine === pos && !isMine) { mine = null; tr.innerHTML = `Your “strangers” is in the yard now. You can act again, anywhere but there.`; }
+  if (isMine) { mine = pos; tr.textContent = `“${word}” is standing for you.`; }
+  renderSentence(pos);
+  anim = { pos, oldWords, start: performance.now(), block };
+  requestAnimationFrame(frame);
+  if (!allGone && words.every((w, i) => w !== STARTING[i])) {
+    allGone = true;
+    setTimeout(() => { const ev = document.getElementById("event"); ev.textContent = "Nothing of the first house stands. All of it is in the yard."; ev.classList.add("on"); setTimeout(() => ev.classList.remove("on"), 4200); }, reduced() ? 0 : 3000);
+  }
+  return true;
+}
+document.getElementById("go").onclick = play;
+document.getElementById("all").onclick = function run() { if (step >= SCRIPT.length) return; if (!anim) play(); setTimeout(run, 350); };
+addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") play(); });
+addEventListener("resize", () => frame(performance.now()));
+renderSentence(); frame(0);
+ISO.demo(play, 12);
+</script>
+</body>
+</html>
