@@ -1,0 +1,332 @@
+import { JSDOM } from "jsdom";
+import { describe, expect, inject, it } from "vitest";
+
+// "Your trace" under the settle rule (docs/decisions/0003-settle-and-kept-ships.md,
+// the handoff recorded at /Users/baizhenhuang/.claude/plans/vectorized-singing-horizon.md).
+// Under rule mode `once` the trace stays exactly what spec/theseus.test.ts already
+// asserts — this file only adds the once-mode regression guards that confirm
+// nothing settle-only leaks in. Under `settle`, a visitor's trace carries:
+//   - their latest change (the existing <del>/word markup, unchanged, plus an
+//     appended eligibility sentence naming a blocked territory by its
+//     territories.ts label, or nothing extra when they're free everywhere)
+//   - every other standing word of theirs (always "settled" by construction)
+//   - every other replaced word of theirs, newest first, each named "kept"
+//
+// Gated the same way spec/eligibility.test.ts gates: RULE_MODE from the test
+// runner's own environment, never probed from response text. CI always sets
+// RULE_MODE explicitly (checks.yml runs both passes), so an unset RULE_MODE
+// there is a real failure, not a deliberate skip.
+
+const baseUrl = inject("baseUrl");
+const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
+
+class Visitor {
+  private cookies = new Map<string, string>();
+
+  private remember(res: Response): void {
+    for (const header of res.headers.getSetCookie()) {
+      const [pair] = header.split(";");
+      const eq = pair.indexOf("=");
+      if (eq > 0) this.cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+  }
+
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
+    const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+    return { ...(cookie ? { cookie } : {}), ...extra };
+  }
+
+  async page(path = "/"): Promise<{ status: number; doc: Document }> {
+    const res = await fetch(new URL(path, baseUrl), { headers: this.headers(), redirect: "manual" });
+    this.remember(res);
+    return { status: res.status, doc: new JSDOM(await res.text()).window.document };
+  }
+
+  async sentence(): Promise<{ position: number; version: number; word: string }[]> {
+    const { doc } = await this.page("/");
+    return [...doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')].map((form) => {
+      const value = (name: string) => form.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.value;
+      return {
+        position: Number(value("position")),
+        version: Number(value("version")),
+        word: form.querySelector("label")?.textContent?.trim() ?? "",
+      };
+    });
+  }
+
+  async replace(slot: { position: number; version: number }, word: string): Promise<{ status: number; text: string }> {
+    const res = await fetch(new URL("/replace", baseUrl), {
+      method: "POST",
+      redirect: "manual",
+      headers: this.headers({
+        "content-type": "application/x-www-form-urlencoded",
+        origin: new URL(baseUrl).origin,
+      }),
+      body: new URLSearchParams({ position: String(slot.position), version: String(slot.version), word }),
+    });
+    this.remember(res);
+    const text = await res.text();
+    return { status: res.status, text };
+  }
+}
+
+async function arrive(): Promise<Visitor> {
+  const v = new Visitor();
+  await v.page("/");
+  return v;
+}
+
+let n = 0;
+const unused = (all: { word: string }[]): string => {
+  let word: string;
+  do {
+    word = `trc${Date.now().toString(36)}${(n++).toString(36)}`.replace(/\d/g, (d) => "abcdefghij"[+d]);
+  } while (all.some((s) => s.word === word));
+  return word;
+};
+
+const at = (all: { position: number; version: number; word: string }[], position: number) => {
+  const slot = all.find((s) => s.position === position);
+  expect(slot, `no word position ${position}`).toBeDefined();
+  return slot!;
+};
+
+// the territory labels (TERRITORIES in src/lib/house/territories.ts), by
+// position — hardcoded here, not imported, so this asserts the contract
+// rather than the module that happens to implement it today
+const TERRITORY_LABELS = [
+  "ground",
+  "front-left mass",
+  "central hall",
+  "front-right mass",
+  "entry",
+  "upper-left volume",
+  "roof",
+  "upper-right volume",
+  "side mass",
+  "threshold",
+];
+
+const traceSection = (doc: Document) => doc.querySelector('section[aria-labelledby="trace-heading"]');
+const traceStatus = (doc: Document) => doc.querySelector('section [role="status"], aside [role="status"]');
+
+const inCI = !!process.env.CI;
+const settleModeReady = local && process.env.RULE_MODE === "settle";
+const settleOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (settleModeReady) return it(name, fn, timeout);
+  if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn, timeout);
+  if (inCI && !process.env.RULE_MODE) {
+    return it(`${name} [RULE_MODE unset in CI]`, () => {
+      throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+    });
+  }
+  return it.skip(`${name} [skipped: RULE_MODE isn't settle]`, fn, timeout);
+};
+
+const onceModeReady = local && process.env.RULE_MODE !== "settle";
+const onceOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (onceModeReady) return it(name, fn, timeout);
+  if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn, timeout);
+  if (inCI && !process.env.RULE_MODE) {
+    return it(`${name} [RULE_MODE unset in CI]`, () => {
+      throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+    });
+  }
+  return it.skip(`${name} [skipped: RULE_MODE is settle]`, fn, timeout);
+};
+
+const settleSeconds = Number(process.env.SETTLE_SECONDS ?? 300);
+const settleByAgeOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn, timeout);
+  if (inCI && !process.env.RULE_MODE) {
+    return it(`${name} [RULE_MODE unset in CI]`, () => {
+      throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+    });
+  }
+  if (!settleModeReady) return it.skip(`${name} [skipped: RULE_MODE isn't settle]`, fn, timeout);
+  if (settleSeconds <= 10) return it(name, fn, timeout);
+  if (inCI) {
+    return it(`${name} [SETTLE_SECONDS too long for CI]`, () => {
+      throw new Error("SETTLE_SECONDS must be short (checks.yml sets 3) so this can actually wait it out in CI");
+    });
+  }
+  return it.skip(`${name} [skipped: SETTLE_SECONDS is too long to wait out here]`, fn, timeout);
+};
+
+describe("Your trace", () => {
+  settleOnly("shows no trace section for a visitor who has never acted", async () => {
+    const v = await arrive();
+    const { doc } = await v.page("/");
+    expect(traceStatus(doc), "a visitor who hasn't changed anything is shown a trace").toBeNull();
+  });
+
+  settleOnly("holding: names the held word, marks it, no <del>, and the eligibility clause blocks it there", async () => {
+    const v = await arrive();
+    const before = await v.sentence();
+    const slot = before[0];
+    const word = unused(before);
+    expect((await v.replace(slot, word)).status).toBe(303);
+
+    const { doc } = await v.page("/");
+    const status = traceStatus(doc)!;
+    expect(status, "no trace shown for a holding visitor").not.toBeNull();
+    expect(status.textContent).toContain(word);
+    expect(status.querySelector("del"), "a held word is shown as removed").toBeNull();
+
+    const form = [...doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')].find(
+      (f) => f.querySelector<HTMLInputElement>('input[name="position"]')?.value === String(slot.position),
+    )!;
+    expect(form.querySelector("label mark"), "the held word isn't marked in the sentence").not.toBeNull();
+
+    const now = await v.sentence();
+    const held = await v.replace(at(now, slot.position), unused(now));
+    expect(held.status, "the trace shows eligibility but the server still refuses the held position").toBe(403);
+  });
+
+  settleOnly("free-but-blocked by replacement: names the blocking territory and still shows what replaced the word", async () => {
+    const ann = await arrive();
+    const before = await ann.sentence();
+    const slot = before[0];
+    const anns = unused(before);
+    expect((await ann.replace(slot, anns)).status).toBe(303);
+
+    const bea = await arrive();
+    const now = await bea.sentence();
+    const beas = unused(now);
+    expect((await bea.replace(at(now, slot.position), beas)).status).toBe(303);
+
+    const { doc } = await ann.page("/");
+    const status = traceStatus(doc)!;
+    expect(status.querySelector("del")?.textContent?.trim(), "the replaced word isn't marked removed").toBe(anns);
+    expect(status.textContent).toContain(beas);
+    expect(status.textContent, "the eligibility clause doesn't name the blocked territory").toContain(TERRITORY_LABELS[slot.position]);
+  });
+
+  settleByAgeOnly(
+    "free-but-blocked by age: a fresh load after SETTLE_SECONDS shows the word standing and settled",
+    async () => {
+      const v = await arrive();
+      const before = await v.sentence();
+      const slot = before[0];
+      const word = unused(before);
+      expect((await v.replace(slot, word)).status).toBe(303);
+
+      await new Promise((resolve) => setTimeout(resolve, (settleSeconds + 1) * 1000));
+
+      const { doc } = await v.page("/");
+      const status = traceStatus(doc)!;
+      expect(status.querySelector("del"), "a settled word is shown as removed").toBeNull();
+      expect(status.textContent).toContain(word);
+      expect(status.textContent, "the eligibility clause still names the now-settled territory").toContain(TERRITORY_LABELS[slot.position]);
+
+      const now = await v.sentence();
+      const settledAgain = await v.replace(at(now, (slot.position + 1) % now.length), unused(now));
+      expect(settledAgain.status, "settling by age didn't actually free the visitor").toBe(303);
+    },
+    20_000,
+  );
+
+  // Needs an untouched first word still standing once a second change is
+  // made, so freeing must come from aging, not from someone else's
+  // replacement (which would move it into "replaced", not "standing").
+  settleByAgeOnly(
+    "lists every other standing word, each labelled settled",
+    async () => {
+      const v = await arrive();
+      const before = await v.sentence();
+      const firstWord = unused(before);
+      expect((await v.replace(at(before, 0), firstWord)).status).toBe(303);
+
+      await new Promise((resolve) => setTimeout(resolve, (settleSeconds + 1) * 1000));
+
+      const now = await v.sentence();
+      expect(at(now, 0).word, "setup: the first word was replaced by someone else, not left to settle").toBe(firstWord);
+      const secondWord = unused(now);
+      expect((await v.replace(at(now, 1), secondWord)).status).toBe(303);
+
+      const { doc } = await v.page("/");
+      const section = traceSection(doc)!;
+      expect(section.textContent, "the standing-but-not-latest word is missing from the trace").toContain(firstWord);
+      expect(section.textContent, "a standing word isn't labelled settled").toMatch(/settled/i);
+
+      // both positions are marked in the sentence
+      for (const position of [0, 1]) {
+        const form = [...doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')].find(
+          (f) => f.querySelector<HTMLInputElement>('input[name="position"]')?.value === String(position),
+        )!;
+        expect(form.querySelector("label mark"), `position ${position} isn't marked`).not.toBeNull();
+      }
+    },
+    20_000,
+  );
+
+  settleOnly("lists replaced words newest first, each named as kept", async () => {
+    const v = await arrive();
+    const bea = await arrive();
+
+    // v's first change, at position 0
+    const before = await v.sentence();
+    const firstWord = unused(before);
+    expect((await v.replace(at(before, 0), firstWord)).status).toBe(303);
+
+    // bea replaces it: frees v everywhere except position 0 (move-on)
+    const replacedFirst = unused(await bea.sentence());
+    expect((await bea.replace(at(await bea.sentence(), 0), replacedFirst)).status).toBe(303);
+
+    // v's second change, at position 1 — now v's latest
+    const now1 = await v.sentence();
+    const secondWord = unused(now1);
+    expect((await v.replace(at(now1, 1), secondWord)).status).toBe(303);
+
+    // bea replaces that too: frees v everywhere except position 1
+    const replacedSecond = unused(await bea.sentence());
+    expect((await bea.replace(at(await bea.sentence(), 1), replacedSecond)).status).toBe(303);
+
+    // v's third change, at position 2 — the new latest; positions 0 and 1 are
+    // now both "replaced" in v's trace, position 1 (the more recent of the two) first
+    const now2 = await v.sentence();
+    const latestWord = unused(now2);
+    expect((await v.replace(at(now2, 2), latestWord)).status).toBe(303);
+
+    const { doc } = await v.page("/");
+    const section = traceSection(doc)!;
+    const text = section.textContent ?? "";
+    expect(text, "the first replaced word is missing").toContain(firstWord);
+    expect(text, "the second replaced word is missing").toContain(secondWord);
+    expect(text, "a replaced word isn't named as kept").toMatch(/kept/i);
+    // newest first: v's second change (position 1) names before v's first (position 0)
+    expect(text.indexOf(secondWord)).toBeLessThan(text.indexOf(firstWord));
+  });
+
+  onceOnly("trace rendering is unaffected by the settle-only shape: no settled/kept labels, no extra lists", async () => {
+    const alice = await arrive();
+    const before = await alice.sentence();
+    const slot = before[0];
+    const word = unused(before);
+    expect((await alice.replace(slot, word)).status).toBe(303);
+
+    const { doc } = await alice.page("/");
+    const section = traceSection(doc)!;
+    expect(section.textContent, "once mode shows a settle-only label").not.toMatch(/settled|kept/i);
+    expect(section.querySelectorAll("ul").length, "once mode's trace grew a list").toBe(0);
+  });
+
+  onceOnly("explains the rule under once mode with the exact, unchanged text", async () => {
+    const v = await arrive();
+    const { doc } = await v.page("/");
+    const how = doc.querySelector("#how");
+    expect(how?.textContent?.trim()).toBe(
+      "Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.",
+    );
+  });
+
+  settleOnly("explains the settle rule under settle mode, honestly", async () => {
+    const v = await arrive();
+    const { doc } = await v.page("/");
+    const how = doc.querySelector("#how");
+    const text = how?.textContent ?? "";
+    expect(text, "#how still claims one change that can't be undone").not.toMatch(/one change/i);
+    expect(text, "#how still claims the change can't be undone").not.toMatch(/can't be undone/i);
+    expect(text, "#how doesn't explain settling or moving on").toMatch(/settl|hold|stand/i);
+  });
+});

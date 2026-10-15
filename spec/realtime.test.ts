@@ -29,12 +29,43 @@ const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUr
 const localOnly = (name: string, fn: () => Promise<void>, timeout?: number) =>
   it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn, timeout);
 
+// Which trace shape the wire carries depends on rules.mode
+// (docs/decisions/0003-settle-and-kept-ships.md): under `once`, the existing
+// single Trace; under `settle`, the richer { latest, otherStanding,
+// otherReplaced } shape (spec/trace.test.ts covers its rendering; this file
+// only pins the wire shape). Gated from the test runner's own RULE_MODE env,
+// the same way spec/eligibility.test.ts gates — never probed from the
+// response itself. CI always sets RULE_MODE explicitly (checks.yml runs both
+// passes), so an unset RULE_MODE there is a real failure, not a skip.
+const inCI = !!process.env.CI;
+const settleModeReady = local && process.env.RULE_MODE === "settle";
+if (local && inCI && !process.env.RULE_MODE) {
+  throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+}
+const settleOnly = (name: string, fn: () => Promise<void>, timeout?: number) =>
+  it.skipIf(!settleModeReady)(settleModeReady ? name : `${name} [skipped: not settle mode]`, fn, timeout);
+
+const settleSecondsEnv = Number(process.env.SETTLE_SECONDS ?? 300);
+const settleByAgeOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (!settleModeReady) return it.skip(`${name} [skipped: not settle mode]`, fn, timeout);
+  if (settleSecondsEnv <= 10) return it(name, fn, timeout);
+  if (inCI) {
+    return it(`${name} [SETTLE_SECONDS too long for CI]`, () => {
+      throw new Error("SETTLE_SECONDS must be short (checks.yml sets 3) so this can actually wait it out in CI");
+    });
+  }
+  return it.skip(`${name} [skipped: SETTLE_SECONDS is too long to wait out here]`, fn, timeout);
+};
+
 const CONNECT_MS = 2000; // headers and the opening snapshot, not the realtime requirement
 const LIVE_MS = 1000; // "within about a second" of the replacement succeeding
 
 const POSITION_KEYS = ["position", "version", "word"];
 const SNAPSHOT_KEYS = ["positions", "trace"];
-const TRACE_KEYS = ["now", "position", "standing", "word"];
+const TRACE_KEYS = settleModeReady ? ["latest", "otherStanding", "otherReplaced"] : ["now", "position", "standing", "word"];
+const LATEST_KEYS = ["now", "position", "settled", "settlesInMs", "standing", "word"];
+const STANDING_ITEM_KEYS = ["position", "word"];
+const REPLACED_ITEM_KEYS = ["now", "position", "word"];
 
 type Slot = { position: number; version: number; word: string };
 type Frame = { event: string; data: unknown };
@@ -284,7 +315,12 @@ describe("Theseus realtime", () => {
     expect(snapshot.trace, "a visitor who hasn't changed anything gets a trace").toBeNull();
   });
 
-  localOnly("includes the visitor's own trace in their snapshot", async () => {
+  // once-mode wire shape only: under settle mode the trace carries { latest,
+  // otherStanding, otherReplaced } instead, covered by its own tests below.
+  const onceOnly = (name: string, fn: () => Promise<void>, timeout?: number) =>
+    it.skipIf(!local || settleModeReady)(local && !settleModeReady ? name : `${name} [skipped: not once mode]`, fn, timeout);
+
+  onceOnly("includes the visitor's own trace in their snapshot", async () => {
     const bea = await arrive();
     const slot = (await bea.sentence())[0];
     const word = unused(await bea.sentence());
@@ -294,6 +330,25 @@ describe("Theseus realtime", () => {
 
     expect(snapshot.trace, "a visitor who has made their change gets no trace").not.toBeNull();
     expect(snapshot.trace).toMatchObject({ position: slot.position, word, standing: true });
+  });
+
+  settleOnly("includes the visitor's own trace, with a settle timer, in their snapshot", async () => {
+    const bea = await arrive();
+    const slot = (await bea.sentence())[0];
+    const word = unused(await bea.sentence());
+    expect(await bea.replace(slot, word)).toBe(303);
+
+    const snapshot = await (await connect(bea)).snapshot();
+
+    expect(snapshot.trace, "a visitor who has made their change gets no trace").not.toBeNull();
+    expect(keysOf(snapshot.trace), "the settle-mode snapshot trace isn't { latest, otherStanding, otherReplaced }").toEqual(TRACE_KEYS);
+    const latest = (snapshot.trace as { latest: Record<string, unknown> }).latest;
+    expect(keysOf(latest), "a holding latest carries more than now/position/settled/settlesInMs/standing/word").toEqual(
+      expect.arrayContaining(LATEST_KEYS),
+    );
+    expect(latest).toMatchObject({ position: slot.position, word, standing: true, settled: false });
+    expect(latest.settlesInMs, "a freshly-placed word's settlesInMs isn't a positive number").toBeTypeOf("number");
+    expect(latest.settlesInMs as number).toBeGreaterThan(0);
   });
 
   localOnly("delivers a successful replacement to another open session within about a second", async () => {
@@ -311,7 +366,7 @@ describe("Theseus realtime", () => {
     expect(asChange(frame)).toEqual({ position: slot.position, word, version: slot.version + 1 });
   });
 
-  localOnly("catches up on reconnect: a change made while disconnected is in the next snapshot", async () => {
+  onceOnly("catches up on reconnect: a change made while disconnected is in the next snapshot", async () => {
     const bea = await arrive();
     const before = await bea.sentence();
     const mine = before[0];
@@ -343,10 +398,84 @@ describe("Theseus realtime", () => {
     });
   });
 
+  settleOnly("catches up on reconnect, settle mode: a change made while disconnected is in the next snapshot's trace", async () => {
+    const bea = await arrive();
+    const before = await bea.sentence();
+    const mine = before[0];
+    const beas = unused(before);
+    expect(await bea.replace(mine, beas)).toBe(303);
+
+    const first = await connect(bea);
+    const firstSnapshot = await first.snapshot();
+    const firstTrace = firstSnapshot.trace as { latest: Record<string, unknown> };
+    expect(firstTrace.latest).toMatchObject({ position: mine.position, word: beas, standing: true });
+    first.close();
+
+    // while bea is disconnected, ann replaces bea's word
+    const ann = await arrive();
+    const now = await ann.sentence();
+    const anns = unused(now);
+    const target = at(now, mine.position);
+    expect(await ann.replace(target, anns)).toBe(303);
+
+    const again = await (await connect(bea)).snapshot();
+    expect(at(again.positions, mine.position), "the reconnected snapshot misses the change").toEqual({
+      position: mine.position,
+      word: anns,
+      version: target.version + 1,
+    });
+    const againTrace = again.trace as { latest: Record<string, unknown> };
+    expect(againTrace.latest, "the reconnected trace doesn't say bea's word was replaced").toMatchObject({
+      position: mine.position,
+      word: beas,
+      standing: false,
+      now: anns,
+    });
+  });
+
+  settleByAgeOnly(
+    "carries otherStanding and otherReplaced entries over the wire, each shaped correctly",
+    async () => {
+      const bea = await arrive();
+      const before = await bea.sentence();
+      const first = at(before, 0);
+      const firstWord = unused(before);
+      expect(await bea.replace(first, firstWord)).toBe(303);
+
+      await new Promise((resolve) => setTimeout(resolve, (settleSecondsEnv + 1) * 1000));
+
+      const now = await bea.sentence();
+      expect(at(now, 0).word, "setup: the first word was replaced by someone else, not left to settle").toBe(firstWord);
+      const secondWord = unused(now);
+      expect(await bea.replace(at(now, 1), secondWord)).toBe(303);
+
+      // someone replaces a third word of bea's, so it shows up in otherReplaced
+      const third = at(await bea.sentence(), 2);
+      const thirdWord = unused(await bea.sentence());
+      expect(await bea.replace(third, thirdWord)).toBe(303);
+      const carol = await arrive();
+      const replacement = unused(await carol.sentence());
+      expect(await carol.replace(at(await carol.sentence(), 2), replacement)).toBe(303);
+
+      const snapshot = await (await connect(bea)).snapshot();
+      const trace = snapshot.trace as { otherStanding: unknown[]; otherReplaced: unknown[] };
+      const standing = trace.otherStanding.find((s) => (s as { position: number }).position === 0) as Record<string, unknown>;
+      expect(standing, "the first word isn't in otherStanding").toBeDefined();
+      expect(keysOf(standing), "a standing item carries more than position and word").toEqual(STANDING_ITEM_KEYS);
+      expect(standing).toEqual({ position: 0, word: firstWord });
+
+      const replaced = trace.otherReplaced.find((r) => (r as { position: number }).position === 2) as Record<string, unknown>;
+      expect(replaced, "the third word isn't in otherReplaced").toBeDefined();
+      expect(keysOf(replaced), "a replaced item carries more than position, word and now").toEqual(REPLACED_ITEM_KEYS);
+      expect(replaced).toEqual({ position: 2, word: thirdWord, now: replacement });
+    },
+    20_000,
+  );
+
   // The same visitor in two tabs: change events carry no trace, so an open
   // stream learns its own visitor's trace from a fresh snapshot, sent only to
   // that connection whenever its trace changes.
-  localOnly("keeps an open stream's own trace current when it changes elsewhere", async () => {
+  onceOnly("keeps an open stream's own trace current when it changes elsewhere", async () => {
     const ann = await arrive();
     const stream = await connect(ann);
     expect((await stream.snapshot()).trace, "ann hasn't changed anything yet").toBeNull();
@@ -378,6 +507,33 @@ describe("Theseus realtime", () => {
     );
     expect(replaced.trace).toEqual({ position: mine.position, word: anns, standing: false, now: bobs });
     expect(at(replaced.positions, mine.position)).toEqual(at(await ann.sentence(), mine.position));
+  });
+
+  settleOnly("keeps an open stream's own trace current when it changes elsewhere, settle mode", async () => {
+    const ann = await arrive();
+    const stream = await connect(ann);
+    expect((await stream.snapshot()).trace, "ann hasn't changed anything yet").toBeNull();
+    const opening = stream.frames[0];
+    const latestOf = (f: Frame) => (f.data as { trace: { latest?: Record<string, unknown> } } | undefined)?.trace?.latest;
+    const refreshed = (standing: boolean) => (f: Frame) =>
+      f !== opening && f.event === "snapshot" && latestOf(f)?.standing === standing;
+
+    // ann's own change, from another tab: same cookie, another request
+    const before = await ann.sentence();
+    const mine = before[0];
+    const anns = unused(before);
+    expect(await ann.replace(mine, anns)).toBe(303);
+    await stream.waitFor(changeAt(mine.position, mine.version + 1), LIVE_MS, "change event for ann's replacement");
+    const standingFrame = await stream.waitFor(refreshed(true), LIVE_MS, "snapshot bringing ann's own new trace");
+    expect(latestOf(standingFrame)).toMatchObject({ position: mine.position, word: anns, standing: true });
+
+    // someone else replaces ann's word
+    const bob = await arrive();
+    const now = await bob.sentence();
+    const bobs = unused(now);
+    expect(await bob.replace(at(now, mine.position), bobs)).toBe(303);
+    const replacedFrame = await stream.waitFor(refreshed(false), LIVE_MS, "snapshot saying ann's word was replaced");
+    expect(latestOf(replacedFrame)).toMatchObject({ position: mine.position, word: anns, standing: false, now: bobs });
   });
 
   // Passes before and after the refresh exists: it guards against sending

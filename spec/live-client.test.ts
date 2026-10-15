@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, inject, it } from "vitest";
-import { attach, deriveTotal, type Position, type Snapshot, type Trace } from "../src/lib/live-client";
+import { afterEach, describe, expect, inject, it, vi } from "vitest";
+import { attach, deriveTotal, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -24,6 +24,24 @@ const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
 const localOnly = (name: string, fn: () => Promise<void>) =>
   it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn);
+
+// Most of this file drives src/lib/live-client.ts directly with hand-built
+// Snapshot/Trace objects, so its rendering is exercised independently of
+// whatever rule mode the real backing app happens to run — the client
+// discriminates a trace's shape structurally, not from the server's mode.
+// The one exception is any test that compares the client's own rendering
+// against what GET / actually serves: that comparison is only valid when
+// the real server's trace shape matches what was hand-fed, which depends on
+// RULE_MODE. Gated the same way spec/eligibility.test.ts gates.
+const inCI = !!process.env.CI;
+const settleModeReady = local && process.env.RULE_MODE === "settle";
+if (local && inCI && !process.env.RULE_MODE) {
+  throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+}
+const onceOnly = (name: string, fn: () => Promise<void>) =>
+  it.skipIf(!local || settleModeReady)(local && !settleModeReady ? name : `${name} [skipped: not once mode]`, fn);
+const settleOnly = (name: string, fn: () => Promise<void>) =>
+  it.skipIf(!settleModeReady)(settleModeReady ? name : `${name} [skipped: not settle mode]`, fn);
 
 // a word that looks like an element; unique per run, so no earlier state on
 // the page can already contain it
@@ -313,8 +331,12 @@ describe("live page reconciliation", () => {
     });
 
     // The same visitor with two tabs open: they make their change in the other
-    // one, so this page loaded with no trace at all.
-    localOnly("creates the trace when a snapshot first brings one, as GET / would render it", async () => {
+    // one, so this page loaded with no trace at all. Compares the client's own
+    // rendering against what GET / actually serves, so it's valid only when
+    // the once-mode Trace shape (hand-fed below) matches the real server's
+    // mode; spec/live-client.test.ts's settle-mode describe block below
+    // covers the equivalent settle-mode rendering without that comparison.
+    onceOnly("creates the trace when a snapshot first brings one, as GET / would render it", async () => {
       const ann = await arrive();
       const doc = await ann.page("/");
       expect(traceStatus(doc), "a visitor who hasn't changed anything has a trace").toBeNull();
@@ -354,6 +376,40 @@ describe("live page reconciliation", () => {
       expect(doc.querySelectorAll('section [role="status"], aside [role="status"]').length, "more than one trace").toBe(1);
     });
 
+    // Same scenario as above, but under settle mode: the server's own
+    // SettleTrace shape is the model, compared the same way.
+    settleOnly("creates the settle-mode trace when a snapshot first brings one, as GET / would render it", async () => {
+      const ann = await arrive();
+      const doc = await ann.page("/");
+      expect(traceStatus(doc), "a visitor who hasn't changed anything has a trace").toBeNull();
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      expect(traceStatus(doc), "a snapshot with no trace created one").toBeNull();
+
+      const mine = positionsOf(doc)[0];
+      const anns = fresh();
+      expect(await ann.replace(mine, anns)).toBe(303); // in the other tab
+      const positions = positionsOf(doc).map((p) =>
+        p.position === mine.position ? { ...p, word: anns, version: p.version + 1 } : p,
+      );
+      const trace: SettleTrace = {
+        latest: { position: mine.position, word: anns, standing: true, settled: false, settlesInMs: 300_000 },
+        otherStanding: [],
+        otherReplaced: [],
+      };
+      page.applySnapshot({ positions, trace });
+
+      // what GET / renders for ann now is the model (settlesInMs ticks down
+      // on the server between these two reads, so it's never compared)
+      const served = await ann.page("/");
+      const section = (d: Document) => traceStatus(d)?.closest("section, aside") ?? null;
+      const withoutTimerDrift = (s: string) => s.replace(/\d+/g, "#"); // defensive: no numbers are expected either way
+      const text = (el: Element | null) => withoutTimerDrift((el?.textContent ?? "").replace(/\s+/g, " ").trim());
+      expect(section(doc), "the snapshot's trace didn't create a trace on the page").not.toBeNull();
+      expect(text(section(doc))).toBe(text(section(served)));
+      expect(slot(doc, mine.position).label.querySelector("mark")?.textContent, "the standing word isn't marked").toBe(anns);
+    });
+
     localOnly("brings the trace up to date from a reconnect snapshot", async () => {
       const ann = await arrive();
       const mine = positionsOf(await ann.page("/"))[0];
@@ -374,6 +430,90 @@ describe("live page reconciliation", () => {
       expect(status.querySelector("del")?.textContent?.trim()).toBe(anns);
       expect(status.textContent).toContain(now);
       expect(labelWord(doc, mine.position)).toBe(now);
+    });
+  });
+
+  // SettleTrace is a hand-built shape here (not fetched over HTTP, same as
+  // the once-mode trace tests above): these drive src/lib/live-client.ts
+  // directly, so they exercise its rendering and timer logic independent of
+  // the server's actual rule mode. spec/trace.test.ts and
+  // spec/realtime.test.ts cover the server side (the rendered page, and the
+  // wire shape) under a real settle-mode app.
+  describe("the visitor's own trace under the settle rule", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const settleTrace = (overrides: Partial<Extract<SettleTrace["latest"], { standing: true }>> = {}): SettleTrace => ({
+      latest: { position: 0, word: "held", standing: true, settled: false, settlesInMs: 5000, ...overrides },
+      otherStanding: [],
+      otherReplaced: [],
+    });
+
+    localOnly("marks every standing word's position in the sentence, and lists the others", async () => {
+      const doc = await (await arrive()).page("/");
+      const [a, b, c] = positionsOf(doc);
+      const page = attach(doc);
+      const trace: SettleTrace = {
+        latest: { position: a.position, word: fresh(), standing: true, settled: false, settlesInMs: 5000 },
+        otherStanding: [{ position: b.position, word: fresh() }],
+        otherReplaced: [{ position: c.position, word: fresh(), now: fresh() }],
+      };
+      page.applySnapshot({ positions: positionsOf(doc), trace });
+
+      expect(slot(doc, a.position).label.querySelector("mark"), "the latest standing word isn't marked").not.toBeNull();
+      expect(slot(doc, b.position).label.querySelector("mark"), "the other standing word isn't marked").not.toBeNull();
+      expect(slot(doc, c.position).label.querySelector("mark"), "a replaced word is marked").toBeNull();
+
+      const section = traceStatus(doc)!.closest("section, aside")!;
+      expect(section.textContent, "the other standing word is missing from the trace").toContain(trace.otherStanding[0].word);
+      expect(section.textContent, "the other standing word isn't labelled settled").toMatch(/settled/i);
+      expect(section.textContent, "the replaced word is missing from the trace").toContain(trace.otherReplaced[0].word);
+      expect(section.textContent, "the replaced word's replacement is missing").toContain(trace.otherReplaced[0].now);
+      expect(section.textContent, "the replaced word isn't labelled kept").toMatch(/kept/i);
+    });
+
+    localOnly("a holding trace becomes free on the page after SETTLE_SECONDS without any other change or reload", async () => {
+      vi.useFakeTimers();
+      const doc = await (await arrive()).page("/");
+      const [a] = positionsOf(doc);
+      const page = attach(doc);
+      const trace = settleTrace({ position: a.position, settlesInMs: 3000 });
+      page.applySnapshot({ positions: positionsOf(doc), trace });
+
+      const before = traceStatus(doc)!.textContent;
+      expect(before, "a holding trace shows the settled wording already").toMatch(/entry|still holding|must change elsewhere/i);
+
+      vi.advanceTimersByTime(2999);
+      expect(traceStatus(doc)!.textContent, "the trace settled before its timer elapsed").toBe(before);
+
+      vi.advanceTimersByTime(2);
+      const after = traceStatus(doc)!.textContent;
+      expect(after, "the trace never flipped once its timer elapsed").not.toBe(before);
+      expect(slot(doc, a.position).label.querySelector("mark"), "a settled word stops being marked").not.toBeNull();
+    });
+
+    localOnly("a newer trace cancels the pending local timer instead of firing late over it", async () => {
+      vi.useFakeTimers();
+      const doc = await (await arrive()).page("/");
+      const [a, b] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: settleTrace({ position: a.position, settlesInMs: 3000 }) });
+
+      // freed by a real replacement elsewhere, before the local timer would fire
+      const freedWord = fresh();
+      const freedTrace: SettleTrace = {
+        latest: { position: b.position, word: freedWord, standing: true, settled: false, settlesInMs: 5000 },
+        otherStanding: [],
+        otherReplaced: [],
+      };
+      page.applySnapshot({ positions: positionsOf(doc), trace: freedTrace });
+      const afterFreed = traceStatus(doc)!.textContent;
+
+      vi.advanceTimersByTime(3000);
+
+      expect(traceStatus(doc)!.textContent, "a stale timer clobbered the newer trace").toBe(afterFreed);
+      expect(traceStatus(doc)!.textContent).toContain(freedWord);
     });
   });
 
