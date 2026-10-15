@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { currentPositions, traceFor, type Trace } from "../lib/db";
 import { subscribe, type Change } from "../lib/live";
+import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 
 // GET /events: the current sentence as a stream. It opens with a `snapshot`
@@ -25,9 +26,11 @@ const sameTrace = (a: Trace | null, b: Trace | null) =>
     a.standing === b.standing &&
     (a.standing || b.standing || a.now === b.now));
 
-export const GET: APIRoute = ({ cookies }) => {
+export const GET: APIRoute = ({ cookies, locals }) => {
   const visitor = visitorId(cookies);
   const traceNow = () => (visitor ? traceFor(visitor) : null);
+  const reqId = locals.requestId;
+  const v = visitorTag(visitor);
   let stop = () => {};
 
   const body = new ReadableStream<Uint8Array>({
@@ -47,9 +50,11 @@ export const GET: APIRoute = ({ cookies }) => {
         if (sameTrace(trace, sent)) return;
         sent = trace;
         event("snapshot", { positions: positionsNow(), trace });
+        logLine(reqId, "stream-resnapshot", { v });
       });
       sent = traceNow();
       event("snapshot", { positions: positionsNow(), trace: sent });
+      logLine(reqId, "stream-open", { v });
 
       // a comment line, ignored by clients, so a dead socket surfaces
       const heartbeat = setInterval(() => {
@@ -59,9 +64,13 @@ export const GET: APIRoute = ({ cookies }) => {
           stop();
         }
       }, HEARTBEAT_MS);
+      let stopped = false;
       stop = () => {
+        if (stopped) return; // the adapter's cancel() can follow a heartbeat failure
+        stopped = true;
         clearInterval(heartbeat);
         unsubscribe();
+        logLine(reqId, "stream-close", { v });
       };
     },
     // the adapter cancels the stream when the client's connection closes
