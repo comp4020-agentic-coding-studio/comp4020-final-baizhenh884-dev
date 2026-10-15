@@ -1,4 +1,5 @@
 import type { AstroCookies } from "astro";
+import { logLine, visitorTag } from "./log";
 
 // A visitor is a browser holding this cookie: a random id, no account, no
 // database row until they make a change. Clearing it makes a new visitor.
@@ -10,10 +11,17 @@ export function visitorId(cookies: AstroCookies): string | null {
   return id && ID.test(id) ? id : null;
 }
 
-// On any page view: keep the visitor's id, or give a new browser one.
-export function ensureVisitor(cookies: AstroCookies): string {
+// On any page view: keep the visitor's id, or give a new browser one. Sets
+// locals.visitorId so the request's own access line (logged after this
+// decision, in src/middleware.ts) agrees with the visitor-new/return line
+// logged here, rather than seeing no cookie yet and logging v=none.
+export function ensureVisitor(cookies: AstroCookies, locals: App.Locals): string {
   const existing = visitorId(cookies);
-  if (existing) return existing;
+  if (existing) {
+    logLine(locals.requestId, "visitor-return", { v: visitorTag(existing) });
+    locals.visitorId = existing;
+    return existing;
+  }
   const id = crypto.randomUUID();
   cookies.set(COOKIE, id, {
     path: "/",
@@ -22,5 +30,7 @@ export function ensureVisitor(cookies: AstroCookies): string {
     secure: import.meta.env.PROD,
     maxAge: 60 * 60 * 24 * 365,
   });
+  logLine(locals.requestId, "visitor-new", { v: visitorTag(id) });
+  locals.visitorId = id;
   return id;
 }

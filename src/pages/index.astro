@@ -3,7 +3,7 @@ import Page from "../layouts/Page.astro";
 import { changeCount, currentPositions, recentPast, sentenceAt, traceFor } from "../lib/db";
 import { ensureVisitor } from "../lib/visitor";
 
-const visitor = ensureVisitor(Astro.cookies);
+const visitor = ensureVisitor(Astro.cookies, Astro.locals);
 
 // GET /?at=N: the whole sentence after the first N changes, read-only.
 // GET /: the current sentence, the only one that can be changed.
