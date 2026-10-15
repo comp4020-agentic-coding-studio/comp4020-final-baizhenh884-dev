@@ -17,6 +17,11 @@ import { describe, expect, inject, it } from "vitest";
 // environment isn't set to settle mode, every check here skips, named,
 // rather than asserting nothing or guessing from side effects.
 //
+// In CI, RULE_MODE is always set explicitly (once or settle — checks.yml
+// runs both passes), so an unset RULE_MODE there means the two are out of
+// sync, not a deliberate choice: this fails instead of skipping, the same
+// pattern spec/logging.test.ts's dockerOnly uses for a missing container.
+//
 // Every check here runs only against a local app: all of them replace a
 // word, and some need control over SETTLE_SECONDS to run in reasonable time.
 
@@ -94,15 +99,18 @@ const at = (all: { position: number; version: number; word: string }[], position
   return slot!;
 };
 
+const inCI = !!process.env.CI;
 const settleModeReady = local && process.env.RULE_MODE === "settle";
-const settleOnly = (name: string, fn: () => Promise<void>, timeout?: number) =>
-  it.skipIf(!settleModeReady)(
-    settleModeReady
-      ? name
-      : `${name} [skipped: ${local ? "RULE_MODE isn't settle" : "APP_URL is not local"}]`,
-    fn,
-    timeout,
-  );
+const settleOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+  if (settleModeReady) return it(name, fn, timeout);
+  if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn, timeout);
+  if (inCI && !process.env.RULE_MODE) {
+    return it(`${name} [RULE_MODE unset in CI]`, () => {
+      throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+    });
+  }
+  return it.skip(`${name} [skipped: RULE_MODE isn't settle]`, fn, timeout);
+};
 
 describe("the settle rule", () => {
   settleOnly("lets a visitor who has never acted, act", async () => {
@@ -188,4 +196,56 @@ describe("the settle rule", () => {
     const stillEligible = await v.replace(slot, unused(before));
     expect(stillEligible.status, "a stale refusal spent the visitor's eligibility").toBe(303);
   });
+
+  // Needs SETTLE_SECONDS short enough to wait out in a test (checks.yml sets
+  // 3); skips, named, if it's left at a production-sized value, rather than
+  // either waiting minutes or silently not covering settle-by-age at all.
+  // Unlike settleOnly, "settle mode is active" alone isn't enough to run this
+  // one — it must also decide whether SETTLE_SECONDS is short enough, so it
+  // doesn't delegate to settleOnly (which would just run it regardless).
+  const settleSeconds = Number(process.env.SETTLE_SECONDS ?? 300);
+  const settleByAgeOnly = (name: string, fn: () => Promise<void>, timeout?: number) => {
+    if (!local) return it.skip(`${name} [skipped: APP_URL is not local]`, fn, timeout);
+    if (inCI && !process.env.RULE_MODE) {
+      return it(`${name} [RULE_MODE unset in CI]`, () => {
+        throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+      });
+    }
+    if (!settleModeReady) return it.skip(`${name} [skipped: RULE_MODE isn't settle]`, fn, timeout);
+    if (settleSeconds <= 10) return it(name, fn, timeout);
+    if (inCI) {
+      return it(`${name} [SETTLE_SECONDS too long for CI]`, () => {
+        throw new Error("SETTLE_SECONDS must be short (checks.yml sets 3) so this can actually wait it out in CI");
+      });
+    }
+    return it.skip(`${name} [skipped: SETTLE_SECONDS is too long to wait out here]`, fn, timeout);
+  };
+
+  settleByAgeOnly(
+    "settles by age: a held visitor can act elsewhere once their word has stood long enough, without being replaced",
+    async () => {
+      const v = await arrive();
+      const before = await v.sentence();
+      const held = before[0];
+      const placed = unused(before);
+      expect((await v.replace(held, placed)).status).toBe(303);
+
+      const afterFirst = await v.sentence();
+      const tooSoon = await v.replace(at(afterFirst, (held.position + 1) % afterFirst.length), unused(afterFirst));
+      expect(tooSoon.status, "a young standing word didn't hold the visitor").toBe(403);
+      expect(tooSoon.text).toContain("still holding");
+
+      await new Promise((resolve) => setTimeout(resolve, (settleSeconds + 1) * 1000));
+
+      // v's own word is still exactly what v placed: nobody replaced it, so
+      // any eligibility below comes from settling by age, not from "freed".
+      const stillStanding = at(await v.sentence(), held.position);
+      expect(stillStanding.word, "setup: held's word was replaced by someone else, not left to settle").toBe(placed);
+
+      const now = await v.sentence();
+      const afterSettling = await v.replace(at(now, (held.position + 1) % now.length), unused(now));
+      expect(afterSettling.status, "the visitor wasn't freed once their word settled").toBe(303);
+    },
+    20_000,
+  );
 });
