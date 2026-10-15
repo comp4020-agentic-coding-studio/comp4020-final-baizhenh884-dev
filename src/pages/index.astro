@@ -1,6 +1,7 @@
 ---
 import Page from "../layouts/Page.astro";
-import { changeCount, currentPositions, recentPast, sentenceAt, traceFor } from "../lib/db";
+import { changeCount, currentPositions, currentTrace, recentPast, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
 import { ensureVisitor } from "../lib/visitor";
 
 const visitor = ensureVisitor(Astro.cookies, Astro.locals);
@@ -19,8 +20,24 @@ const current = earlier ? [] : currentPositions();
 const past = earlier ? new Map<number, string[]>() : recentPast();
 const changes = changeCount();
 const n = Number(at);
-const trace = earlier ? null : traceFor(visitor);
-const yours = trace?.standing ? trace.position : null;
+
+// Which trace shape renders is itself rule-mode config, never guessed from
+// the trace's own content (docs/decisions/0003-settle-and-kept-ships.md).
+// Under `once` the markup below is unchanged, byte for byte, from Crit 9.
+const trace = earlier ? null : currentTrace(visitor);
+const markedPositions = new Set<number>(
+  trace?.mode === "once" && trace.trace?.standing
+    ? [trace.trace.position]
+    : trace?.mode === "settle" && trace.trace
+      ? [trace.trace.latest.standing ? trace.trace.latest.position : null, ...trace.trace.otherStanding.map((s) => s.position)].filter(
+          (p): p is number => p !== null,
+        )
+      : [],
+);
+const how =
+  trace?.mode === "settle"
+    ? `Choose a word, type its replacement and press Enter. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
+    : "Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
 ---
 
 <Page title="Theseus">
@@ -65,7 +82,7 @@ const yours = trace?.standing ? trace.position : null;
                   <form method="post" action="/replace">
                     <input type="hidden" name="position" value={p.position} />
                     <input type="hidden" name="version" value={p.version} />
-                    <label for={`word-${p.position}`}>{p.position === yours ? <mark>{p.word}</mark> : p.word}</label>
+                    <label for={`word-${p.position}`}>{markedPositions.has(p.position) ? <mark>{p.word}</mark> : p.word}</label>
                     <input
                       id={`word-${p.position}`}
                       name="word"
@@ -87,21 +104,50 @@ const yours = trace?.standing ? trace.position : null;
             ))}.
           </div>
           <p id="part" class="caps" aria-hidden="true" hidden></p>
-          <p id="how">
-            Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.
-          </p>
-          {trace && (
+          <p id="how">{how}</p>
+          {trace?.mode === "once" && trace.trace && (
             <section aria-labelledby="trace-heading">
               <h2 id="trace-heading">Your trace</h2>
               <p role="status">
-                {trace.standing ? (
-                  <>Your word “{trace.word}” still stands, marked in the sentence above.</>
+                {trace.trace.standing ? (
+                  <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
                 ) : (
                   <>
-                    Your word “<del>{trace.word}</del>” has since been replaced: “{trace.now}” stands in its place now.
+                    Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
                   </>
                 )}
               </p>
+            </section>
+          )}
+          {trace?.mode === "settle" && trace.trace && (
+            <section aria-labelledby="trace-heading">
+              <h2 id="trace-heading">Your trace</h2>
+              {(() => {
+                const parts = latestParts(trace.trace.latest);
+                return (
+                  <p role="status">
+                    {parts.del ? (
+                      <>
+                        Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.eligibility}
+                      </>
+                    ) : (
+                      <>
+                        Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                      </>
+                    )}
+                  </p>
+                );
+              })()}
+              {trace.trace.otherStanding.length > 0 && (
+                <ul class="trace-standing">
+                  {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
+                </ul>
+              )}
+              {trace.trace.otherReplaced.length > 0 && (
+                <ul class="trace-replaced">
+                  {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
+                </ul>
+              )}
             </section>
           )}
           {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
