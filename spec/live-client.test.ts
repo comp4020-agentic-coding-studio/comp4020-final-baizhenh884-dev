@@ -474,8 +474,8 @@ describe("live page reconciliation", () => {
     });
 
     localOnly("a holding trace becomes free on the page after SETTLE_SECONDS without any other change or reload", async () => {
-      vi.useFakeTimers();
       const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
       const [a] = positionsOf(doc);
       const page = attach(doc);
       const trace = settleTrace({ position: a.position, settlesInMs: 3000 });
@@ -490,12 +490,13 @@ describe("live page reconciliation", () => {
       vi.advanceTimersByTime(2);
       const after = traceStatus(doc)!.textContent;
       expect(after, "the trace never flipped once its timer elapsed").not.toBe(before);
-      expect(slot(doc, a.position).label.querySelector("mark"), "a settled word stops being marked").not.toBeNull();
+      expect(after, "the settled trace still claims it's holding").not.toMatch(/holding/i);
+      expect(slot(doc, a.position).label.querySelector("mark"), "the settled word is no longer marked as standing").not.toBeNull();
     });
 
     localOnly("a newer trace cancels the pending local timer instead of firing late over it", async () => {
-      vi.useFakeTimers();
       const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
       const [a, b] = positionsOf(doc);
       const page = attach(doc);
       page.applySnapshot({ positions: positionsOf(doc), trace: settleTrace({ position: a.position, settlesInMs: 3000 }) });

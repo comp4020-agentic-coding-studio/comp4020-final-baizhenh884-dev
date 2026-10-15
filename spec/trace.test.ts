@@ -262,25 +262,28 @@ describe("Your trace", () => {
 
   settleOnly("lists replaced words newest first, each named as kept", async () => {
     const v = await arrive();
-    const bea = await arrive();
 
     // v's first change, at position 0
     const before = await v.sentence();
     const firstWord = unused(before);
     expect((await v.replace(at(before, 0), firstWord)).status).toBe(303);
 
-    // bea replaces it: frees v everywhere except position 0 (move-on)
-    const replacedFirst = unused(await bea.sentence());
-    expect((await bea.replace(at(await bea.sentence(), 0), replacedFirst)).status).toBe(303);
+    // a fresh visitor replaces it: frees v everywhere except position 0 (move-on)
+    const beaA = await arrive();
+    const replacedFirst = unused(await beaA.sentence());
+    expect((await beaA.replace(at(await beaA.sentence(), 0), replacedFirst)).status).toBe(303);
 
     // v's second change, at position 1 — now v's latest
     const now1 = await v.sentence();
     const secondWord = unused(now1);
     expect((await v.replace(at(now1, 1), secondWord)).status).toBe(303);
 
-    // bea replaces that too: frees v everywhere except position 1
-    const replacedSecond = unused(await bea.sentence());
-    expect((await bea.replace(at(await bea.sentence(), 1), replacedSecond)).status).toBe(303);
+    // a different fresh visitor replaces that too (beaA is themselves still
+    // holding position 0 and move-on blocked there, so they can't act again
+    // yet): frees v everywhere except position 1
+    const beaB = await arrive();
+    const replacedSecond = unused(await beaB.sentence());
+    expect((await beaB.replace(at(await beaB.sentence(), 1), replacedSecond)).status).toBe(303);
 
     // v's third change, at position 2 — the new latest; positions 0 and 1 are
     // now both "replaced" in v's trace, position 1 (the more recent of the two) first

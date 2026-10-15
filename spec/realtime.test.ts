@@ -62,8 +62,9 @@ const LIVE_MS = 1000; // "within about a second" of the replacement succeeding
 
 const POSITION_KEYS = ["position", "version", "word"];
 const SNAPSHOT_KEYS = ["positions", "trace"];
-const TRACE_KEYS = settleModeReady ? ["latest", "otherStanding", "otherReplaced"] : ["now", "position", "standing", "word"];
-const LATEST_KEYS = ["now", "position", "settled", "settlesInMs", "standing", "word"];
+// keysOf sorts, so these are alphabetical, not declaration order
+const TRACE_KEYS = settleModeReady ? ["latest", "otherReplaced", "otherStanding"] : ["now", "position", "standing", "word"];
+const HOLDING_LATEST_KEYS = ["position", "settled", "settlesInMs", "standing", "word"];
 const STANDING_ITEM_KEYS = ["position", "word"];
 const REPLACED_ITEM_KEYS = ["now", "position", "word"];
 
@@ -343,9 +344,7 @@ describe("Theseus realtime", () => {
     expect(snapshot.trace, "a visitor who has made their change gets no trace").not.toBeNull();
     expect(keysOf(snapshot.trace), "the settle-mode snapshot trace isn't { latest, otherStanding, otherReplaced }").toEqual(TRACE_KEYS);
     const latest = (snapshot.trace as { latest: Record<string, unknown> }).latest;
-    expect(keysOf(latest), "a holding latest carries more than now/position/settled/settlesInMs/standing/word").toEqual(
-      expect.arrayContaining(LATEST_KEYS),
-    );
+    expect(keysOf(latest), "a holding latest isn't exactly position/settled/settlesInMs/standing/word").toEqual(HOLDING_LATEST_KEYS);
     expect(latest).toMatchObject({ position: slot.position, word, standing: true, settled: false });
     expect(latest.settlesInMs, "a freshly-placed word's settlesInMs isn't a positive number").toBeTypeOf("number");
     expect(latest.settlesInMs as number).toBeGreaterThan(0);
@@ -439,35 +438,41 @@ describe("Theseus realtime", () => {
       const bea = await arrive();
       const before = await bea.sentence();
       const first = at(before, 0);
-      const firstWord = unused(before);
+      const firstWord = unused(before); // stays untouched by bea; replaced by someone else at the end → otherReplaced
       expect(await bea.replace(first, firstWord)).toBe(303);
 
       await new Promise((resolve) => setTimeout(resolve, (settleSecondsEnv + 1) * 1000));
 
       const now = await bea.sentence();
       expect(at(now, 0).word, "setup: the first word was replaced by someone else, not left to settle").toBe(firstWord);
-      const secondWord = unused(now);
+      const secondWord = unused(now); // never replaced or re-touched → stays otherStanding
       expect(await bea.replace(at(now, 1), secondWord)).toBe(303);
 
-      // someone replaces a third word of bea's, so it shows up in otherReplaced
-      const third = at(await bea.sentence(), 2);
-      const thirdWord = unused(await bea.sentence());
+      await new Promise((resolve) => setTimeout(resolve, (settleSecondsEnv + 1) * 1000));
+
+      const now2 = await bea.sentence();
+      expect(at(now2, 1).word, "setup: the second word was replaced by someone else, not left to settle").toBe(secondWord);
+      const third = at(now2, 2);
+      const thirdWord = unused(now2); // bea's latest
       expect(await bea.replace(third, thirdWord)).toBe(303);
+
+      // someone replaces bea's first word (not bea's latest), so it moves
+      // from otherStanding to otherReplaced
       const carol = await arrive();
       const replacement = unused(await carol.sentence());
-      expect(await carol.replace(at(await carol.sentence(), 2), replacement)).toBe(303);
+      expect(await carol.replace(at(await carol.sentence(), 0), replacement)).toBe(303);
 
       const snapshot = await (await connect(bea)).snapshot();
       const trace = snapshot.trace as { otherStanding: unknown[]; otherReplaced: unknown[] };
-      const standing = trace.otherStanding.find((s) => (s as { position: number }).position === 0) as Record<string, unknown>;
-      expect(standing, "the first word isn't in otherStanding").toBeDefined();
+      const standing = trace.otherStanding.find((s) => (s as { position: number }).position === 1) as Record<string, unknown>;
+      expect(standing, "the second word isn't in otherStanding").toBeDefined();
       expect(keysOf(standing), "a standing item carries more than position and word").toEqual(STANDING_ITEM_KEYS);
-      expect(standing).toEqual({ position: 0, word: firstWord });
+      expect(standing).toEqual({ position: 1, word: secondWord });
 
-      const replaced = trace.otherReplaced.find((r) => (r as { position: number }).position === 2) as Record<string, unknown>;
-      expect(replaced, "the third word isn't in otherReplaced").toBeDefined();
+      const replaced = trace.otherReplaced.find((r) => (r as { position: number }).position === 0) as Record<string, unknown>;
+      expect(replaced, "the first word isn't in otherReplaced").toBeDefined();
       expect(keysOf(replaced), "a replaced item carries more than position, word and now").toEqual(REPLACED_ITEM_KEYS);
-      expect(replaced).toEqual({ position: 2, word: thirdWord, now: replacement });
+      expect(replaced).toEqual({ position: 0, word: firstWord, now: replacement });
     },
     20_000,
   );
