@@ -56,6 +56,7 @@ class Visitor:
         self.lock_durations = []  # completed lock episodes (seconds)
         self.open_lock = None  # censored episode at session end
         self.releases = 0
+        self.freed_by_others = 0  # lock episodes ended by someone replacing your word
         self.return_visits = 0
         self.return_visits_able = 0
 
@@ -204,7 +205,10 @@ def run(rule, mix, seed, delib_mean=40.0, p_retaliate=0.8, p_unlock=0.8, settle_
                 log.append((t, v.id, p, prev))
                 if isinstance(prev, int):
                     d = visitors[prev]
+                    was_locked = not el(d, t)
                     d.standing.pop(p, None)
+                    if was_locked and el(d, t):
+                        d.freed_by_others += 1
                     d.last_displacer = v.id
                     d.retaliated = False
                 v.standing[p] = t
@@ -308,6 +312,7 @@ def metrics(visitors, log, stale, first_all_gone, owner, length):
         "never_acted": sum(a == 0 for a in acts) / len(acts),
         "mostly_blocked": sum(v.blocked_ticks / v.present_ticks > 0.5 for v in present) / len(present),
         "wait_mean": statistics.mean(locks) if locks else float("nan"),
+        "freed_by_others": sum(v.freed_by_others for v in visitors) / len(locks) if locks else float("nan"),
         "regained_share": len(locks) / (len(locks) + len(open_locks)) if locks or open_locks else float("nan"),
         "vv_share": len(vv) / n if n else float("nan"),
         "repeated_pair": repeated_pair / n if n else float("nan"),
@@ -353,6 +358,7 @@ COLUMNS = [
     ("frozen", "room frozen", True, 0),
     ("wait_mean_min", "wait to regain (min)", False, 1),
     ("regained_share", "locks that end", True, 0),
+    ("freed_by_others", "regained via another's act", True, 0),
     ("repeated_pair", "repeated-pair", True, 0),
     ("revenge", "revenge", True, 0),
     ("pingpong", "A→B→A same pos", True, 0),

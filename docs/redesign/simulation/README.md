@@ -58,6 +58,8 @@ python3 -I docs/redesign/simulation/sim.py 200 > docs/redesign/simulation/result
 - **room frozen**: share of occupied time in which *nobody present* can act.
 - **wait to regain**: mean length of a completed lock (wall clock).
 - **locks that end**: share of lock episodes that end before the window does.
+- **regained via another's act**: share of ended locks that ended because
+  someone else replaced the visitor's word (rather than by time).
 - **repeated-pair**: share of replacements between a pair of visitors who
   displace each other ≥ 3 times in total.
 - **revenge**: share of replacements where the actor displaces the last person
@@ -94,7 +96,11 @@ python3 -I docs/redesign/simulation/sim.py 200 > docs/redesign/simulation/result
    produces the most actions (median 4 per visitor in 20 min). At T = 10 min
    `pod-4` is frozen ~64 % of the time; at T ≥ 20 min it behaves like
    `standing` inside a 20-minute session.
-6. **`cooldown` is the most active and the least Theseus**: no relationship
+6. **Under `settle`, other people still drive eligibility when there are
+   people:** ~67–74 % of regained eligibility in the 12-person rooms comes
+   from someone replacing your word; time takes over only when the room is
+   thin (`sparse` 33 %, `pod-4` 21 %, `trickle-24h` 1 %).
+7. **`cooldown` is the most active and the least Theseus**: no relationship
    between your eligibility and other people at all.
 
 ## Sensitivity
