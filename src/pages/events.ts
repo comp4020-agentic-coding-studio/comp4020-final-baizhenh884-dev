@@ -26,8 +26,20 @@ const encoder = new TextEncoder();
 
 const positionsNow = () => currentPositions().map(({ position, word, version }) => ({ position, word, version }));
 
+// settlesInMs is recomputed from the current time on every read, so it never
+// equals a prior read even when nothing a visitor would notice has changed:
+// comparing it directly would resend a snapshot on every single broadcast
+// anywhere, for every connection with a holding trace. It drives only the
+// client's own local timer (never rendered), so it's excluded from the
+// comparison that decides whether to resend.
+function withoutSettleTimer(trace: CurrentTrace["trace"]): unknown {
+  if (!trace || !("latest" in trace) || !trace.latest.standing || trace.latest.settled) return trace;
+  const { settlesInMs: _settlesInMs, ...latest } = trace.latest;
+  return { ...trace, latest };
+}
+
 const sameTrace = (a: CurrentTrace["trace"], b: CurrentTrace["trace"]) =>
-  a === b || JSON.stringify(a) === JSON.stringify(b);
+  a === b || JSON.stringify(withoutSettleTimer(a)) === JSON.stringify(withoutSettleTimer(b));
 
 export const GET: APIRoute = ({ cookies, locals }) => {
   const visitor = visitorId(cookies);
