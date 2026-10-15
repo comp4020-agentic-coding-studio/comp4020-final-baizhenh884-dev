@@ -14,8 +14,8 @@ from what `README.md` argues "good" means (see "Product contract").
   shared-cpu-1x machine with 256 MB, one volume at `/data` (the only storage
   that survives a restart or redeploy), HTTP on `0.0.0.0:$PORT`, and `/readme/`
   publishing all of `README.md` in the HTML the server sends.
-- Current deliverable: Crit 9, "All at once". Crit 10 and the final
-  submission run in this same repo.
+- Current deliverable: Crit 10, "Fly by instruments". The final submission
+  runs in this same repo.
 - `README.md` is the public definition and record of the work; `PROCESS.md` is
   the process evidence (900–1100 words, rewritten at each crit). Neither stands
   in for the other.
@@ -32,7 +32,7 @@ from what `README.md` argues "good" means (see "Product contract").
   this file: update, generalise or remove what no longer applies (through
   "Maintaining this file").
 
-## Scope (Crit 9)
+## Scope (current crit; realtime limits since Crit 9)
 
 - Build the smallest slice that satisfies the current crit's spec — no more.
   Don't add a feature because it's easy to build, and don't add speculative
@@ -44,12 +44,28 @@ from what `README.md` argues "good" means (see "Product contract").
   Catch-up after a disconnect is a fresh read from SQLite, never a replay
   log, a queue, or any durable pub/sub.
 
+## Scope (Crit 10)
+
+- Multi-user is already satisfied: the visitor cookie (`src/lib/visitor.ts`)
+  already tells browsers apart, and the one-change and stale-version rules
+  already enforce it server-side. This crit's work is not a new mechanism;
+  it's naming the existing one and adding the logging the crit's own
+  verification needs:
+  - `docs/decisions/0002-pseudonymous-visitor-and-logging.md` records what
+    counts as a person, what each may see and change, where it's enforced,
+    and why per-browser is the right strength, not an accepted gap.
+  - Server-side logging of who did what (`src/lib/log.ts`,
+    `src/middleware.ts`), so the app can be narrated from `flyctl logs`
+    alone, without clicking through the UI.
+- No new product surface: no accounts, no visible identity, no presence,
+  no change to the one-change-per-visitor rule.
+
 ## Scope (Final Project: House integration)
 
 The Final Project deliberately pivots to the House of Theseus. This section
-supersedes the Crit 9 "smallest slice" rule above for the house itself; the
-Crit 9 realtime limits still hold. The prototypes behind the house live outside
-this repo: it holds their result and its specs, not the search.
+supersedes the "smallest slice" rule above for the house itself; the realtime
+limits above (since Crit 9) still hold. The prototypes behind the house live
+outside this repo: it holds their result and its specs, not the search.
 
 - The public object is one shared ten-word sentence and one corresponding
   house, two forms of the same thing. The house is a deterministic
@@ -160,7 +176,7 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 - CI gates the deploy on `pnpm check:evidence`. It passes once `PROCESS.md`
   and any one crit reflection exist, so it can't tell which crit's file is
   there: before each cutoff, confirm that crit's own reflection
-  (`reflections/crit-9.md` now) exists and holds a real account. Never create
+  (`reflections/crit-10.md` now) exists and holds a real account. Never create
   a placeholder or stub to make it, CI or any rubric check pass.
 - Never fabricate user testing, research, sources, observations, command
   output, failures, deployment results or design rationale. If something
@@ -286,6 +302,15 @@ What the code must hold to. The README says why; don't restate it here.
   remain authoritative; stale, invalid or second replacements continue to be
   refused by the server. Realtime presentation and navigation behaviour are
   page-side only and never override those server guarantees.
+- The server logs who did what, server-side, to stdout, so it outlives the
+  crit (`docs/decisions/0002-pseudonymous-visitor-and-logging.md`). Logging
+  is observation only: it never changes a response, the replacement
+  transaction, or realtime delivery, and a logging failure never fails a
+  request. The visitor tag is a one-way hash of the cookie; the raw cookie,
+  IP address and user agent are never logged. A refused replacement's word
+  text is never logged, only a reason category. A broadcast's reach is
+  logged as a count of streams notified, never a per-stream identity.
+  Nothing from the logs reaches any public response, stream, or API.
 
 ### Current design (revisable)
 
