@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { deriveKeptShip, type KeptShip } from "./kept-ship";
 import { positions } from "./schema";
 import { STARTING_WORDS } from "./sentence";
 
@@ -76,6 +77,19 @@ export function sentenceAt(n: number): string[] | null {
     .all(n) as { position: number; word: string }[];
   for (const row of rows) words[row.position] = row.word;
   return words;
+}
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): derived
+// entirely from `changes` and the current `positions`, no stored state of
+// its own. See kept-ship.ts for the derivation itself.
+export function keptShipAt(): KeptShip {
+  const changes = client.prepare("SELECT position, from_version AS fromVersion, from_word AS fromWord FROM changes ORDER BY id").all() as {
+    position: number;
+    fromVersion: number;
+    fromWord: string;
+  }[];
+  const current = currentPositions().map(({ word, version }) => ({ word, version }));
+  return deriveKeptShip(changes, current);
 }
 
 // The most recent words each position held before its current one (newest
