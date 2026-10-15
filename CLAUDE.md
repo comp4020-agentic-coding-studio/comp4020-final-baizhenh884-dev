@@ -179,6 +179,17 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
    fly.dev URL tests the last deploy, not the working tree (`/readme/` compares
    the local `README.md` with what's served). `--tmpfs /data` wipes data, so a
    persistence claim needs a named volume (`-v data:/data`) and a restart.
+
+   **On `final/theseus-redesign` (`RULE_MODE=settle` in production), run it
+   a second time against a settle-mode container**, exactly as `checks.yml`
+   does, since production's actual mode is never exercised by the default
+   run above:
+
+   ```sh
+   docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 --tmpfs /data app
+   RULE_MODE=settle pnpm check    # APP_URL defaults to http://localhost:8080
+   docker stop app
+   ```
 3. **Deployed:** `flyctl deploy --remote-only --ha=false -a
    comp4020-final-baizhenh884-dev`, then
    `APP_URL=https://comp4020-final-baizhenh884-dev.fly.dev pnpm check`. Against
@@ -201,7 +212,21 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 - Never weaken or skip a local/CI check because production can't run it.
 - New checks go in `spec/*.test.ts` (`spec/README.md` covers the shipped
   ones), assert the contract rather than the implementation, and are written
-  before the code, failing for the right reason.
+  before the code, failing for the right reason. **The spec commit itself
+  must land before the feat commit it covers**, not just be written first and
+  committed alongside or after (the settle-rule migration, commits
+  `0118706..5feee78`, landed before `spec/eligibility.test.ts`, commit
+  `53b8a5d` — the spec existed and was green locally before each feat commit,
+  but the commit *order* didn't show that, so the history can't prove it on
+  its own). History is never rewritten to fix this after the fact; it's a
+  rule for commits from here on.
+- **A check gated on configuration the test runner doesn't control on its own
+  (a rule mode, a feature flag) must never be silently skippable in CI.**
+  Follow `spec/logging.test.ts`'s `dockerOnly` pattern: skip, named, when the
+  gating condition is genuinely absent from a local or non-CI run, but fail
+  loudly when CI's own environment should have declared it and didn't. CI
+  must declare every such variable explicitly on every run it does — never
+  leave it unset and rely on a check's default to paper over the gap.
 - Don't replace judgement with a proxy: no keyword checks, and no fields added
   only so something can be tested.
 
