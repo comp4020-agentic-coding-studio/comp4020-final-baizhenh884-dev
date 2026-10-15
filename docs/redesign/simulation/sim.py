@@ -24,14 +24,14 @@ SETTLED = "settled"  # a settled word: still in the sentence, nobody's eligibili
 # once      : current product. One successful replacement per visitor, ever.
 # standing  : candidate. Eligible iff none of your words stands.
 # moveon    : standing + your next word must go somewhere other than your last.
-# settle    : moveon + a word that has stood SETTLE_AGE settles: it stays in
+# settle    : moveon + a word that has stood SETTLE_AGE (5 min) settles: it stays in
 #             the sentence but stops counting as yours, so you are eligible
 #             again. Derivable from history (the change's time), no button.
 #             Modelled as: an eligible visitor's next act settles their old word.
 # cooldown  : reference (r/Place-like). One replacement per COOLDOWN, no
 #             standing condition.
 RULES = ["once", "standing", "moveon", "settle", "cooldown"]
-SETTLE_AGE = 10 * 60
+SETTLE_AGE = 5 * 60
 COOLDOWN = 5 * 60
 
 

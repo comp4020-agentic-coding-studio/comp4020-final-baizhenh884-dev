@@ -18,7 +18,7 @@ python3 -I docs/redesign/simulation/sim.py 200 > docs/redesign/simulation/result
 | `once` | you have never succeeded | current production rule |
 | `standing` | none of your words stands | the brief's candidate |
 | `moveon` | `standing`, and your next word goes to a position other than your last | blocks immediate re-taking of the spot you just lost |
-| `settle` | `moveon`, or your standing word has stood ≥ T (default 10 min) | a word that has stood T *settles*: it stays in the sentence but stops holding you; derived from the change's timestamp, no button |
+| `settle` | `moveon`, or your standing word has stood ≥ T (default 5 min) | a word that has stood T *settles*: it stays in the sentence but stops holding you; derived from the change's timestamp, no button |
 | `cooldown` | ≥ 5 min since your last success | r/Place-style reference, no standing condition |
 
 ## Behavioural assumptions (all are guesses)
@@ -87,10 +87,13 @@ python3 -I docs/redesign/simulation/sim.py 200 > docs/redesign/simulation/result
    only slows it.
 4. **Free withdrawal is unlimited editing.** `settle` with T = 0 (release on
    demand) gives 12–17 acts per visitor in 20 minutes; the scarcity vanishes.
-5. **`settle` at T ≈ 5–10 min removes stuck visitors entirely** in every mix,
-   keeps revenge ≤ 3 %, and in `pod-4` cuts room-frozen time from ~84 % to
-   33 % (T = 5) or 64 % (T = 10). At T ≥ 20 min it behaves like `standing`
-   inside a 20-minute session.
+5. **`settle` (T = 5 min) removes stuck visitors entirely** in every mix,
+   keeps revenge ≤ 3 %, cuts room-frozen time in `pod-4` from ~85 % to ~36 %
+   and in the 12-person mixes from ~16–21 % to 2–3 %, and lets ~90 % of
+   return visits arrive able to act (vs ~40 % for `standing`). It also
+   produces the most actions (median 4 per visitor in 20 min). At T = 10 min
+   `pod-4` is frozen ~64 % of the time; at T ≥ 20 min it behaves like
+   `standing` inside a 20-minute session.
 6. **`cooldown` is the most active and the least Theseus**: no relationship
    between your eligibility and other people at all.
 
