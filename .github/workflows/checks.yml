@@ -37,11 +37,36 @@ jobs:
           docker build -t app .
           docker run -d --init --name app -p 8080:8080 -e PORT=8080 --tmpfs /data app
       - name: Run the spec
+        # RULE_MODE is explicit here (not left unset) so spec/eligibility.test.ts
+        # can tell "deliberately testing once" apart from "CI forgot to say
+        # which mode this run is" — the latter fails instead of skipping.
         run: pnpm check
         env:
           APP_URL: http://localhost:8080
+          RULE_MODE: once
       - name: Show the app's output
         # what the container printed, so a crash or slow boot is visible
+        if: ${{ failure() }}
+        run: docker logs app
+      - name: Stop the once-mode container
+        # settle mode needs a container of its own: switching RULE_MODE on a
+        # running container isn't possible (it's read once at boot), and the
+        # two modes mustn't share a database
+        if: ${{ always() }}
+        run: docker stop app || true
+      - name: Build and start the app under settle mode
+        # production's actual mode (docs/decisions/0003-settle-and-kept-ships.md):
+        # the once-mode run above never exercises it, and RULE_MODE=settle is
+        # what production runs once the redesign ships, so CI must run the
+        # full spec against it too, not just the default. A short
+        # SETTLE_SECONDS keeps the settle-by-age checks fast.
+        run: docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 --tmpfs /data app
+      - name: Run the spec under settle mode
+        run: pnpm check
+        env:
+          APP_URL: http://localhost:8080
+          RULE_MODE: settle
+      - name: Show the settle-mode app's output
         if: ${{ failure() }}
         run: docker logs app
       - name: Check the process evidence
