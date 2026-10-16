@@ -175,21 +175,29 @@ const how =
         </div>
         <p class="plate-note">Ten words. Ten parts of one house.<br />Change a word, and its part is rebuilt.</p>
         <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
-        <script define:vars={{ kept }}>
+        <script>
           // Only the current sentence goes live; earlier forms never load this.
-          import { attach, parseChange, parseSnapshot } from "../lib/live-client";
+          import { attach, parseChange, parseSnapshot, type KeptShip } from "../lib/live-client";
           import { mountCurrent, mountKept } from "../lib/house/page";
 
           const house = mountCurrent(document);
-          const keptHouse = mountKept(document, kept);
+          const keptHouse = mountKept(document);
           const keptLabel = document.querySelector(".kept-sentence");
-          function renderKept(k) {
+          // Visitor words are text wherever they land (CLAUDE.md): built from
+          // DOM nodes, never innerHTML, the same discipline live-client.ts
+          // already applies to the sentence and the trace.
+          function renderKept(k: KeptShip): void {
             if (!keptLabel) return;
-            keptLabel.innerHTML =
-              k.words.map((w, i) => `<span class="w${k.gaps[i] ? " gap" : ""}">${k.gaps[i] ? "—" : escapeHtml(w)}</span>`).join(" ") + ".";
-          }
-          function escapeHtml(s) {
-            return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+            const nodes: (string | HTMLElement)[] = [];
+            k.words.forEach((w, i) => {
+              const span = document.createElement("span");
+              span.className = k.gaps[i] ? "w gap" : "w";
+              span.textContent = k.gaps[i] ? "—" : w;
+              nodes.push(span);
+              if (i < k.words.length - 1) nodes.push(" ");
+            });
+            nodes.push(".");
+            keptLabel.replaceChildren(...nodes);
           }
           const page = attach(document, {
             onLatest: (change) => house?.latest(change),

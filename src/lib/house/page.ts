@@ -208,15 +208,34 @@ export type KeptShip = { words: string[]; gaps: boolean[] };
 export type KeptHouse = { update(kept: KeptShip): void };
 
 // The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): read-only,
-// never selected or hovered, its gaps a faint outline from the first load.
-// `.update()` is a static re-render (never `view.change()`): Slice 5 adds the
-// break-and-fall motion; this only guarantees the page never shows a stale
-// kept ship while the live sentence moves beside it.
-export function mountKept(doc: Document, initial: KeptShip): KeptHouse | null {
+// never selected or hovered, its gaps a faint outline from the first load. A
+// gap's word, for the body's own geometry, is the position's current live
+// word (deriveKeptShip's own convention: a gap position's word is the current
+// one, until it's replaced away and kept); the gap flag alone decides whether
+// that territory is drawn solid or as a faint outline. The initial state is
+// read entirely from the server-rendered markup — the .kept-sentence spans
+// index.astro already wrote, and the live sentence's own word labels — the
+// same way mountEarlier reads an earlier form's words, never passed in as a
+// script variable, so this script stays a plain ES module. `.update()` is a
+// static re-render (never `view.change()`): Slice 5 adds the break-and-fall
+// motion; this only guarantees the page never shows a stale kept ship while
+// the live sentence moves beside it.
+export function mountKept(doc: Document): KeptHouse | null {
+  const keptSpans = [...doc.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+  // keptShipAt() already sets a gap position's word to the position's
+  // current live word (src/lib/kept-ship.ts) — the server's own convention,
+  // reused here: read it from the live sentence, since the kept-sentence
+  // markup itself shows "—" at a gap, not the word.
+  const currentWords = [...doc.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"] label')].map((l) =>
+    l.textContent!.trim(),
+  );
+  if (keptSpans.length !== 10 || currentWords.length !== 10) return null;
   const view = viewIn(doc.getElementById("house-kept"), true);
   if (!view) return null;
-  view.show(initial.words);
-  view.ghost(initial.gaps.flatMap((gap, i) => (gap ? [i] : [])));
+  const initialGaps = keptSpans.map((s) => s.classList.contains("gap"));
+  const initialWords = initialGaps.map((gap, i) => (gap ? currentWords[i] : keptSpans[i].textContent!.trim()));
+  view.show(initialWords);
+  view.ghost(initialGaps.flatMap((gap, i) => (gap ? [i] : [])));
   return {
     update(kept) {
       view.show(kept.words);
