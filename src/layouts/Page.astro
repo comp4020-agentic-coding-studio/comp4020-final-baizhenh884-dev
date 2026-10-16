@@ -191,13 +191,20 @@ const { title } = Astro.props;
 
       /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once, across both
          halves. Not red (red is only a part being rebuilt): pale, in difference, so it reads
-         as ink on the study field and as light on the kept ground. */
+         as ink on the study field and as light on the kept ground. src/lib/moment-line.ts
+         sets its top in the clear band of the screen; both halves are veiled behind it. */
       .moment {
-        position: fixed; left: 0; right: 0; top: 38%; z-index: 3; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
-        font: italic 400 clamp(34px, 5.4vw, 104px)/1.02 "Instrument Serif", serif; letter-spacing: -0.015em;
+        position: fixed; left: 0; right: 0; top: 38%; z-index: 4; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
+        font: italic 400 clamp(34px, 5.4vw, 104px)/1.02 "Instrument Serif", serif; letter-spacing: -0.015em; text-wrap: balance;
         color: #fff; mix-blend-mode: difference; opacity: 0; transition: opacity 0.7s;
       }
       .moment.on { opacity: 1; }
+      /* the veil: each half recedes into its own ground behind the line, and comes back when it goes */
+      .half { position: relative; }
+      .half::after { content: ""; position: absolute; inset: 0; z-index: 3; background: inherit; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
+      body.moment-on .half::after { opacity: 0.86; }
+      /* the phone pointer, acknowledging a part just kept below: ink rather than grey, never red */
+      .kept-pointer.ack { color: var(--ink); }
 
       @media (max-width: 900px) {
         /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
@@ -227,7 +234,7 @@ const { title } = Astro.props;
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }
         .thread { transition: none; }
-        .moment { transition: none; }
+        .moment, .half::after { transition: none; }
       }
     </style>
   </head>

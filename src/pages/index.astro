@@ -180,6 +180,7 @@ const how =
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
           import { classifyMoment } from "../lib/kept-moment";
+          import { acknowledgeBelow, showMomentLine } from "../lib/moment-line";
           import { BEAT_MS } from "../lib/house/kept-stage";
           import { duration } from "../lib/house/motion";
           import { mountCurrent, mountKept } from "../lib/house/page";
@@ -219,18 +220,12 @@ const how =
             keptLabel.replaceChildren(...nodes);
           }
 
-          // Ship 1 complete: the one loud line, once, live. Never on a load, a reconnect or ?at=N.
-          function announce(): void {
-            document.querySelector(".moment")?.remove();
-            const line = document.createElement("p");
-            line.className = "moment";
-            line.setAttribute("role", "status");
-            line.textContent = "None of the first sentence stands. All of it has been kept.";
-            setTimeout(() => {
-              document.body.append(line);
-              requestAnimationFrame(() => line.classList.add("on"));
-              setTimeout(() => { line.classList.remove("on"); setTimeout(() => line.remove(), 900); }, 6500);
-            }, reduced() ? 0 : 2400); // as the last part sets down
+          // Ship 1 complete: the one loud line, once, live, as the last part sets down.
+          // Never on a load, a reconnect or ?at=N. On a phone the pointer to the kept
+          // half also says that a part (or the whole first sentence) went below.
+          function acknowledge(moment: Moment): void {
+            if (moment.kind === "cross" || moment.kind === "first") acknowledgeBelow(document, moment.kind, reduced());
+            if (moment.kind === "first") setTimeout(() => showMomentLine(document, reduced()), reduced() ? 0 : 2400);
           }
 
           // a kept ship and the moment a change brought to it
@@ -249,7 +244,7 @@ const how =
                 renderKept({ words: before.words, gaps: before.gaps.map(() => false) });
                 beat = window.setTimeout(() => renderKept(k), (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
               } else renderKept(k);
-              if (moment.kind === "first") announce();
+              acknowledge(moment);
             }
             keptNow = k;
           }
