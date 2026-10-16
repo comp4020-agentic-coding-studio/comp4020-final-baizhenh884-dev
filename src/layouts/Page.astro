@@ -149,6 +149,12 @@ const { title } = Astro.props;
       .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
+      /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
+      .foot #how { margin: 0; }
+      .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
+      .foot .earlier { margin: 0; }
+      /* only when the halves stack: the kept half is far below, so say so */
+      .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
 
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
@@ -199,6 +205,7 @@ const { title } = Astro.props;
         .sentence form { min-height: 44px; }
         /* the two halves stack: what stands, then what was kept, each a band of its own ground */
         .two { display: block; min-height: 0; }
+        .kept-pointer { display: block; }
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
         .half-label { margin-bottom: 0.8rem; }
         main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }

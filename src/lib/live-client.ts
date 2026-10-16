@@ -266,7 +266,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     else show(slot);
   }
 
-  // the trace GET / renders after the sentence, for a page that loaded
+  // the trace GET / renders under the how-text, for a page that loaded
   // before this visitor had made their change
   function ensureTraceSection(): Element | null {
     const existing = doc.querySelector('section[aria-labelledby="trace-heading"]');
@@ -281,7 +281,8 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
     section.append(heading, status);
-    sentence.after(section);
+    // where GET / renders it: under the how-text, in the live half's foot
+    (doc.getElementById("how") ?? sentence).after(section);
     return section;
   }
 
@@ -395,8 +396,11 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       link.rel = "prev";
       link.textContent = "Earlier form";
       p.append(link);
+      // where GET / renders it: after the trace, or the how-text
+      const after = doc.querySelector('section[aria-labelledby="trace-heading"]') ?? doc.getElementById("how");
       const readme = doc.querySelector('a[href="/readme/"]')?.closest("p");
-      if (readme) readme.before(p);
+      if (after) after.after(p);
+      else if (readme) readme.before(p);
       else doc.querySelector("main")?.append(p);
     }
     link.setAttribute("href", `?at=${total - 1}`);

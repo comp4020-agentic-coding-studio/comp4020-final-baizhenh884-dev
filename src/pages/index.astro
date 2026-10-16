@@ -52,7 +52,7 @@ const how =
     earlier ? (
       <>
         <header class="mast">
-          <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
+          <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
         </header>
         <div class="text">
           <p class="form-state caps">An earlier form (read-only)</p>
@@ -84,7 +84,7 @@ const how =
           <div class="half stands-half">
             <div class="half-head">
               <header class="mast">
-                <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
+                <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
               </header>
               <p class="caps half-label">What stands</p>
             </div>
@@ -102,6 +102,11 @@ const how =
                 ))}
               </div>
               <p id="part" class="caps" aria-hidden="true" hidden></p>
+            </div>
+            <div id="house" aria-hidden="true"></div>
+            <div class="foot">
+              {/* the kept half is far below on a phone: one quiet line says it's there */}
+              <p class="kept-pointer">What was replaced is kept below.</p>
               <p id="how">{how}</p>
               {trace?.mode === "once" && trace.trace && (
                 <section aria-labelledby="trace-heading">
@@ -149,9 +154,6 @@ const how =
                 </section>
               )}
               {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
-            </div>
-            <div id="house" aria-hidden="true"></div>
-            <div class="foot">
               <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
               <p class="question">If every word and every part is replaced, is it still the same thing?</p>
               <p class="about caps"><a href="/readme/">About Theseus</a></p>
