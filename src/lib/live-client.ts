@@ -1,3 +1,4 @@
+import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
 import { latestParts, replacedText, standingText } from "./trace-text";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
@@ -25,7 +26,7 @@ export type Position = { position: number; word: string; version: number };
 // have nothing to do with kept ships can keep building a bare Position):
 // parseChange, which reads the real wire format, still rejects an event
 // missing it.
-export type KeptShip = { words: string[]; gaps: boolean[] };
+export type { KeptShip, Moment };
 export type ChangeEvent = Position & { keptShip?: KeptShip };
 
 export type Trace =
@@ -167,7 +168,8 @@ export type Options = {
   onLatest?: (change: Position) => void;
   // told the kept ship every time it's known to have changed (every change
   // event, and every snapshot): global, so never held back by a draft
-  onKept?: (kept: KeptShip) => void;
+  // the kept ship, and the moment a newer change brought to it (null for a snapshot, or nothing crossing)
+  onKept?: (kept: KeptShip, moment: Moment | null) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {
@@ -442,10 +444,10 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     });
   }
 
-  function tellKept(kept: KeptShip | undefined): void {
+  function tellKept(kept: KeptShip | undefined, moment: Moment | null = null): void {
     if (!kept || JSON.stringify(kept) === JSON.stringify(keptSent)) return;
     keptSent = kept;
-    options.onKept?.(kept);
+    options.onKept?.(kept, moment);
   }
 
   return {
@@ -461,8 +463,11 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       render();
     },
     applyChange(change) {
+      // the moment is told first, so the house knows how this change moves before onLatest exchanges it
+      const slot = slots.get(change.position);
+      const newer = !!slot && change.version > slot.latest.version;
+      if (change.keptShip) tellKept(change.keptShip, newer ? classifyMoment(keptSent, change.keptShip, change.position) : null);
       offer(change);
-      tellKept(change.keptShip);
       render();
     },
   };
