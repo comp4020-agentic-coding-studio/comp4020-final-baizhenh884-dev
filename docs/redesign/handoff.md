@@ -56,6 +56,56 @@ Slice 2c — **Your Trace** (this session, done):
   snapshot on every broadcast anywhere, because `settlesInMs` never
   compares equal to a prior read of itself; excluded from the comparison
 
+Slice 3 — kept-ship data, derived (`816ff18..`):
+- `0644c97` — spec: `deriveKeptShip` (gaps, the ship-1 hold, ship 2's
+  partial fill), pure logic in `spec/kept-ship.test.ts`
+- `0c3a781` — `src/lib/kept-ship.ts`: derived from `changes` alone
+- `fb8fb23` — `keptShipAt()` in `src/lib/db.ts`
+
+Slice 3b — the kept ship live:
+- `282c3ab` — spec: `keptShip` `{ words, gaps }` on every snapshot and
+  change event; `onKept` in live-client
+- `a858bb2` — `events.ts` + `live-client.ts` carry it
+
+Slice 4 — the kept ship on the page:
+- `3392b68` `b0764f8` — spec: kept-ship markup on GET / (read-only,
+  aria-hidden, a gap closes with the word that stood there)
+- `7763bbb` — second house panel (`#house-kept`), `HouseView.ghost()`
+  for gaps, `mountKept()`
+- `daff497` — fix: `define:vars` scripts aren't modules; `mountKept`
+  reads its initial state from the rendered markup
+- `01fda2f` — screenshots. Review of these found the page was visually
+  direction A (a small kept caption in a corner, houses floating), not B,
+  plus a stray dot: the two items below.
+
+Slice 4b — direction B's composition, and the stray full stop:
+- `e20ba5c` — spec: `spec/sentence-wrap.test.ts` (headless Chrome, last
+  word 1-24 letters at 1920/1280/390: the full stop stays on its line,
+  right after it). The Chrome helper moved to `spec/chrome.ts`. Red: the
+  dot wrapped alone at 9/18/19 letters.
+- `4bfc0b0` — fix: last `.pos` + full stop share a nowrap
+  `<span class="end">`; one position's markup moved to
+  `src/components/WordSlot.astro`
+- `0de8ec6` — spec: `spec/two-ships-layout.test.ts` (headless Chrome:
+  two equal halves side by side at 1920/1280, stacked at 390; grounds at
+  least 3:1 apart; each sentence above its own house in its own half; kept
+  sentence >= 0.6x and < the live size, >= 4.5:1 on its ground; ten gaps
+  each >= 1.2em and drawn at >= 3:1). `kept-ship.test.ts`: a gap holds no
+  text.
+- `7cd0efc` — feat: `.stands-half` (study field, plaster, interactive
+  sentence) and `.kept-half` (dark umber `#2b241d`, new `kept` look in
+  `theme.ts`: timber tones, pale edges), rows shared through CSS subgrid
+  so the houses stand level. `HouseView`/`LiveBody`/`dress()` take a
+  `Look` (`present | past | kept`) instead of `past: boolean`. A house's
+  canvas lies over its host (it used to inflate its row). `?at=N`'s single
+  fixed house restored (Slice 4 had dropped it). Captions: stands "Ten
+  words. Ten parts. Change a word, and its part is rebuilt."; kept
+  "Replaced words are kept here, and built back into a house."
+- `ce83792` — screenshots retaken under `RULE_MODE=settle`: fresh, then
+  ten replacements by three fresh headless-Chrome visitors (click, type,
+  Enter; staged test words, not participant evidence). Phone shots are
+  full page height so the stacked kept half shows.
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -71,8 +121,13 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-- `once` mode: **82 passed, 21 named skips, 0 failed**
-- `settle` mode: **97 passed, 6 named skips, 0 failed**
+At `7cd0efc` (the app tree since is unchanged):
+
+- `once` mode: **100 passed, 21 named skips, 0 failed**
+- `settle` mode: **115 passed, 6 named skips, 0 failed**
+
+The layout specs (`sentence-wrap`, `two-ships-layout`, `word-field`) need
+Chrome: `CHROME=...` or the usual paths; they fail, never skip, without it.
 
 Every skip in both runs is named and settle/once-exclusive (confirmed by
 listing them with `--reporter=verbose`) — none is an accidental gap.
@@ -102,26 +157,35 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
   own local timer from `settlesInMs`, flips the trace's *display* only —
   presentation only, server remains sole authority on any submit.
 
-## What's next — Slices 3-5, not started
+- **Kept half** (Slice 4b, chosen by the maker): dark umber ground with
+  the timber model, not a lighter kraft paper. The live half stays primary
+  (larger sentence, the only interactive one).
 
-**Slice 3 — kept-ship data, derived, no new stored state.** A
-`keptShipAt(n)`-style function in `src/lib/db.ts`: ship *m* =
-`min(version)` across positions; gaps are positions still at version *m*.
-Empty sentence → ship 1, all ten gaps, rendered as faint outlines from the
-first load.
+## Open, not yet done
 
-**Slice 4 — visual direction B on the real page, mobile + reduced motion.**
-Wire `docs/redesign/prototypes/b-two-ships.html` into the real frozen
-grammar in `src/lib/house` (same territory/grammar module, never a second
-renderer). Two ships at rest, stacked on mobile (390×844). Check
-`src/lib/house/motion.ts`'s existing reduced-motion mechanism before
-building anything new.
+- **CLAUDE.md still quotes the old caption** ("Ten words. Ten parts of one
+  house.", "Current design (revisable)"). Changing it needs the maker's
+  approval of the diff first; not edited.
+- The mast still says "One sentence, one house". It wasn't in scope for
+  Slice 4b, but with two houses on the page it reads as wrong as the old
+  caption did.
+- A settle-mode trace with several standing words is long, and pushes the
+  live house below the fold at 1920x1080 (seen in the screenshots when one
+  visitor made many changes). The page scrolls; not changed.
+- When a word is chosen, the other words recede but the full stop stays
+  full ink (it isn't a label). Pre-existing; visible in the focus state.
+
+## What's next — Slice 5, not started
 
 **Slice 5 — the replacement event and the last-original moment.** Ship 1's
 "just completed" hold is the derived state above, not a timer; false the
 instant any further replacement lands anywhere. A fresh page load during
 the hold computes the identical state a live viewer already sees.
 Historical `?at=N` shows the same derivation truncated at N.
+
+Slice 5's motion goes onto the two halves as they are now: pieces cross
+from `.stands-half` into `.kept-half`. Reduced motion: check
+`src/lib/house/motion.ts`'s existing mechanism before building anything new.
 
 Each slice follows the same discipline as Slice 2: spec committed and red
 before any feat commit, both `RULE_MODE` passes green before moving on,
