@@ -158,15 +158,28 @@ describe("Kept ship markup on GET /", () => {
     expect(sentence?.getAttribute("aria-hidden"), "the kept sentence isn't aria-hidden").toBe("true");
   });
 
-  changesTheSentence("reflects a replaced word as kept, text content only", async () => {
+  // The shared sentence accumulates every other spec file's replacements, so
+  // this never assumes which ship is currently shown or which position is a
+  // gap: it reads the kept ship's own rendered gaps, picks one, replaces
+  // exactly that position (the word a gap waits for is always the word
+  // standing there right now — docs/decisions/0003), and checks that gap
+  // alone closes with that word, text content only.
+  changesTheSentence("fills a gap with the word that stood there, the moment it's replaced", async () => {
     const v = new Visitor();
+    const doc1 = await v.page();
+    const spans = [...doc1.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+    expect(spans, "the kept ship has no ten word spans").toHaveLength(10);
+    const gapIndex = spans.findIndex((s) => s.classList.contains("gap"));
+    expect(gapIndex, "no gap to fill: every position is already kept").toBeGreaterThanOrEqual(0);
+
     const before = await v.sentence();
-    const slot = before[0];
+    const slot = before[gapIndex];
     const word = unusedWord(before);
     expect(await v.replace(slot, word)).toBe(303);
 
-    const doc = await v.page();
-    const text = doc.querySelector(".kept-sentence")?.textContent ?? "";
-    expect(text, "the kept ship doesn't show the position's original word once it's been replaced").toContain(slot.word);
+    const doc2 = await v.page();
+    const after = [...doc2.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+    expect(after[gapIndex].classList.contains("gap"), "the replaced gap is still a gap").toBe(false);
+    expect(after[gapIndex].textContent?.trim(), "the kept ship doesn't show the word that stood there").toBe(slot.word);
   });
 });
