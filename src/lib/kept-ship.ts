@@ -3,10 +3,10 @@
 // state. Ship k is the word that stood at version k of each position. The
 // ship normally shown is m0 = min(version) across the ten positions, the
 // oldest ship not yet complete; its gaps are exactly the positions still at
-// version m0. But once a ship completes it holds, visibly whole, until the
+// version m0. But once ship 1 completes it holds, visibly whole, until the
 // next accepted replacement anywhere: re-derived on every read from whether
-// the single most recent change in `changes` is the one that closed that
-// ship's last gap, never from a timer or a stored flag.
+// the single most recent change in `changes` is the one that closed its last
+// gap, never from a timer or a stored flag. Later ships never hold.
 //
 // Pure, so it's tested directly (spec/kept-ship.test.ts) without a database,
 // the same way deriveTotal (live-client.ts) is.
@@ -18,7 +18,8 @@ export type KeptShip = { ship: number; words: string[]; gaps: boolean[] };
 export function deriveKeptShip(changes: readonly KeptChange[], current: readonly CurrentWord[]): KeptShip {
   const m0 = Math.min(...current.map((c) => c.version));
   const last = changes[changes.length - 1]; // `changes` is append-only in order (ORDER BY id)
-  const ship = last && last.fromVersion === m0 - 1 ? m0 - 1 : m0;
+  // only ship 1 holds: a later ship's completion is a quiet beat on the page, never a hold
+  const ship = last && last.fromVersion === m0 - 1 && m0 - 1 === 1 ? 1 : m0;
 
   const words = current.map((c) => c.word);
   const gaps = current.map((c) => c.version <= ship);
