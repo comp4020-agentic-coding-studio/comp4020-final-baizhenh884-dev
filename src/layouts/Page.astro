@@ -204,7 +204,7 @@ const { title } = Astro.props;
       .half::after { content: ""; position: absolute; inset: 0; z-index: 3; background: inherit; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
       body.moment-on .half::after { opacity: 0.86; }
       /* the phone pointer, acknowledging a part just kept below: ink rather than grey, never red */
-      .kept-pointer.ack { color: var(--ink); }
+      .kept-pointer.ack { color: var(--ink); position: relative; z-index: 4; /* above the veil, so it reads while the line is up */ }
 
       @media (max-width: 900px) {
         /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */

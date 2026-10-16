@@ -39,7 +39,8 @@ function place(doc: Document, line: HTMLElement): void {
     size *= 0.92;
     line.style.fontSize = `${size}px`;
   }
-  line.style.top = `${Math.max(top, top + (bottom - top - line.getBoundingClientRect().height) / 2)}px`;
+  // in the upper part of the band: under the sentence, over the houses, clear of the notes below them
+  line.style.top = `${Math.max(top, top + (bottom - top - line.getBoundingClientRect().height) * 0.3)}px`;
 }
 
 export function showMomentLine(doc: Document, reduced: boolean, ms = LINE_MS): HTMLElement {
