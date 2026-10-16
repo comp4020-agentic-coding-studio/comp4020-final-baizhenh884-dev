@@ -61,6 +61,25 @@ export class HouseView {
   // the territory this visitor's standing word made: drawn a little firmer than the rest, nothing more
   trace(position: number | null): void { this.traced = position; this.paint(); }
 
+  // The kept ship's gaps (docs/decisions/0003-settle-and-kept-ships.md): a
+  // waiting territory reads as a faint outline, never a solid, from the very
+  // first load. Static only — this view is read-only and never selected or
+  // hovered, so it never needs paint()'s own selection logic.
+  ghost(positions: readonly number[]): void {
+    const gaps = new Set(positions);
+    this.body.groups.forEach((g, i) => {
+      if (!gaps.has(i)) return;
+      for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) {
+        m.transparent = true;
+        m.opacity = 0;
+        m.depthWrite = false;
+      }
+      for (const l of (g.userData.edges as THREE.LineSegments[]) ?? []) (l.material as THREE.LineBasicMaterial).opacity = 0.35;
+      g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = false; });
+    });
+    this.requestFrame();
+  }
+
   // where a territory sits on the page (client pixels): the centre of what is standing there now
   anchor(position: number): { x: number; y: number } | null {
     const g = this.body.groups[position];

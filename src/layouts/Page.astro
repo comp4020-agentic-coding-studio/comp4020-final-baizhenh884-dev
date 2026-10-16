@@ -115,8 +115,20 @@ const { title } = Astro.props;
       /* its line is always kept, so choosing a word never moves the centred column */
       #part { margin: 0 0 1rem; color: var(--soft); min-height: 1.45em; }
       #part[hidden] { display: block; visibility: hidden; }
-      #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
-      #house canvas { display: block; width: 100%; height: 100%; }
+      /* Two ships, side by side: the current sentence's house (left) and the
+         kept ship (right), sharing the band #house alone used to occupy. */
+      .houses { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; display: flex; }
+      #house, #house-kept { flex: 1 1 0; min-width: 0; height: 100%; }
+      #house canvas, #house-kept canvas { display: block; width: 100%; height: 100%; }
+      /* the kept ship's own plate: its label and sentence sit above its body */
+      .kept-plate { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: 2.4vh 1.4vw 0; }
+      .kept-label { margin: 0 0 0.5rem; }
+      .kept-sentence {
+        font: italic 400 clamp(17px, 1.7vw, 26px)/1.22 "Instrument Serif", serif; color: var(--soft);
+        margin: 0 0 0.6rem; max-width: 100%;
+      }
+      .kept-sentence .gap { opacity: 0.45; }
+      #house-kept { flex: 1; }
 
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
@@ -165,8 +177,13 @@ const { title } = Astro.props;
         .sentence label { position: relative; }
         .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: calc(100% + 0.16em); transform: translateX(-50%); }
         .sentence form { min-height: 44px; }
-        /* the house takes its own band under the sentence; the page scrolls through it as a page */
-        #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
+        /* the houses take their own band under the sentence, stacked rather than
+           side by side, and the page scrolls through them as a page */
+        .houses { position: relative; width: auto; height: auto; flex-direction: column; top: auto; right: auto; }
+        #house { width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
+        .kept-plate { padding: 0.6rem 0 0; }
+        #house-kept { width: auto; height: min(70vw, 340px); margin: 0 -1rem; touch-action: pan-y; }
+        .kept-sentence { font-size: 18px; max-width: calc(100% + 2rem); }
       }
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }

@@ -1,6 +1,6 @@
 ---
 import Page from "../layouts/Page.astro";
-import { changeCount, currentPositions, currentTrace, recentPast, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { changeCount, currentPositions, currentTrace, keptShipAt, recentPast, sentenceAt, SETTLE_SECONDS } from "../lib/db";
 import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
 import { ensureVisitor } from "../lib/visitor";
 
@@ -20,6 +20,12 @@ const current = earlier ? [] : currentPositions();
 const past = earlier ? new Map<number, string[]>() : recentPast();
 const changes = changeCount();
 const n = Number(at);
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): derived,
+// never stored, and only for the live current sentence — an earlier form's
+// kept ship isn't rendered (?at=N is a single read-only form of the sentence,
+// not a live pairing). Always computed (cheap, one read), used only below.
+const kept = keptShipAt();
 
 // Which trace shape renders is itself rule-mode config, never guessed from
 // the trace's own content (docs/decisions/0003-settle-and-kept-ships.md).
@@ -152,16 +158,43 @@ const how =
           )}
           {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
         </div>
-        <div id="house" aria-hidden="true"></div>
+        <div class="houses">
+          <div id="house" aria-hidden="true"></div>
+          <div class="kept-plate">
+            <p class="caps kept-label">What was kept</p>
+            <p class="sentence kept-sentence" aria-hidden="true">
+              {kept.words.map((w, i) => (
+                <>
+                  <span class={`w${kept.gaps[i] ? " gap" : ""}`}>{kept.gaps[i] ? "—" : w}</span>
+                  {i < kept.words.length - 1 ? " " : ""}
+                </>
+              ))}.
+            </p>
+            <div id="house-kept" aria-hidden="true"></div>
+          </div>
+        </div>
         <p class="plate-note">Ten words. Ten parts of one house.<br />Change a word, and its part is rebuilt.</p>
         <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
-        <script>
+        <script define:vars={{ kept }}>
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot } from "../lib/live-client";
-          import { mountCurrent } from "../lib/house/page";
+          import { mountCurrent, mountKept } from "../lib/house/page";
 
           const house = mountCurrent(document);
-          const page = attach(document, { onLatest: (change) => house?.latest(change) });
+          const keptHouse = mountKept(document, kept);
+          const keptLabel = document.querySelector(".kept-sentence");
+          function renderKept(k) {
+            if (!keptLabel) return;
+            keptLabel.innerHTML =
+              k.words.map((w, i) => `<span class="w${k.gaps[i] ? " gap" : ""}">${k.gaps[i] ? "—" : escapeHtml(w)}</span>`).join(" ") + ".";
+          }
+          function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+          }
+          const page = attach(document, {
+            onLatest: (change) => house?.latest(change),
+            onKept: (k) => { keptHouse?.update(k); renderKept(k); },
+          });
           const events = new EventSource("/events");
           events.addEventListener("snapshot", (e) => {
             const snapshot = parseSnapshot(e.data);

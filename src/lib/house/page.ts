@@ -203,3 +203,24 @@ export function mountEarlier(doc: Document): void {
   if (words.length !== 10) return;
   viewIn(doc.getElementById("house"), true)?.show(words);
 }
+
+export type KeptShip = { words: string[]; gaps: boolean[] };
+export type KeptHouse = { update(kept: KeptShip): void };
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): read-only,
+// never selected or hovered, its gaps a faint outline from the first load.
+// `.update()` is a static re-render (never `view.change()`): Slice 5 adds the
+// break-and-fall motion; this only guarantees the page never shows a stale
+// kept ship while the live sentence moves beside it.
+export function mountKept(doc: Document, initial: KeptShip): KeptHouse | null {
+  const view = viewIn(doc.getElementById("house-kept"), true);
+  if (!view) return null;
+  view.show(initial.words);
+  view.ghost(initial.gaps.flatMap((gap, i) => (gap ? [i] : [])));
+  return {
+    update(kept) {
+      view.show(kept.words);
+      view.ghost(kept.gaps.flatMap((gap, i) => (gap ? [i] : [])));
+    },
+  };
+}
