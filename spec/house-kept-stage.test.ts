@@ -71,7 +71,7 @@ function history(seed: number, length: number) {
 function freshMismatches(stage: KeptStage, kept: { words: string[]; gaps: boolean[] }): string[] {
   const fresh = new LiveBody("kept", drawing);
   fresh.show(kept.words);
-  const out = TERRITORIES.filter((_, i) => form(stage.body.groups[i]) !== form(fresh.groups[i])).map((t) => t.id);
+  const out: string[] = TERRITORIES.filter((_, i) => form(stage.body.groups[i]) !== form(fresh.groups[i])).map((t) => t.id);
   if (JSON.stringify(stage.gaps) !== JSON.stringify(kept.gaps)) out.push("gaps");
   if (stage.animating) out.push("not settled");
   fresh.dispose();
