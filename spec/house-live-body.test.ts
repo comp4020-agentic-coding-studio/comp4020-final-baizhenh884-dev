@@ -164,6 +164,31 @@ describe("House live body", () => {
     }
   });
 
+  // a busy room (Slice 5): crossings, own and remote changes landing within a
+  // second or two of one another, each finishing the one before it at once
+  it("settles a burst of crossings and exchanges on the fresh body, never more than one in flight", () => {
+    const next = rng(5020), word = () => POOL[Math.floor(next() * POOL.length)];
+    const kinds = ["cross", "remote", "cross", "own", "cross"] as const;
+    for (let k = 0; k < 12; k++) {
+      const body = new LiveBody("present", drawing), words = Array.from({ length: 10 }, word);
+      body.show(words);
+      let now = 0;
+      for (const [j, position] of [4, 4, 0, 7, 2, 2, 9, 5].entries()) {
+        words[position] = word();
+        now += [0, 150, 800][j % 3];
+        body.step(now, false);
+        body.change(position, [...words], kinds[j % kinds.length], now, new THREE.Vector3(30, 0, 0));
+        expect(body.exchanges.length, "exchanges stacked up").toBeLessThanOrEqual(1);
+      }
+      body.step(now + 60_000, false);
+      const fresh = new LiveBody("present", drawing);
+      fresh.show(words);
+      body.groups.forEach((g, i) => expect(form(g), `${TERRITORIES[i].id} after a burst`).toBe(form(fresh.groups[i])));
+      expect([...body.root.children].sort((a, b) => a.userData.position - b.userData.position), "something other than the ten standing groups is left").toEqual([...body.groups]);
+      body.dispose(); fresh.dispose();
+    }
+  });
+
   it("refuses to release a standing territory except in a whole-body teardown", () => {
     const body = new LiveBody("present", drawing);
     body.show(BASE);
