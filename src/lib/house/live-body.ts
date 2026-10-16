@@ -8,7 +8,7 @@
 import * as THREE from "three";
 import { buildBody, type BuiltBody } from "./build";
 import { duration, frameAt, type Frame, type Kind } from "./motion";
-import { dress, undress } from "./theme";
+import { dress, type Look, undress } from "./theme";
 
 export type Exchange = { start: number; kind: Kind; position: number; outgoing: THREE.Group; incoming: THREE.Group; trace: THREE.Group; away: THREE.Vector3; inY: number };
 export type Follow = { start: number; outgoing: THREE.Group; incoming: THREE.Group };
@@ -40,7 +40,7 @@ export class LiveBody {
   readonly exchanges: Exchange[] = [];
   readonly follows: Follow[] = [];
 
-  constructor(private past: boolean, private drawing: (g: THREE.Group) => THREE.Group) {}
+  constructor(private look: Look, private drawing: (g: THREE.Group) => THREE.Group) {}
 
   // the territories standing now, by position (read-only to callers)
   get groups(): readonly THREE.Group[] { return this.current; }
@@ -108,7 +108,7 @@ export class LiveBody {
   // ---------------------------------------------------------------------------
 
   private adopt(g: THREE.Group, i: number): THREE.Group {
-    dress(g, i, this.past);
+    dress(g, i, this.look);
     g.userData.position = i;
     this.root.add(g);
     return g;

@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { place } from "./camera";
 import { LiveBody } from "./live-body";
 import type { Kind } from "./motion";
-import { EDGE, FIELD, INK, lights, RED } from "./theme";
+import { EDGE, EDGE_COLOUR, FIELD, INK, lights, type Look, RED } from "./theme";
 
 export class HouseView {
   readonly canvas: HTMLCanvasElement;
@@ -24,7 +24,7 @@ export class HouseView {
   private observer: ResizeObserver;
   private reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  constructor(private host: HTMLElement, private past = false) {
+  constructor(private host: HTMLElement, private look: Look = "present") {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -33,7 +33,7 @@ export class HouseView {
     this.canvas = this.renderer.domElement;
     host.append(this.canvas);
     lights(this.scene);
-    this.body = new LiveBody(past, (g) => this.drawing(g));
+    this.body = new LiveBody(look, (g) => this.drawing(g));
     this.scene.add(this.body.root);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -153,7 +153,7 @@ export class HouseView {
       m.opacity = a;
       m.depthWrite = a >= 0.999;
     }
-    for (const l of (g.userData.edges as THREE.LineSegments[]) ?? []) (l.material as THREE.LineBasicMaterial).opacity = (this.past ? EDGE.past : EDGE.present) * a;
+    for (const l of (g.userData.edges as THREE.LineSegments[]) ?? []) (l.material as THREE.LineBasicMaterial).opacity = EDGE[this.look] * a;
     g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = a > 0.5 && o.userData.role !== "opening"; });
   }
 
@@ -171,8 +171,8 @@ export class HouseView {
     this.body.groups.forEach((g, i) => {
       const other = focus !== null && i !== focus;
       for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.color.copy(m.userData.base as THREE.Color).lerp(field, other ? 0.62 : 0);
-      const base = (this.past ? EDGE.past : EDGE.present) + (i === this.traced ? 0.12 : 0);
-      this.edges(g, INK, i === this.selected ? 0.9 : i === this.hovered ? 0.6 : other ? 0.05 : base);
+      const base = EDGE[this.look] + (i === this.traced ? 0.12 : 0);
+      this.edges(g, EDGE_COLOUR[this.look], i === this.selected ? 0.9 : i === this.hovered ? 0.6 : other ? 0.05 : base);
     });
     this.requestFrame();
   }

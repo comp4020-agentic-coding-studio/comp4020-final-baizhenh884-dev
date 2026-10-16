@@ -45,7 +45,7 @@ function form(g: THREE.Group): string {
 
 // the live path (show, change, settle) against a fresh show of the same final sentence: the territories that differ
 function mismatches(before: string[], position: number, after: string[]): string[] {
-  const live = new LiveBody(false, drawing), fresh = new LiveBody(false, drawing);
+  const live = new LiveBody("present", drawing), fresh = new LiveBody("present", drawing);
   live.show(before);
   live.change(position, after, "remote", 0);
   live.step(1e9, false); // the exchange and any following neighbour end
@@ -72,7 +72,7 @@ function rng(seed: number) {
 
 describe("House live body", () => {
   it("hands each changed position to its incoming group, and a second change replaces that one", () => {
-    const body = new LiveBody(false, drawing);
+    const body = new LiveBody("present", drawing);
     body.show(BASE);
     const original = body.groups[2], untouched = body.groups[5];
     const originalReleased = watch(original);
@@ -110,7 +110,7 @@ describe("House live body", () => {
   });
 
   it("keeps exactly the ten standing groups in the body once an exchange is over", () => {
-    const body = new LiveBody(false, drawing);
+    const body = new LiveBody("present", drawing);
     body.show(BASE);
     body.change(6, at(6, "garden"), "own", 0);
     body.step(1e9, false);
@@ -148,14 +148,14 @@ describe("House live body", () => {
   it("settles a run of live changes, including two at one position, on the fresh body", () => {
     const next = rng(77), word = () => POOL[Math.floor(next() * POOL.length)];
     for (let k = 0; k < 12; k++) {
-      const body = new LiveBody(false, drawing), words = Array.from({ length: 10 }, word);
+      const body = new LiveBody("present", drawing), words = Array.from({ length: 10 }, word);
       body.show(words);
       for (const position of [2, 0, 3, 3, 8, 4, 1, 1, 9]) {
         words[position] = word();
         body.change(position, [...words], "remote", 0); // each change finishes the one before it
       }
       body.finishAll();
-      const fresh = new LiveBody(false, drawing);
+      const fresh = new LiveBody("present", drawing);
       fresh.show(words);
       expect(body.groups).toHaveLength(10);
       body.groups.forEach((g, i) => expect(form(g), `${TERRITORIES[i].id} after a run of changes`).toBe(form(fresh.groups[i])));
@@ -165,7 +165,7 @@ describe("House live body", () => {
   });
 
   it("refuses to release a standing territory except in a whole-body teardown", () => {
-    const body = new LiveBody(false, drawing);
+    const body = new LiveBody("present", drawing);
     body.show(BASE);
     const standing = body.groups[3];
     expect(() => (body as unknown as { release(g: THREE.Group): void }).release(standing)).toThrow();

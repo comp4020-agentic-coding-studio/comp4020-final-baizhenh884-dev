@@ -48,12 +48,12 @@ const how =
 ---
 
 <Page title="Theseus">
-  <header class="mast">
-    <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
-  </header>
   {
     earlier ? (
       <>
+        <header class="mast">
+          <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
+        </header>
         <div class="text">
           <p class="form-state caps">An earlier form (read-only)</p>
           <p class="sentence past">
@@ -80,84 +80,99 @@ const how =
       </>
     ) : (
       <>
-        <div class="text current">
-          <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
-          <div class="sentence">
-            {current.slice(0, -1).map((p) => (
-              <>
-                <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />{" "}
-              </>
-            ))}
-            {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
-            {current.slice(-1).map((p) => (
-              <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />.</span>
-            ))}
-          </div>
-          <p id="part" class="caps" aria-hidden="true" hidden></p>
-          <p id="how">{how}</p>
-          {trace?.mode === "once" && trace.trace && (
-            <section aria-labelledby="trace-heading">
-              <h2 id="trace-heading">Your trace</h2>
-              <p role="status">
-                {trace.trace.standing ? (
-                  <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
-                ) : (
+        <div class="two">
+          <div class="half stands-half">
+            <div class="half-head">
+              <header class="mast">
+                <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
+              </header>
+              <p class="caps half-label">What stands</p>
+            </div>
+            <div class="text current">
+              <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+              <div class="sentence">
+                {current.slice(0, -1).map((p) => (
                   <>
-                    Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
+                    <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />{" "}
                   </>
-                )}
-              </p>
-            </section>
-          )}
-          {trace?.mode === "settle" && trace.trace && (
-            <section aria-labelledby="trace-heading">
-              <h2 id="trace-heading">Your trace</h2>
-              {(() => {
-                const parts = latestParts(trace.trace.latest);
-                return (
+                ))}
+                {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
+                {current.slice(-1).map((p) => (
+                  <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />.</span>
+                ))}
+              </div>
+              <p id="part" class="caps" aria-hidden="true" hidden></p>
+              <p id="how">{how}</p>
+              {trace?.mode === "once" && trace.trace && (
+                <section aria-labelledby="trace-heading">
+                  <h2 id="trace-heading">Your trace</h2>
                   <p role="status">
-                    {parts.del ? (
-                      <>
-                        Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.eligibility}
-                      </>
+                    {trace.trace.standing ? (
+                      <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
                     ) : (
                       <>
-                        Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                        Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
                       </>
                     )}
                   </p>
-                );
-              })()}
-              {trace.trace.otherStanding.length > 0 && (
-                <ul class="trace-standing">
-                  {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
-                </ul>
+                </section>
               )}
-              {trace.trace.otherReplaced.length > 0 && (
-                <ul class="trace-replaced">
-                  {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
-                </ul>
+              {trace?.mode === "settle" && trace.trace && (
+                <section aria-labelledby="trace-heading">
+                  <h2 id="trace-heading">Your trace</h2>
+                  {(() => {
+                    const parts = latestParts(trace.trace.latest);
+                    return (
+                      <p role="status">
+                        {parts.del ? (
+                          <>
+                            Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.eligibility}
+                          </>
+                        ) : (
+                          <>
+                            Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                          </>
+                        )}
+                      </p>
+                    );
+                  })()}
+                  {trace.trace.otherStanding.length > 0 && (
+                    <ul class="trace-standing">
+                      {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
+                    </ul>
+                  )}
+                  {trace.trace.otherReplaced.length > 0 && (
+                    <ul class="trace-replaced">
+                      {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
+                    </ul>
+                  )}
+                </section>
               )}
-            </section>
-          )}
-          {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
-        </div>
-        <div class="houses">
-          <div id="house" aria-hidden="true"></div>
-          <div class="kept-plate">
-            <p class="caps kept-label">What was kept</p>
-            <p class="sentence kept-sentence" aria-hidden="true">
-              {kept.words.map((w, i) => (
-                <>
-                  <span class={`w${kept.gaps[i] ? " gap" : ""}`}>{kept.gaps[i] ? "—" : w}</span>
-                  {i < kept.words.length - 1 ? " " : ""}
-                </>
-              ))}.
+              {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+            </div>
+            <div id="house" aria-hidden="true"></div>
+            <div class="foot">
+              <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
+              <p class="question">If every word and every part is replaced, is it still the same thing?</p>
+              <p class="about caps"><a href="/readme/">About Theseus</a></p>
+            </div>
+          </div>
+          <div class="half kept-half kept-plate">
+            <div class="half-head">
+              <p class="caps half-label kept-label">What was kept</p>
+            </div>
+            <p class="kept-sentence" aria-hidden="true">
+              {kept.words.map((w, i) => {
+                const word = <span class={`w${kept.gaps[i] ? " gap" : ""}`}>{kept.gaps[i] ? "" : w}</span>;
+                return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
+              })}
             </p>
             <div id="house-kept" aria-hidden="true"></div>
+            <div class="foot">
+              <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
+            </div>
           </div>
         </div>
-        <p class="plate-note">Ten words. Ten parts of one house.<br />Change a word, and its part is rebuilt.</p>
         <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
@@ -176,11 +191,16 @@ const how =
             k.words.forEach((w, i) => {
               const span = document.createElement("span");
               span.className = k.gaps[i] ? "w gap" : "w";
-              span.textContent = k.gaps[i] ? "—" : w;
-              nodes.push(span);
-              if (i < k.words.length - 1) nodes.push(" ");
+              span.textContent = k.gaps[i] ? "" : w;
+              if (i < k.words.length - 1) nodes.push(span, " ");
+              else {
+                // the full stop stays on the last word's line, as GET / renders it
+                const end = document.createElement("span");
+                end.className = "end";
+                end.append(span, ".");
+                nodes.push(end);
+              }
             });
-            nodes.push(".");
             keptLabel.replaceChildren(...nodes);
           }
           const page = attach(document, {
@@ -200,6 +220,5 @@ const how =
       </>
     )
   }
-  {!earlier && <p class="question">If every word and every part is replaced, is it still the same thing?</p>}
-  <p class="about caps"><a href="/readme/">About Theseus</a></p>
+  {earlier && <p class="about caps"><a href="/readme/">About Theseus</a></p>}
 </Page>

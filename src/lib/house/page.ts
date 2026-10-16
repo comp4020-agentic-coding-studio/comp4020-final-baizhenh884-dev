@@ -5,6 +5,7 @@
 // accepted it. Nothing here runs while a visitor types (no preview).
 
 import { TERRITORIES } from "./territories";
+import type { Look } from "./theme";
 import { HouseView } from "./view";
 import { TIMING, type Kind } from "./motion";
 
@@ -13,10 +14,10 @@ const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 export const partLabel = (position: number) => `${String(position + 1).padStart(2, "0")} — ${TERRITORIES[position].label}`;
 
 // a browser that can't draw WebGL keeps the sentence and loses only the house
-function viewIn(host: HTMLElement | null, past: boolean): HouseView | null {
+function viewIn(host: HTMLElement | null, look: Look): HouseView | null {
   if (!host) return null;
   try {
-    const view = new HouseView(host, past);
+    const view = new HouseView(host, look);
     // a page leaving for good releases everything it drew
     addEventListener("pagehide", (e) => { if (!e.persisted) view.destroy(); });
     return view;
@@ -38,7 +39,7 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
     if (Number.isInteger(position) && label && input && pos) slots.push({ position, pos, label, input });
   }
   if (slots.length !== 10) return null;
-  const view = viewIn(doc.getElementById("house"), false);
+  const view = viewIn(doc.getElementById("house"), "present");
   if (!view) return null;
   // the words the house shows: the shared truth, held drafts or not
   const words = slots.map((s) => s.label.textContent!.trim());
@@ -201,7 +202,7 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
 export function mountEarlier(doc: Document): void {
   const words = [...doc.querySelectorAll(".sentence .w")].map((w) => w.textContent!.trim());
   if (words.length !== 10) return;
-  viewIn(doc.getElementById("house"), true)?.show(words);
+  viewIn(doc.getElementById("house"), "past")?.show(words);
 }
 
 export type KeptShip = { words: string[]; gaps: boolean[] };
@@ -230,7 +231,7 @@ export function mountKept(doc: Document): KeptHouse | null {
     l.textContent!.trim(),
   );
   if (keptSpans.length !== 10 || currentWords.length !== 10) return null;
-  const view = viewIn(doc.getElementById("house-kept"), true);
+  const view = viewIn(doc.getElementById("house-kept"), "kept");
   if (!view) return null;
   const initialGaps = keptSpans.map((s) => s.classList.contains("gap"));
   const initialWords = initialGaps.map((gap, i) => (gap ? currentWords[i] : keptSpans[i].textContent!.trim()));
