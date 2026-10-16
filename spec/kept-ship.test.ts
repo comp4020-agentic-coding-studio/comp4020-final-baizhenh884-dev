@@ -156,6 +156,8 @@ describe("Kept ship markup on GET /", () => {
     expect(house?.getAttribute("aria-hidden"), "the kept house isn't aria-hidden").toBe("true");
     const sentence = doc.querySelector(".kept-sentence");
     expect(sentence?.getAttribute("aria-hidden"), "the kept sentence isn't aria-hidden").toBe("true");
+    // a gap is a blank waiting for its word (drawn as one, spec/two-ships-layout.test.ts), never a glyph standing in for it
+    for (const gap of doc.querySelectorAll(".kept-sentence .w.gap")) expect(gap.textContent, "a gap holds text").toBe("");
   });
 
   // The shared sentence accumulates every other spec file's replacements, so
