@@ -17,6 +17,17 @@ import { latestParts, replacedText, standingText } from "./trace-text";
 
 export type Position = { position: number; word: string; version: number };
 
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md), global
+// rather than per-visitor: unlike the visitor's own trace, which needs a
+// follow-up snapshot, it rides on every change event itself, since every
+// open stream already gets every change and the kept ship changes on each
+// one. Optional on the type (so existing position-reconciliation tests that
+// have nothing to do with kept ships can keep building a bare Position):
+// parseChange, which reads the real wire format, still rejects an event
+// missing it.
+export type KeptShip = { words: string[]; gaps: boolean[] };
+export type ChangeEvent = Position & { keptShip?: KeptShip };
+
 export type Trace =
   | { position: number; word: string; standing: true }
   | { position: number; word: string; standing: false; now: string };
@@ -34,11 +45,11 @@ export type SettleTrace = {
 
 const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
 
-export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null };
+export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
 
 export interface LivePage {
   applySnapshot(snapshot: Snapshot): void;
-  applyChange(change: Position): void;
+  applyChange(change: ChangeEvent): void;
 }
 
 // Successful changes so far: each one moves exactly one position's version
@@ -49,8 +60,13 @@ export function deriveTotal(positions: readonly Pick<Position, "version">[]): nu
 
 // Event data arrives as text from the network: anything that isn't the
 // expected shape is dropped rather than applied.
-export function parseChange(raw: string): Position | null {
-  return asPosition(parse(raw));
+export function parseChange(raw: string): ChangeEvent | null {
+  const data = parse(raw);
+  const position = asPosition(data);
+  if (!position || !isObject(data)) return null;
+  const keptShip = asKeptShip(data.keptShip);
+  if (!keptShip) return null;
+  return { ...position, keptShip };
 }
 
 export function parseSnapshot(raw: string): Snapshot | null {
@@ -64,7 +80,9 @@ export function parseSnapshot(raw: string): Snapshot | null {
     trace = "latest" in data.trace ? asSettleTrace(data.trace) : asTrace(data.trace);
     if (trace === null) return null;
   }
-  return { positions: positions as Position[], trace };
+  const keptShip = asKeptShip(data.keptShip);
+  if (!keptShip) return null;
+  return { positions: positions as Position[], trace, keptShip };
 }
 
 function parse(raw: string): unknown {
@@ -111,6 +129,13 @@ function asStandingItem(v: unknown): StandingItem | null {
   return { position: v.position, word: v.word };
 }
 
+function asKeptShip(v: unknown): KeptShip | null {
+  if (!isObject(v) || !Array.isArray(v.words) || !Array.isArray(v.gaps)) return null;
+  if (v.words.length !== 10 || v.gaps.length !== 10) return null;
+  if (v.words.some((w) => typeof w !== "string") || v.gaps.some((g) => typeof g !== "boolean")) return null;
+  return { words: v.words as string[], gaps: v.gaps as boolean[] };
+}
+
 function asReplacedItem(v: unknown): ReplacedItem | null {
   if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string" || typeof v.now !== "string") return null;
   return { position: v.position, word: v.word, now: v.now };
@@ -140,6 +165,9 @@ export type Options = {
   // told every newer version of a position, held back by a draft or not:
   // what the house shows is the shared truth
   onLatest?: (change: Position) => void;
+  // told the kept ship every time it's known to have changed (every change
+  // event, and every snapshot): global, so never held back by a draft
+  onKept?: (kept: KeptShip) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {
@@ -161,6 +189,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   // replacement, a reconnect snapshot) clears and re-arms it, so there's
   // never more than one pending.
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let keptSent: KeptShip | undefined; // the kept ship last told to onKept, so a reconnect snapshot doesn't repeat it
 
   const hasDraft = (slot: Slot) => slot.input.value !== "";
   const shownVersion = (slot: Slot) => Number(slot.version.value);
@@ -409,6 +438,12 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     });
   }
 
+  function tellKept(kept: KeptShip | undefined): void {
+    if (!kept || JSON.stringify(kept) === JSON.stringify(keptSent)) return;
+    keptSent = kept;
+    options.onKept?.(kept);
+  }
+
   return {
     applySnapshot(snapshot) {
       for (const change of snapshot.positions) offer(change);
@@ -418,10 +453,12 @@ export function attach(doc: Document, options: Options = {}): LivePage {
         armSettleTimer();
       }
       for (const slot of slots.values()) if (!hasDraft(slot) && !slot.notice) show(slot);
+      tellKept(snapshot.keptShip);
       render();
     },
     applyChange(change) {
       offer(change);
+      tellKept(change.keptShip);
       render();
     },
   };

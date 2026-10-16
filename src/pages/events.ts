@@ -1,16 +1,16 @@
 import type { APIRoute } from "astro";
-import { currentPositions, currentTrace, type CurrentTrace } from "../lib/db";
+import { currentPositions, currentTrace, keptShipAt, type CurrentTrace } from "../lib/db";
 import { subscribe, type Change } from "../lib/live";
 import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 
 // GET /events: the current sentence as a stream. It opens with a `snapshot`
-// of SQLite ({ positions, trace }), then sends each successful replacement as
-// a `change` ({ position, word, version }). Changes carry no trace, so when a
-// change alters this connection's own visitor's trace (their change made in
-// another tab, or their word replaced) the connection also gets a fresh
-// snapshot. A reconnect is a new request, so it catches up from a fresh
-// snapshot rather than from any replay.
+// of SQLite ({ positions, trace, keptShip }), then sends each successful
+// replacement as a `change` ({ position, word, version, keptShip }). Changes
+// carry no trace, so when a change alters this connection's own visitor's
+// trace (their change made in another tab, or their word replaced) the
+// connection also gets a fresh snapshot. A reconnect is a new request, so it
+// catches up from a fresh snapshot rather than from any replay.
 //
 // `trace` carries whichever shape rules.mode is currently serving
 // (docs/decisions/0003-settle-and-kept-ships.md): the once-mode Trace, or
@@ -20,11 +20,20 @@ import { visitorId } from "../lib/visitor";
 // itself (it has no server event to push with): the client's own local
 // timer handles that entirely on the page, never by the server sending more
 // snapshots.
+//
+// `keptShip` (docs/decisions/0003) is global, not per-visitor: unlike the
+// trace, it rides on every `change` event itself, since every open stream
+// already gets every change and the kept ship changes on each one — no
+// follow-up snapshot needed for it the way the trace sometimes needs one.
 
 const HEARTBEAT_MS = 20_000;
 const encoder = new TextEncoder();
 
 const positionsNow = () => currentPositions().map(({ position, word, version }) => ({ position, word, version }));
+// the ship number is an internal derivation detail, never exposed: no
+// numeric "ship id" is part of the product contract, only which words are
+// kept vs. gaps
+const keptShipNow = () => { const { words, gaps } = keptShipAt(); return { words, gaps }; };
 
 // settlesInMs is recomputed from the current time on every read, so it never
 // equals a prior read even when nothing a visitor would notice has changed:
@@ -60,15 +69,15 @@ export const GET: APIRoute = ({ cookies, locals }) => {
 
       let sent: CurrentTrace["trace"] = null; // the trace this connection last received
       const unsubscribe = subscribe((change: Change) => {
-        event("change", change);
+        event("change", { ...change, keptShip: keptShipNow() });
         const trace = traceNow();
         if (sameTrace(trace, sent)) return;
         sent = trace;
-        event("snapshot", { positions: positionsNow(), trace });
+        event("snapshot", { positions: positionsNow(), trace, keptShip: keptShipNow() });
         logLine(reqId, "stream-resnapshot", { v });
       });
       sent = traceNow();
-      event("snapshot", { positions: positionsNow(), trace: sent });
+      event("snapshot", { positions: positionsNow(), trace: sent, keptShip: keptShipNow() });
       logLine(reqId, "stream-open", { v });
 
       // a comment line, ignored by clients, so a dead socket surfaces
