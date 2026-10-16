@@ -13,6 +13,11 @@ import { measureIn, servedPage } from "./chrome";
 // The shared sentence may hold any state, so the gap check turns every kept
 // word into a gap in the measured copy only (a gap is a ".w.gap" span with
 // no word in it, as GET / serves one), never on the server.
+//
+// However long the live half's notes run (how-to, a settle trace naming many
+// standing words, the Earlier link), each house stays directly under its
+// own sentence on a desktop: the notes are lengthened in the measured copy
+// only, the way a long trace lengthens them for a visitor.
 
 const baseUrl = inject("baseUrl");
 
@@ -24,10 +29,16 @@ type Layout = {
   standsSentence: Box; standsHouse: Box; keptSentence: Box; keptHouse: Box;
   liveSize: number; keptSize: number; keptTextContrast: number;
   gaps: { width: number; ink: number }[];
+  pointer: Box | null; pointerShown: boolean;
 };
 
-async function layout(size: [number, number]): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
+  if (longNotes) {
+    const how = doc.querySelector("#how");
+    if (!how) throw new Error("GET / has no #how");
+    for (let i = 0; i < 12; i++) how.append(doc.createElement("br"), doc.createTextNode(`“standing${i}” still stands, settled.`));
+  }
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
     const q = (s) => { const el = document.querySelector(s); if (!el) throw new Error('GET / has no ' + s); return el; };
@@ -57,6 +68,9 @@ async function layout(size: [number, number]): Promise<Layout> {
       liveSize: parseFloat(getComputedStyle(q('.stands-half .sentence')).fontSize), keptSize: parseFloat(ks.fontSize),
       keptTextContrast: ink(keptSentence, 'color'),
       gaps,
+      // the stacked layout's line pointing down to the kept half
+      pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
+      pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
     };
   })()`, size)) as Layout;
 }
@@ -92,7 +106,19 @@ describe("two ships on GET /", () => {
       expect(l.stands.right, "the live half isn't on the left").toBeLessThanOrEqual(l.kept.left + 1);
       expect(Math.abs(l.stands.width - l.kept.width) / l.viewport, "the halves aren't equal").toBeLessThan(0.02);
       expect(l.stands.width + l.kept.width, "the halves don't share the page").toBeGreaterThan(l.viewport * 0.98);
+      expect(l.pointerShown, "the pointer to the kept half shows beside it").toBe(false);
       bothHalves(l);
+    }, 90_000);
+
+    it(`keeps each house directly under its sentence, however long the notes (${name})`, async () => {
+      const l = await layout([size[0], size[1]], true);
+      // directly under: at most a little air (the part notation's line, margins), never the notes
+      const near = size[1] * 0.15;
+      expect(l.standsHouse.top - l.standsSentence.bottom, "the live house is pushed away from its sentence").toBeLessThanOrEqual(near);
+      expect(l.keptHouse.top - l.keptSentence.bottom, "the kept house is pushed away from its sentence").toBeLessThanOrEqual(near);
+      // and both houses start in the first screen
+      expect(l.standsHouse.top, "the live house starts below the fold").toBeLessThan(size[1] * 0.6);
+      expect(l.keptHouse.top, "the kept house starts below the fold").toBeLessThan(size[1] * 0.6);
     }, 90_000);
   }
 
@@ -101,6 +127,9 @@ describe("two ships on GET /", () => {
     expect(l.kept.top, "the kept half isn't below the live one").toBeGreaterThanOrEqual(l.stands.bottom - 1);
     expect(l.stands.width, "the live half isn't full width").toBeGreaterThan(l.viewport * 0.98);
     expect(l.kept.width, "the kept half isn't full width").toBeGreaterThan(l.viewport * 0.98);
+    // the kept half is far below the fold: a line in the live half says it's there
+    expect(l.pointerShown, "the stacked layout has no line pointing to the kept half").toBe(true);
+    expect(l.pointer!.bottom, "the pointer isn't in the live half").toBeLessThanOrEqual(l.stands.bottom);
     bothHalves(l);
   }, 90_000);
 });
