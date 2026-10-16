@@ -189,6 +189,16 @@ const { title } = Astro.props;
       .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
       .foot .about { margin: 0; }
 
+      /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once, across both
+         halves. Not red (red is only a part being rebuilt): pale, in difference, so it reads
+         as ink on the study field and as light on the kept ground. */
+      .moment {
+        position: fixed; left: 0; right: 0; top: 38%; z-index: 3; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
+        font: italic 400 clamp(34px, 5.4vw, 104px)/1.02 "Instrument Serif", serif; letter-spacing: -0.015em;
+        color: #fff; mix-blend-mode: difference; opacity: 0; transition: opacity 0.7s;
+      }
+      .moment.on { opacity: 1; }
+
       @media (max-width: 900px) {
         /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
         .thread { display: none; }
@@ -217,6 +227,7 @@ const { title } = Astro.props;
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }
         .thread { transition: none; }
+        .moment { transition: none; }
       }
     </style>
   </head>

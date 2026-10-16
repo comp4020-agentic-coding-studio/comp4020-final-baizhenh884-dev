@@ -178,12 +178,25 @@ const how =
         <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
-          import { attach, parseChange, parseSnapshot, type KeptShip } from "../lib/live-client";
+          import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
+          import { classifyMoment } from "../lib/kept-moment";
+          import { BEAT_MS } from "../lib/house/kept-stage";
+          import { duration } from "../lib/house/motion";
           import { mountCurrent, mountKept } from "../lib/house/page";
 
-          const house = mountCurrent(document);
-          const keptHouse = mountKept(document);
+          // The moment of a replacement (docs/decisions/0003, Slice 5): a part that
+          // crosses from the standing house into the kept one; ship 1's completion,
+          // announced once, live; a later ship's quiet beat. Presentation only: what
+          // either house settles on is the kept ship the server derived.
+          const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+          const standsHost = document.getElementById("house"), keptHost = document.getElementById("house-kept");
+          const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null;
           const keptLabel = document.querySelector(".kept-sentence");
+          const keptHouse = mountKept(document);
+          let keptNow: KeptShip | null = keptHouse?.initial ?? null; // the kept ship the page shows
+          let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
+          let beat = 0;
+
           // Visitor words are text wherever they land (CLAUDE.md): built from
           // DOM nodes, never innerHTML, the same discipline live-client.ts
           // already applies to the sentence and the trace.
@@ -205,9 +218,81 @@ const how =
             });
             keptLabel.replaceChildren(...nodes);
           }
+
+          // Ship 1 complete: the one loud line, once, live. Never on a load, a reconnect or ?at=N.
+          function announce(): void {
+            document.querySelector(".moment")?.remove();
+            const line = document.createElement("p");
+            line.className = "moment";
+            line.setAttribute("role", "status");
+            line.textContent = "None of the first sentence stands. All of it has been kept.";
+            setTimeout(() => {
+              document.body.append(line);
+              requestAnimationFrame(() => line.classList.add("on"));
+              setTimeout(() => { line.classList.remove("on"); setTimeout(() => line.remove(), 900); }, 6500);
+            }, reduced() ? 0 : 2400); // as the last part sets down
+          }
+
+          // a kept ship and the moment a change brought to it
+          function moveKept(k: KeptShip, moment: Moment | null): void {
+            // a snapshot telling what the page already shows (every load's first one) changes nothing, mid-motion included
+            if (!moment && keptNow && JSON.stringify(k) === JSON.stringify(keptNow)) return;
+            clearTimeout(beat);
+            if (!moment || !keptHouse) {
+              keptHouse?.update(k);
+              renderKept(k);
+            } else {
+              const before = keptNow;
+              keptHouse.apply(k, moment, box(standsHost));
+              if (moment.kind === "later" && before) {
+                // the completed ship stands whole for its beat, in words as in its house
+                renderKept({ words: before.words, gaps: before.gaps.map(() => false) });
+                beat = window.setTimeout(() => renderKept(k), (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
+              } else renderKept(k);
+              if (moment.kind === "first") announce();
+            }
+            keptNow = k;
+          }
+
+          // This visitor's own change, just made (Post/Redirect/Get): the kept ship
+          // the page showed when they submitted, read back once, if their word stands.
+          let own: Moment | null = null, ownBefore: KeptShip | null = null;
+          try {
+            const saved = sessionStorage.getItem("theseus:kept-before");
+            sessionStorage.removeItem("theseus:kept-before");
+            if (saved && keptNow) {
+              const { position, kept } = JSON.parse(saved) as { position: number; kept: KeptShip };
+              if (document.querySelector(`label[for="word-${position}"] mark`)) {
+                own = classifyMoment(kept, keptNow, position);
+                ownBefore = kept;
+              }
+            }
+          } catch { /* no storage: no moment */ }
+          for (const form of document.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"]')) {
+            form.addEventListener("submit", () => {
+              const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
+              try { if (keptNow) sessionStorage.setItem("theseus:kept-before", JSON.stringify({ position, kept: keptNow })); } catch { /* optional */ }
+            });
+          }
+
+          const house = mountCurrent(document, (position) => {
+            if (!own || own.position !== position || !ownBefore) return null;
+            const now = keptNow!;
+            keptHouse?.update(ownBefore);
+            keptNow = ownBefore;
+            moveKept(now, own);
+            return { toward: box(keptHost) };
+          });
           const page = attach(document, {
-            onLatest: (change) => house?.latest(change),
-            onKept: (k) => { keptHouse?.update(k); renderKept(k); },
+            onLatest: (change) => {
+              const c = crossing && crossing.position === change.position ? { toward: box(keptHost) } : null;
+              crossing = null;
+              house?.latest(change, c);
+            },
+            onKept: (k, moment) => {
+              crossing = moment;
+              moveKept(k, moment);
+            },
           });
           const events = new EventSource("/events");
           events.addEventListener("snapshot", (e) => {
