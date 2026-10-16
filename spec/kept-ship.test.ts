@@ -82,6 +82,18 @@ describe("Kept ships", () => {
     expect(kept.gaps.filter((g) => g).length, "only the two already-twice-replaced positions should be filled").toBe(8);
   });
 
+  // Only ship 1 holds (docs/decisions/0003): a later ship's completion is a
+  // quiet beat on the page, never a hold, so the read after the change that
+  // closes ship 2 already shows ship 3.
+  it("never holds a later ship: the change that closes ship 2 shows ship 3 at once", () => {
+    const round1: [number, string][] = STARTING.map((_, i) => [i, `v2-${i}`]);
+    const round2: [number, string][] = STARTING.map((_, i) => [i, `v3-${i}`]);
+    const { changes, current } = simulate([...round1, ...round2]);
+    const kept = deriveKeptShip(changes, current);
+    expect(kept.ship, "ship 2 is held after its last gap closed").toBe(3);
+    expect(kept.gaps, "ship 3 starts empty").toEqual(Array(10).fill(true));
+  });
+
   it("never reports a position as a gap and kept at once (gaps/words agree with one another)", () => {
     const { changes, current } = simulate([[0, "ox"], [0, "cat"], [4, "dog"]]);
     const kept = deriveKeptShip(changes, current);
