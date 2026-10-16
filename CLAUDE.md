@@ -414,8 +414,10 @@ hold.
   by paired emphasis, with no line. A focused or selected word gets a thin
   line to its territory and the part notation ("05 — entry"). An accepted
   change draws that line red while exactly that part is exchanged, then
-  everything returns to neutral. A phone has no line. Under the house: "Ten
-  words. Ten parts of one house. Change a word, and its part is rebuilt." At
+  everything returns to neutral. A phone has no line. Under the standing
+  house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
+  Under the kept house: "Replaced words are kept here, and built back into
+  a house." At
   the foot beside About: "If every word and every part is replaced, is it
   still the same thing?" With reduced motion nothing moves and the cue stands
   still for a moment, then clears.
