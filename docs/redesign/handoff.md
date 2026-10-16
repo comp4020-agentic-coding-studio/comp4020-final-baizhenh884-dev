@@ -121,6 +121,33 @@ Slice 4c — the maker's review of 4b:
   sentence, two houses"; phone-only "What was replaced is kept below."
 - `4b914f1` — screenshots retaken, same scenario as `ce83792`.
 
+Slice 5 — the moment of replacement:
+- Each spec commit below landed red before its feat commit.
+- `608850e` `7d50249` — only ship 1 holds (spec, then `deriveKeptShip` fix);
+  a later ship's closing change shows the next ship at once.
+- `252f7f2` `54b5020` — `src/lib/kept-moment.ts`:
+  `classifyMoment(prev, next, position)` → cross / first / later / null,
+  from the kept ship a page last showed and the one a change event brings.
+  No new server field. live-client's `onKept(kept, moment)` classifies
+  only change events newer than what's shown, and tells the moment before
+  `onLatest`; snapshots never bring one.
+- `b32cf95` `4b7c07b` — spec: `cross` motion + `arrivalAt`; new
+  `spec/house-kept-stage.test.ts` (bursts 0/150/10000 ms apart over a
+  `deriveKeptShip` history through ship 1's hold and ship 2's completion:
+  at most one motion in flight, target always the newest, settles on a
+  fresh load's body and gaps); a burst of crossings in the standing house
+  settles on the fresh body.
+- `b355f7e` — `motion.ts` cross + `arrivalAt`, `LiveBody.arrive`,
+  `src/lib/house/kept-stage.ts` (`KeptStage`, `BEAT_MS`).
+- `920f7ce` — on the page: the part crosses out of the standing canvas
+  toward the kept house and comes in from the facing edge; ship 1's line
+  ("None of the first sentence stands. All of it has been kept."),
+  centred across both halves, `mix-blend-mode: difference`, not red,
+  ~6.5 s, live only; a later ship's beat in words and house; the actor's
+  own change classified once after Post/Redirect/Get from sessionStorage.
+- `bd2fcb7` — `docs/redesign/screenshots/replacement-crossing.webm`,
+  `ship-1-complete.webm` (Playwright, two windows; staged test words).
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -136,10 +163,15 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `d470a1d` (the app tree since is unchanged):
+At `920f7ce` (the app tree since is unchanged):
 
-- `once` mode: **102 passed, 21 named skips, 0 failed**
-- `settle` mode: **117 passed, 6 named skips, 0 failed**
+- `once` mode: **128 passed, 21 named skips, 0 failed**
+- `settle` mode: **143 passed, 6 named skips, 0 failed**
+
+Seen in a real browser (headless Chrome via Playwright, two windows, not
+a check): a crossing from a second window, ship 1's completion with the
+line and the held ship, and the actor's own crossing after the redirect
+(the first change after the hold, into ship 2); no page errors.
 
 The layout specs (`sentence-wrap`, `two-ships-layout`, `word-field`) need
 Chrome: `CHROME=...` or the usual paths; they fail, never skip, without it.
@@ -172,6 +204,14 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
   own local timer from `settlesInMs`, flips the trace's *display* only —
   presentation only, server remains sole authority on any submit.
 
+- **Moments come from the client, not a server field**: the ship number
+  stays internal; `classifyMoment` reads the kept ship before and after.
+- **The loud line is never replayed**: it needs a change event (or, for
+  the actor, the one sessionStorage read after their own submit). The held
+  completed ship itself is derived, so a fresh load during the hold shows
+  it whole, without the line. `?at=N` has no kept ship at all.
+- **The line isn't red** (CLAUDE.md: red is only a part being rebuilt):
+  Instrument Serif italic, pale in `difference`, rather than C's red sans.
 - **Kept half** (Slice 4b, chosen by the maker): dark umber ground with
   the timber model, not a lighter kraft paper. The live half stays primary
   (larger sentence, the only interactive one).
@@ -185,18 +225,15 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
 - When a word is chosen, the other words recede but the full stop stays
   full ink (it isn't a label). Pre-existing; visible in the focus state.
 
-## What's next — Slice 5, not started
+## What's next
 
-**Slice 5 — the replacement event and the last-original moment.** Ship 1's
-"just completed" hold is the derived state above, not a timer; false the
-instant any further replacement lands anywhere. A fresh page load during
-the hold computes the identical state a live viewer already sees.
-Historical `?at=N` shows the same derivation truncated at N.
+Slices 1-5 are built. Not done: informal tries by 2-3 classmates; the
+one-way migration 0001 has still never touched production (the backup
+hard stop above stands); nothing merges to `main` before the Crit 10
+cutoff.
 
-Slice 5's motion goes onto the two halves as they are now: pieces cross
-from `.stands-half` into `.kept-half`. Reduced motion: check
-`src/lib/house/motion.ts`'s existing mechanism before building anything new.
-
-Each slice follows the same discipline as Slice 2: spec committed and red
-before any feat commit, both `RULE_MODE` passes green before moving on,
-nothing merges to `main` before the cutoff above.
+Open, seen while building Slice 5:
+- On a phone the kept house is far below, so a crossing part leaves the
+  standing house downward and arrives out of view; the line still shows.
+- The line's timing (it appears ~2.4 s after the change, as the last part
+  sets down) is judged, not specified.
