@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { deriveKeptShip, type KeptChange, type CurrentWord } from "../src/lib/kept-ship";
+import { JSDOM } from "jsdom";
+import { describe, expect, inject, it } from "vitest";
+import { deriveKeptShip, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
 
 // Kept ships (docs/decisions/0003-settle-and-kept-ships.md): ship m0 =
 // min(version) across the ten positions is the ship being built; the ship
@@ -86,5 +87,86 @@ describe("Kept ships", () => {
     const kept = deriveKeptShip(changes, current);
     expect(kept.words).toHaveLength(10);
     expect(kept.gaps).toHaveLength(10);
+  });
+});
+
+// The rendered markup on GET / (Slice 4): the kept ship is read-only and
+// decorative (no forms, aria-hidden), shown from the first load, and its
+// text content reflects filled-vs-gap exactly as the live sentence changes —
+// checked over HTTP against the running app, like spec/theseus.test.ts.
+const baseUrl = inject("baseUrl");
+const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
+const changesTheSentence = (name: string, fn: () => Promise<void>) =>
+  it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn);
+
+class Visitor {
+  private cookies = new Map<string, string>();
+  private remember(res: Response): void {
+    for (const header of res.headers.getSetCookie()) {
+      const [pair] = header.split(";");
+      const eq = pair.indexOf("=");
+      if (eq > 0) this.cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+  }
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
+    const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+    return { ...(cookie ? { cookie } : {}), ...extra };
+  }
+  async page(): Promise<Document> {
+    const res = await fetch(new URL("/", baseUrl), { headers: this.headers() });
+    this.remember(res);
+    return new JSDOM(await res.text()).window.document;
+  }
+  async sentence(): Promise<{ position: number; version: number; word: string }[]> {
+    const doc = await this.page();
+    return [...doc.querySelectorAll<HTMLFormElement>('form[action="/replace"]')].map((form) => {
+      const value = (n: string) => form.querySelector<HTMLInputElement>(`input[name="${n}"]`)?.value;
+      return { position: Number(value("position")), version: Number(value("version")), word: form.querySelector("label")?.textContent?.trim() ?? "" };
+    });
+  }
+  async replace(slot: { position: number; version: number }, word: string): Promise<number> {
+    const res = await fetch(new URL("/replace", baseUrl), {
+      method: "POST",
+      redirect: "manual",
+      headers: this.headers({ "content-type": "application/x-www-form-urlencoded", origin: new URL(baseUrl).origin }),
+      body: new URLSearchParams({ position: String(slot.position), version: String(slot.version), word }),
+    });
+    this.remember(res);
+    return res.status;
+  }
+}
+
+let n2 = 0;
+const unusedWord = (all: { word: string }[]): string => {
+  let word: string;
+  do {
+    word = `kept${Date.now().toString(36)}${(n2++).toString(36)}`.replace(/\d/g, (d) => "abcdefghij"[+d]);
+  } while (all.some((s) => s.word === word));
+  return word;
+};
+
+describe("Kept ship markup on GET /", () => {
+  it("is read-only and decorative: no forms, aria-hidden", async () => {
+    const v = new Visitor();
+    const doc = await v.page();
+    const plate = doc.querySelector(".kept-plate");
+    expect(plate, "GET / has no kept-ship plate").not.toBeNull();
+    expect(plate!.querySelector("form"), "the kept ship has an interactive form").toBeNull();
+    const house = doc.querySelector("#house-kept");
+    expect(house?.getAttribute("aria-hidden"), "the kept house isn't aria-hidden").toBe("true");
+    const sentence = doc.querySelector(".kept-sentence");
+    expect(sentence?.getAttribute("aria-hidden"), "the kept sentence isn't aria-hidden").toBe("true");
+  });
+
+  changesTheSentence("reflects a replaced word as kept, text content only", async () => {
+    const v = new Visitor();
+    const before = await v.sentence();
+    const slot = before[0];
+    const word = unusedWord(before);
+    expect(await v.replace(slot, word)).toBe(303);
+
+    const doc = await v.page();
+    const text = doc.querySelector(".kept-sentence")?.textContent ?? "";
+    expect(text, "the kept ship doesn't show the position's original word once it's been replaced").toContain(slot.word);
   });
 });
