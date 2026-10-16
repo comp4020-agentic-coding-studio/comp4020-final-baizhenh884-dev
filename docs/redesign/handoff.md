@@ -106,6 +106,21 @@ Slice 4b — direction B's composition, and the stray full stop:
   Enter; staged test words, not participant evidence). Phone shots are
   full page height so the stacked kept half shows.
 
+Slice 4c — the maker's review of 4b:
+- `f6d6c0a` — CLAUDE.md quotes both houses' captions (approved diff)
+- `c093c81` — spec: with the live half's notes lengthened, each house is
+  within 15% of the viewport height of its own sentence (1920, 1280); a
+  `.kept-pointer` line shows only when the halves stack. Red: 369px gap,
+  no pointer.
+- `5fca602` — spec fix: dropped `c093c81`'s "house starts in the first
+  60% of the screen". It measured the shared sentence's length (after the
+  once-mode files, ten 13-letter test words, about six lines), not the
+  layout; checked against the running container.
+- `d470a1d` — how-text, trace and Earlier link move into the live half's
+  foot, under its house (live-client inserts them there too); mast "One
+  sentence, two houses"; phone-only "What was replaced is kept below."
+- `4b914f1` — screenshots retaken, same scenario as `ce83792`.
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -121,10 +136,10 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `7cd0efc` (the app tree since is unchanged):
+At `d470a1d` (the app tree since is unchanged):
 
-- `once` mode: **100 passed, 21 named skips, 0 failed**
-- `settle` mode: **115 passed, 6 named skips, 0 failed**
+- `once` mode: **102 passed, 21 named skips, 0 failed**
+- `settle` mode: **117 passed, 6 named skips, 0 failed**
 
 The layout specs (`sentence-wrap`, `two-ships-layout`, `word-field`) need
 Chrome: `CHROME=...` or the usual paths; they fail, never skip, without it.
@@ -163,15 +178,10 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
 
 ## Open, not yet done
 
-- **CLAUDE.md still quotes the old caption** ("Ten words. Ten parts of one
-  house.", "Current design (revisable)"). Changing it needs the maker's
-  approval of the diff first; not edited.
-- The mast still says "One sentence, one house". It wasn't in scope for
-  Slice 4b, but with two houses on the page it reads as wrong as the old
-  caption did.
-- A settle-mode trace with several standing words is long, and pushes the
-  live house below the fold at 1920x1080 (seen in the screenshots when one
-  visitor made many changes). The page scrolls; not changed.
+- A long shared sentence (many long words) still pushes both houses down,
+  since the houses stay directly under their sentences; the page scrolls.
+- On a phone there's ~150px of air between the sentence and the live house
+  (the part notation's reserved line plus the canvas's own margin).
 - When a word is chosen, the other words recede but the full stop stays
   full ink (it isn't a label). Pre-existing; visible in the focus state.
 
