@@ -604,6 +604,36 @@ describe("live page reconciliation", () => {
       expect(slot(doc, other).input.value, "the kept ship touched an unrelated draft").toBe("mydraft");
     });
 
+    // The moment of a replacement (spec/kept-moment.test.ts) comes only with a
+    // change event, never a snapshot: a reload or reconnect never replays it.
+    localOnly("brings a moment only with a change event, never a snapshot", async () => {
+      const doc = await (await arrive()).page("/");
+      const moments: unknown[] = [];
+      const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
+      const { position, version } = positionsOf(doc)[0];
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+
+      page.applyChange({ position, word: fresh(), version: version + 1, keptShip: filled });
+      expect(moments, "a crossing change brought no moment").toEqual([null, { position, kind: "cross" }]);
+
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty }); // a reconnect onto a different kept ship
+      expect(moments.at(-1), "a snapshot brought a moment").toBeNull();
+    });
+
+    localOnly("brings no moment for a duplicate or stale change", async () => {
+      const doc = await (await arrive()).page("/");
+      const moments: unknown[] = [];
+      const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
+      const { position, version } = positionsOf(doc)[0];
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+      page.applyChange({ position, word: fresh(), version, keptShip: filled }); // not newer than what's shown
+      expect(moments.filter((m) => m !== null), "a stale change brought a moment").toEqual([]);
+    });
+
     localOnly("isn't told twice for a reconnect snapshot whose kept ship didn't change", async () => {
       const doc = await (await arrive()).page("/");
       const heard: KeptShip[] = [];
