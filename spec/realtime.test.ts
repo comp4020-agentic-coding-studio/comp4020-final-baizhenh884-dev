@@ -8,13 +8,20 @@ import { afterEach, describe, expect, inject, it } from "vitest";
 //   GET /events       a text/event-stream for the current sentence, sent with
 //                     the visitor cookie. Its first event is `snapshot`:
 //                       { positions: [{ position, word, version }, ...],
-//                         trace: null | { position, word, standing, now? } }
+//                         trace: null | { position, word, standing, now? },
+//                         keptShip: { words: string[10], gaps: boolean[10] } }
 //                     read from SQLite when the connection opens, so a fresh
 //                     connection is always current truth. After it, each
 //                     successful replacement anywhere arrives as `change`:
-//                       { position, word, version }
-//                     with the position's new version. Nothing else rides
-//                     along: no visitor ids, times, counts or feed data.
+//                       { position, word, version, keptShip }
+//                     with the position's new version. The kept ship
+//                     (docs/decisions/0003-settle-and-kept-ships.md) is global,
+//                     not per-visitor, so — unlike the visitor's own trace,
+//                     which needs a follow-up snapshot — it rides on every
+//                     change event itself: every open stream already gets
+//                     every change, and the kept ship changes on every one.
+//                     Nothing else rides along: no visitor ids, times, counts
+//                     or feed data.
 //
 // A client applies an update to a position only if its version is newer than
 // the one it shows, so a replacement that appears in both the snapshot and a
@@ -61,7 +68,11 @@ const CONNECT_MS = 2000; // headers and the opening snapshot, not the realtime r
 const LIVE_MS = 1000; // "within about a second" of the replacement succeeding
 
 const POSITION_KEYS = ["position", "version", "word"];
-const SNAPSHOT_KEYS = ["positions", "trace"];
+const SNAPSHOT_KEYS = ["keptShip", "positions", "trace"];
+// a change event carries the kept ship too (it's global, not per-visitor, so
+// every open stream needs it on every change — no follow-up snapshot)
+const CHANGE_KEYS = ["keptShip", "position", "version", "word"];
+const KEPT_SHIP_KEYS = ["gaps", "words"];
 // keysOf sorts, so these are alphabetical, not declaration order
 const TRACE_KEYS = settleModeReady ? ["latest", "otherReplaced", "otherStanding"] : ["now", "position", "standing", "word"];
 const HOLDING_LATEST_KEYS = ["position", "settled", "settlesInMs", "standing", "word"];
@@ -270,14 +281,26 @@ async function connect(v: Visitor): Promise<Stream> {
   return new Stream(res.body!, controller);
 }
 
-type Snapshot = { positions: Slot[]; trace: Record<string, unknown> | null };
+type KeptShip = { words: string[]; gaps: boolean[] };
+type Snapshot = { positions: Slot[]; trace: Record<string, unknown> | null; keptShip: KeptShip };
 
 const keysOf = (value: unknown) => Object.keys(value as object).sort();
 
+function asKeptShip(data: unknown): KeptShip {
+  expect(data, "keptShip isn't a JSON object").toBeTypeOf("object");
+  expect(keysOf(data), "keptShip isn't exactly { words, gaps }").toEqual(KEPT_SHIP_KEYS);
+  const { words, gaps } = data as { words: unknown; gaps: unknown };
+  expect(Array.isArray(words) && words.length === 10, "keptShip.words isn't ten words").toBe(true);
+  expect(Array.isArray(gaps) && gaps.length === 10, "keptShip.gaps isn't ten booleans").toBe(true);
+  for (const w of words as unknown[]) expect(typeof w, "a kept-ship word isn't a string").toBe("string");
+  for (const g of gaps as unknown[]) expect(typeof g, "a kept-ship gap flag isn't a boolean").toBe("boolean");
+  return { words: words as string[], gaps: gaps as boolean[] };
+}
+
 function asSnapshot(data: unknown): Snapshot {
   expect(data, "the snapshot isn't a JSON object").toBeTypeOf("object");
-  expect(keysOf(data), "the snapshot isn't exactly { positions, trace }").toEqual(SNAPSHOT_KEYS);
-  const { positions, trace } = data as { positions: unknown; trace: unknown };
+  expect(keysOf(data), "the snapshot isn't exactly { positions, trace, keptShip }").toEqual(SNAPSHOT_KEYS);
+  const { positions, trace, keptShip } = data as { positions: unknown; trace: unknown; keptShip: unknown };
   expect(Array.isArray(positions), "the snapshot has no positions list").toBe(true);
   for (const p of positions as unknown[]) {
     expect(keysOf(p), "a snapshot position carries more than position, word and version").toEqual(POSITION_KEYS);
@@ -290,13 +313,14 @@ function asSnapshot(data: unknown): Snapshot {
   return {
     positions: (positions as Slot[]).map((p) => ({ position: Number(p.position), version: Number(p.version), word: p.word })),
     trace: trace as Record<string, unknown> | null,
+    keptShip: asKeptShip(keptShip),
   };
 }
 
-function asChange(frame: Frame): Slot {
-  expect(keysOf(frame.data), "a change carries more than position, word and version").toEqual(POSITION_KEYS);
-  const d = frame.data as Slot;
-  return { position: Number(d.position), version: Number(d.version), word: d.word };
+function asChange(frame: Frame): Slot & { keptShip: KeptShip } {
+  expect(keysOf(frame.data), "a change carries more than position, word, version and keptShip").toEqual(CHANGE_KEYS);
+  const d = frame.data as Slot & { keptShip: unknown };
+  return { position: Number(d.position), version: Number(d.version), word: d.word, keptShip: asKeptShip(d.keptShip) };
 }
 
 const changeAt = (position: number, version: number) => (f: Frame) =>
@@ -314,6 +338,30 @@ describe("Theseus realtime", () => {
       "the snapshot isn't the sentence GET / shows",
     ).toEqual(now);
     expect(snapshot.trace, "a visitor who hasn't changed anything gets a trace").toBeNull();
+  });
+
+  // The kept ship (docs/decisions/0003-settle-and-kept-ships.md) is global, so
+  // every open stream carries it on every change, live — not only in a
+  // follow-up snapshot the way a visitor's own trace does. Mode-agnostic.
+  localOnly("delivers the updated kept ship on every change, to every open stream, without a reconnect", async () => {
+    const bea = await arrive();
+    const stream = await connect(bea);
+    await stream.snapshot();
+
+    const ann = await arrive();
+    const before = await ann.sentence();
+    const slot = before[0];
+    const word = unused(before);
+    expect(await ann.replace(slot, word)).toBe(303);
+
+    const frame = await stream.waitFor(changeAt(slot.position, slot.version + 1), LIVE_MS, "change event for the replacement");
+    const delivered = asChange(frame).keptShip;
+
+    // what a brand-new connection sees right now must be exactly the same
+    // derived truth: the live delivery is never stale or out of step with a
+    // fresh read of the same state.
+    const fresh = await (await connect(bea)).snapshot();
+    expect(delivered, "the kept ship delivered live isn't what a fresh read of the same state shows").toEqual(fresh.keptShip);
   });
 
   // once-mode wire shape only: under settle mode the trace carries { latest,
@@ -362,7 +410,10 @@ describe("Theseus realtime", () => {
     expect(await ann.replace(slot, word)).toBe(303);
 
     const frame = await stream.waitFor(changeAt(slot.position, slot.version + 1), LIVE_MS, "change event for the replacement");
-    expect(asChange(frame)).toEqual({ position: slot.position, word, version: slot.version + 1 });
+    const change = asChange(frame);
+    expect(change).toMatchObject({ position: slot.position, word, version: slot.version + 1 });
+    expect(change.keptShip.words, "the change's kept ship isn't ten words").toHaveLength(10);
+    expect(change.keptShip.gaps, "the change's kept ship isn't ten gap flags").toHaveLength(10);
   });
 
   onceOnly("catches up on reconnect: a change made while disconnected is in the next snapshot", async () => {

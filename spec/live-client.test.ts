@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it, vi } from "vitest";
-import { attach, deriveTotal, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
+import { attach, deriveTotal, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -571,6 +571,46 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ positions, trace: null });
 
       expect(heard).toEqual([{ position: a.position, word, version: a.version + 1 }]);
+    });
+  });
+
+  // The kept ship (docs/decisions/0003-settle-and-kept-ships.md) is global,
+  // not per-visitor: unlike the trace, it's told on every change event
+  // itself, never held back by a draft, and never needs a follow-up
+  // snapshot the way the trace sometimes does.
+  describe("the kept ship", () => {
+    const ship = (n: number): KeptShip => ({ words: Array(10).fill(`ship${n}`), gaps: Array(10).fill(n === 0) });
+
+    localOnly("is told on an initial snapshot", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      expect(heard).toEqual([ship(1)]);
+    });
+
+    localOnly("is told again on every change event, even under an unrelated draft", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      const { position, version } = positionsOf(doc)[0];
+      const other = positionsOf(doc)[1].position;
+      type(doc, other, "mydraft"); // an unsubmitted draft elsewhere never holds this back
+
+      page.applyChange({ position, word: fresh(), version: version + 1, keptShip: ship(2) });
+
+      expect(heard).toEqual([ship(1), ship(2)]);
+      expect(slot(doc, other).input.value, "the kept ship touched an unrelated draft").toBe("mydraft");
+    });
+
+    localOnly("isn't told twice for a reconnect snapshot whose kept ship didn't change", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) }); // a reconnect, nothing new
+      expect(heard, "an unchanged kept ship was announced more than once").toEqual([ship(1)]);
     });
   });
 
