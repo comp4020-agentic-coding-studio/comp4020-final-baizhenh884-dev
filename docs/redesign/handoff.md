@@ -148,6 +148,28 @@ Slice 5 — the moment of replacement:
 - `bd2fcb7` — `docs/redesign/screenshots/replacement-crossing.webm`,
   `ship-1-complete.webm` (Playwright, two windows; staged test words).
 
+Slice 5b — the maker's frame-by-frame review of the videos:
+- `ab08dfd` — spec: `spec/moment-line.test.ts` (headless Chrome, the
+  page's own `src/lib/moment-line.ts` transpiled and injected): at
+  1920x1080 and 390x844, as served and with every word 13 letters, the
+  line's box overlaps no live sentence word and stays on screen, wraps
+  balanced, isn't red, the halves are veiled behind it and the veil goes
+  with it; the phone pointer acknowledges a crossing and ship 1
+  differently, quietly, then returns.
+- `603e7eb` — `src/lib/moment-line.ts`: the veil (each half's `::after`
+  in its own ground), the line placed in the tallest band no live word,
+  earlier word or part notation occupies (re-placed on scroll/resize,
+  smaller if the band is short), `acknowledgeBelow()` for the phone
+  pointer. No auto-scroll; nothing about either house changes.
+- `474710e` — the line sits in the upper part of that band (over the
+  houses, clear of the notes); ship 1's phone acknowledgement stands above
+  the veil and lasts until the line has gone.
+- `fdf2275` — four videos at 1920x1080 and 390x844 replace the two
+  1280x800 ones: `replacement-crossing-<viewport>.webm`,
+  `ship-1-complete-<viewport>.webm`. Chrome's own screencast, started once
+  the page had laid out, at the viewport's size, encoded on real
+  timestamps. Staged test words.
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -163,10 +185,10 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `920f7ce` (the app tree since is unchanged):
+At `474710e` (the app tree since is unchanged):
 
-- `once` mode: **128 passed, 21 named skips, 0 failed**
-- `settle` mode: **143 passed, 6 named skips, 0 failed**
+- `once` mode: **133 passed, 21 named skips, 0 failed**
+- `settle` mode: **148 passed, 6 named skips, 0 failed**
 
 Seen in a real browser (headless Chrome via Playwright, two windows, not
 a check): a crossing from a second window, ship 1's completion with the
@@ -233,7 +255,7 @@ hard stop above stands); nothing merges to `main` before the Crit 10
 cutoff.
 
 Open, seen while building Slice 5:
-- On a phone the kept house is far below, so a crossing part leaves the
-  standing house downward and arrives out of view; the line still shows.
-- The line's timing (it appears ~2.4 s after the change, as the last part
+- On a phone a crossing still arrives out of view (by decision: no
+  auto-scroll); the pointer now says that a part went below.
+- The line's placement inside its free band (30% down) and its timing (it appears ~2.4 s after the change, as the last part
   sets down) is judged, not specified.
