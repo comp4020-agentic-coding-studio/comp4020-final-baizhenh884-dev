@@ -7,10 +7,12 @@
 
 import * as THREE from "three";
 import { buildBody, type BuiltBody } from "./build";
-import { duration, frameAt, type Frame, type Kind } from "./motion";
+import { arrivalAt, duration, frameAt, type Arrival as ArrivalFrame, type Frame, type Kind } from "./motion";
 import { dress, type Look, undress } from "./theme";
 
-export type Exchange = { start: number; kind: Kind; position: number; outgoing: THREE.Group; incoming: THREE.Group; trace: THREE.Group; away: THREE.Vector3; inY: number };
+export type Exchange = { start: number; kind: Kind; position: number; outgoing: THREE.Group; incoming: THREE.Group; trace: THREE.Group; away: THREE.Vector3; across: THREE.Vector3; inY: number };
+// a crossing part arriving in the kept house: the standing group at `position`, set down from `from` (its offset at the start)
+export type Arrival = { start: number; position: number; group: THREE.Group; from: THREE.Vector3 };
 export type Follow = { start: number; outgoing: THREE.Group; incoming: THREE.Group };
 export const FOLLOW_MS = 450;
 
@@ -39,12 +41,13 @@ export class LiveBody {
   private plan: BuiltBody["plan"] | null = null;
   readonly exchanges: Exchange[] = [];
   readonly follows: Follow[] = [];
+  readonly arrivals: Arrival[] = [];
 
   constructor(private look: Look, private drawing: (g: THREE.Group) => THREE.Group) {}
 
   // the territories standing now, by position (read-only to callers)
   get groups(): readonly THREE.Group[] { return this.current; }
-  get animating(): boolean { return this.exchanges.length + this.follows.length > 0; }
+  get animating(): boolean { return this.exchanges.length + this.follows.length + this.arrivals.length > 0; }
 
   // the whole body of a sentence, at once
   show(words: readonly string[]): void {
@@ -58,8 +61,10 @@ export class LiveBody {
   // One position's word changed. The body is rebuilt from the whole new
   // sentence: that territory is exchanged; a neighbour whose form followed from
   // it (a roof's overhang, a threshold's spread) follows quietly; every other
-  // territory keeps its standing group and the rebuilt copy is released.
-  change(position: number, words: readonly string[], kind: Kind, now: number): void {
+  // territory keeps its standing group and the rebuilt copy is released. A
+  // crossing's old part travels `across` (its whole way out of the house, in
+  // world units, which the view measures) as well.
+  change(position: number, words: readonly string[], kind: Kind, now: number, across = new THREE.Vector3()): void {
     if (!this.current.length) return this.show(words);
     this.finishAll();
     const next = buildBody(words);
@@ -76,10 +81,19 @@ export class LiveBody {
         const c = new THREE.Box3().setFromObject(standing, true).getCenter(new THREE.Vector3()).setY(0);
         const away = c.lengthSq() > 1e-6 ? c.normalize().multiplyScalar(0.55) : new THREE.Vector3(0, 0, 0.55);
         away.y = 1.15;
-        this.exchanges.push({ start: now, kind, position, outgoing: standing, incoming: this.current[i], trace, away, inY: kind === "remote" ? 0.8 : 1.1 });
+        this.exchanges.push({ start: now, kind, position, outgoing: standing, incoming: this.current[i], trace, away, across: kind === "cross" ? across.clone() : new THREE.Vector3(), inY: kind === "own" ? 1.1 : 0.8 });
       } else this.follows.push({ start: now, outgoing: standing, incoming: this.current[i] });
     });
     this.plan = next.plan;
+  }
+
+  // A crossing part arrives in this (kept) body: the territory standing at
+  // `position` sets down into its place from `from`. Whatever was under way
+  // finishes first, so arrivals never stack up.
+  arrive(position: number, now: number, from: THREE.Vector3): void {
+    this.finishAll();
+    const group = this.current[position];
+    if (group) this.arrivals.push({ start: now, position, group, from: from.clone() });
   }
 
   // advance every exchange to `now`; returns the frames to draw (an ended one is released and dropped)
@@ -90,13 +104,20 @@ export class LiveBody {
       else out.push({ exchange: x, frame: frameAt(x.kind, now - x.start, reduced) });
     }
     for (const f of [...this.follows]) if (reduced || now - f.start >= FOLLOW_MS) this.endFollow(f);
+    for (const a of [...this.arrivals]) if (now - a.start >= duration("cross", reduced)) this.endArrival(a);
     return out;
+  }
+
+  // the arrivals still under way at `now` (after step), with their frames
+  arriving(now: number, reduced: boolean): { arrival: Arrival; frame: ArrivalFrame }[] {
+    return this.arrivals.map((arrival) => ({ arrival, frame: arrivalAt(now - arrival.start, reduced) }));
   }
 
   // finish whatever is under way, at once (a newer change, a reset, leaving)
   finishAll(): void {
     for (const x of [...this.exchanges]) this.end(x);
     for (const f of [...this.follows]) this.endFollow(f);
+    for (const a of [...this.arrivals]) this.endArrival(a);
   }
 
   dispose(): void {
@@ -120,6 +141,11 @@ export class LiveBody {
     this.release(x.outgoing);
     this.release(x.trace, false);
     (x.trace.userData.material as THREE.Material | undefined)?.dispose();
+  }
+
+  private endArrival(a: Arrival): void {
+    this.arrivals.splice(this.arrivals.indexOf(a), 1);
+    a.group.position.set(0, 0, 0);
   }
 
   private endFollow(f: Follow): void {
