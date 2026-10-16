@@ -1,4 +1,5 @@
 ---
+import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
 import { changeCount, currentPositions, currentTrace, keptShipAt, recentPast, sentenceAt, SETTLE_SECONDS } from "../lib/db";
 import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
@@ -82,32 +83,15 @@ const how =
         <div class="text current">
           <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
           <div class="sentence">
-            {current.map((p, i) => (
+            {current.slice(0, -1).map((p) => (
               <>
-                <div class="pos">
-                  <form method="post" action="/replace">
-                    <input type="hidden" name="position" value={p.position} />
-                    <input type="hidden" name="version" value={p.version} />
-                    <label for={`word-${p.position}`}>{markedPositions.has(p.position) ? <mark>{p.word}</mark> : p.word}</label>
-                    <input
-                      id={`word-${p.position}`}
-                      name="word"
-                      aria-describedby="how"
-                      placeholder={p.word}
-                      autocomplete="off"
-                      spellcheck="false"
-                      required
-                    />
-                  </form>
-                  {(past.get(p.position) ?? []).length > 0 && (
-                    <span class="past" aria-hidden="true">
-                      {(past.get(p.position) ?? []).map((w) => <span>{w}</span>)}
-                    </span>
-                  )}
-                </div>
-                {i < current.length - 1 && " "}
+                <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />{" "}
               </>
-            ))}.
+            ))}
+            {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
+            {current.slice(-1).map((p) => (
+              <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} past={past.get(p.position) ?? []} />.</span>
+            ))}
           </div>
           <p id="part" class="caps" aria-hidden="true" hidden></p>
           <p id="how">{how}</p>

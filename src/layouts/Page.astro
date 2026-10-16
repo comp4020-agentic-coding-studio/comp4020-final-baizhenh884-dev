@@ -47,6 +47,9 @@ const { title } = Astro.props;
       /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
       .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
       .sentence.past { font-style: italic; color: #3b3630; }
+      /* the last word and the full stop: no line break between them, while the word itself wraps as any other */
+      .sentence .end { white-space: nowrap; }
+      .sentence .end > .pos { white-space: normal; }
       .sentence .pos { position: relative; display: inline-flex; flex-direction: column; vertical-align: top; max-width: 100%; padding-bottom: 0.18em; }
       /* Each word's label and input share one grid cell, so editing happens in
          the word's own place. The input contributes no width (width: 0) and

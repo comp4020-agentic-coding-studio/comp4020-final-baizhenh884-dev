@@ -1,0 +1,34 @@
+---
+// One position of the current sentence: its form (the HTTP contract at the
+// top of spec/theseus.test.ts) and the words it held before, beneath it.
+interface Props {
+  position: number;
+  version: number;
+  word: string;
+  marked: boolean;
+  past: string[];
+}
+const { position, version, word, marked, past } = Astro.props;
+---
+
+<div class="pos">
+  <form method="post" action="/replace">
+    <input type="hidden" name="position" value={position} />
+    <input type="hidden" name="version" value={version} />
+    <label for={`word-${position}`}>{marked ? <mark>{word}</mark> : word}</label>
+    <input
+      id={`word-${position}`}
+      name="word"
+      aria-describedby="how"
+      placeholder={word}
+      autocomplete="off"
+      spellcheck="false"
+      required
+    />
+  </form>
+  {past.length > 0 && (
+    <span class="past" aria-hidden="true">
+      {past.map((w) => <span>{w}</span>)}
+    </span>
+  )}
+</div>
