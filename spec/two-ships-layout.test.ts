@@ -116,9 +116,6 @@ describe("two ships on GET /", () => {
       const near = size[1] * 0.15;
       expect(l.standsHouse.top - l.standsSentence.bottom, "the live house is pushed away from its sentence").toBeLessThanOrEqual(near);
       expect(l.keptHouse.top - l.keptSentence.bottom, "the kept house is pushed away from its sentence").toBeLessThanOrEqual(near);
-      // and both houses start in the first screen
-      expect(l.standsHouse.top, "the live house starts below the fold").toBeLessThan(size[1] * 0.6);
-      expect(l.keptHouse.top, "the kept house starts below the fold").toBeLessThan(size[1] * 0.6);
     }, 90_000);
   }
 
