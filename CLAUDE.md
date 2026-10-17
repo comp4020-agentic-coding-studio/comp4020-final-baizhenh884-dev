@@ -397,8 +397,9 @@ What the code must hold to. The README says why; don't restate it here.
 These can change without a contract change, as long as the enforced rules
 hold.
 
-- Beneath each word, a few of the most recent words it replaced (currently
-  four), receding, hidden from screen readers.
+- Only what stands now under the live sentence (`GET /`): no earlier words
+  beneath its words. Replaced words are shown kept in the kept half; the
+  whole history is one step away under "Earlier form" (`?at=N`).
 - Earlier whole sentences, reached one step at a time (Earlier / Later / Now),
   one on screen at once and never listed together.
 - Not built (as of Crit 9): an "as you left it" jump, a client-side
