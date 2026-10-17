@@ -187,6 +187,38 @@ Slice 5c — only what stands now (the maker's decision):
   `.sentence.past` and `?at=N` untouched.
 - screenshots retaken (fresh/replaced, 1920x1080 and 390 wide).
 
+Slice 5d — the air between the live sentence and its house:
+- Measured first (screenshot pixels against the field, fresh sentence):
+  sentence to drawn house was 154.5px at 390x844 and 164.9px at 1920x1080.
+  Of that, 61.5 / 51.9px was page layout (the sentence's 1.2rem margin, the
+  part notation's reserved line, its 1rem margin, the phone house's 0.6rem
+  top margin) and 93 / 113px was the canvas's own top margin. Most of the
+  canvas margin is headroom: through the fixed camera the tallest body (ten
+  13-letter words) starts 34px (phone) / 28px (desktop) below the canvas
+  edge, so it stays.
+- `0ce4c1f` — spec: `spec/two-ships-layout.test.ts`, at 1920x1080 and
+  390x844, as served and with ten long words: showing any of the ten
+  parts' notations moves neither the sentence nor either house; the house
+  starts within 20px of the sentence; it never gets smaller; the houses
+  stay level side by side; every body at rest (the 500 sentences, the
+  extremes, ten 13-letter words, through `place()` at the measured canvas
+  size) starts at least 8px below the notation. The sentence sets moved to
+  `spec/house-sentences.ts`, shared with `house-constraints`. Red: 51.9 /
+  61.5px.
+- `5d4382d` — `#part` is set absolutely under the sentence (0.5rem into
+  the sentence's margin), over the canvas's empty top band; the phone house
+  loses its 0.6rem top margin. Now 111.2px (390, house unchanged 205x153)
+  and 141.2px (1920, the row's freed height goes to the house: 295x220 ->
+  319x238). A first try at `top: 100%` failed the 8px clearance at 1920 with
+  ten long words (22.3 vs 24.7px).
+- **Accepted exception (the maker's decision):** the clearance is for the
+  house at rest. During an exchange (under a second) the old part lifts
+  ~21px (phone) / ~33px (desktop), and for the tallest bodies it may pass
+  briefly under the notation; before this the same lift was cut off by the
+  canvas edge. Not checked, by decision.
+- `5c1811b` — screenshots retaken, same scenario as `4889fe4` (fresh, then
+  ten staged replacements by three fresh visitors, settle mode). No videos.
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -202,10 +234,15 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `cca10fe` (the app tree since is unchanged):
+At `5d4382d` (the app tree since is unchanged):
 
-- `once` mode: **136 passed, 21 named skips, 0 failed**
-- `settle` mode: **151 passed, 6 named skips, 0 failed**
+- `once` mode: **140 passed, 21 named skips, 0 failed**
+- `settle` mode: **155 passed, 6 named skips, 0 failed**
+
+Seen in a real browser at `5d4382d` (headless Chrome, not a check): a
+chosen word at 1920x1080 and 390x844 shows its notation clear above the
+house, and the desktop line runs from the word to its part without
+crossing the notation.
 
 Seen in a real browser (headless Chrome via Playwright, two windows, not
 a check): a crossing from a second window, ship 1's completion with the
@@ -259,8 +296,6 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
 
 - A long shared sentence (many long words) still pushes both houses down,
   since the houses stay directly under their sentences; the page scrolls.
-- On a phone there's ~150px of air between the sentence and the live house
-  (the part notation's reserved line plus the canvas's own margin).
 - When a word is chosen, the other words recede but the full stop stays
   full ink (it isn't a label). Pre-existing; visible in the focus state.
 
