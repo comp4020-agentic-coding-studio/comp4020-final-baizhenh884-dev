@@ -45,6 +45,8 @@ export type SettleTrace = {
 };
 
 const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
+// longer than a crossing (1.9 s, house/motion.ts), so one burst is one announcement
+export const ANNOUNCE_MS = 2500;
 
 export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
 
@@ -444,6 +446,32 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     });
   }
 
+  // Others' changes, said once a burst has settled: positions and words,
+  // never who or when. Only change events reach this, so a load, snapshot or
+  // reconnect stays silent.
+  const news = doc.getElementById("news");
+  const heard = new Map<number, string>();
+  let speakTimer: ReturnType<typeof setTimeout> | null = null;
+  function announce(change: Position): void {
+    if (!news) return;
+    heard.delete(change.position);
+    heard.set(change.position, change.word);
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = setTimeout(() => {
+      speakTimer = null;
+      const said = [...heard].sort((a, b) => a[0] - b[0]);
+      heard.clear();
+      const words = [...slots.values()].sort((a, b) => a.latest.position - b.latest.position).map((s) => s.latest.word);
+      const n = (p: number) => String(p + 1);
+      news.textContent =
+        said.length === 1
+          ? `Changed: word ${n(said[0][0])} is now “${said[0][1]}”.`
+          : said.length <= 3
+            ? `Changed: words ${said.slice(0, -1).map(([p]) => n(p)).join(", ")} and ${n(said.at(-1)![0])}. The sentence now reads: ${words.join(" ")}.`
+            : `Several words changed. The sentence now reads: ${words.join(" ")}.`;
+    }, ANNOUNCE_MS);
+  }
+
   function tellKept(kept: KeptShip | undefined, moment: Moment | null = null): void {
     if (!kept || JSON.stringify(kept) === JSON.stringify(keptSent)) return;
     keptSent = kept;
@@ -468,6 +496,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       const newer = !!slot && change.version > slot.latest.version;
       if (change.keptShip) tellKept(change.keptShip, newer ? classifyMoment(keptSent, change.keptShip, change.position) : null);
       offer(change);
+      if (newer) announce(change);
       render();
     },
   };

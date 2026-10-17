@@ -89,6 +89,8 @@ const how =
             </div>
             <div class="text current">
               <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+              {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
+              <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
               <div class="sentence">
                 {current.slice(0, -1).map((p) => (
                   <>
@@ -162,9 +164,10 @@ const how =
             <div class="half-head">
               <p class="caps half-label kept-label">What was kept</p>
             </div>
-            <p class="kept-sentence" aria-hidden="true">
+            {/* the kept sentence is read as words, a gap as "blank" (src/lib/kept-sentence.ts redraws it the same way) */}
+            <p class="kept-sentence">
               {kept.words.map((w, i) => {
-                const word = <span class={`w${kept.gaps[i] ? " gap" : ""}`}>{kept.gaps[i] ? "" : w}</span>;
+                const word = kept.gaps[i] ? <><span class="w gap"></span><span class="sr-only">blank</span></> : <span class="w">{w}</span>;
                 return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
               })}
             </p>
@@ -179,6 +182,7 @@ const how =
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
           import { classifyMoment } from "../lib/kept-moment";
+          import { renderKeptSentence } from "../lib/kept-sentence";
           import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
           import { BEAT_MS } from "../lib/house/kept-stage";
           import { duration } from "../lib/house/motion";
@@ -197,26 +201,8 @@ const how =
           let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
           let beat = 0;
 
-          // Visitor words are text wherever they land (CLAUDE.md): built from
-          // DOM nodes, never innerHTML, the same discipline live-client.ts
-          // already applies to the sentence and the trace.
           function renderKept(k: KeptShip): void {
-            if (!keptLabel) return;
-            const nodes: (string | HTMLElement)[] = [];
-            k.words.forEach((w, i) => {
-              const span = document.createElement("span");
-              span.className = k.gaps[i] ? "w gap" : "w";
-              span.textContent = k.gaps[i] ? "" : w;
-              if (i < k.words.length - 1) nodes.push(span, " ");
-              else {
-                // the full stop stays on the last word's line, as GET / renders it
-                const end = document.createElement("span");
-                end.className = "end";
-                end.append(span, ".");
-                nodes.push(end);
-              }
-            });
-            keptLabel.replaceChildren(...nodes);
+            if (keptLabel) renderKeptSentence(keptLabel, k);
           }
 
           // Ship 1 complete: the one loud line, once, live, as the last part sets down.
