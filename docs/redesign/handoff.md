@@ -219,25 +219,103 @@ Slice 5d — the air between the live sentence and its house:
 - `5c1811b` — screenshots retaken, same scenario as `4889fe4` (fresh, then
   ten staged replacements by three fresh visitors, settle mode). No videos.
 
-Working tree is clean. Nothing staged or uncommitted.
+Audit against the Final Project brief (2026-10-17, no code): the gaps
+are the maker's writing (`reflections/crit-10.md`, `PROCESS.md` rewrite on
+`main`; README rewrite on this branch before the merge) and deployment.
+Decided: merge and deploy only after the Crit 10 cutoff (2026-10-21 08:30);
+no `crit-9` tag (none was made; the maker notes it in `PROCESS.md`); the
+refused-replacement URL stays `/replace` (refusals are full pages at their
+real status). Deploy checklist: see "Merge and deploy" below.
+
+Slice 6a — accessibility (plan 2, approved):
+- `928fd0e` — spec: the kept sentence is readable (each gap "blank", its
+  drawn span still empty; the kept house stays aria-hidden), replacing
+  Slice 4's "kept sentence aria-hidden"; new `spec/kept-sentence.test.ts`;
+  `spec/live-client.test.ts`: one polite live region, silent on load,
+  snapshot, reconnect or a stale event; a burst coalesced into one
+  announcement 2.5 s after its last change, naming positions and words as
+  text, no time.
+- `b2f4504` — feat: `src/lib/kept-sentence.ts` (the live redraw, moved out
+  of index.astro), `#news` live region, `ANNOUNCE_MS = 2500` in
+  live-client. Known limit: a second tab of the same browser hears its own
+  change announced (the client can't tell whose change it is).
+- `b2e9956` — CLAUDE.md: both sentences are the accessible state; the
+  enforced announcement line (approved diff).
+
+Slice 6b — the one-off layout failure, found and fixed:
+- After `b2f4504`, one once pass failed "two halves side by side and equal
+  (1920x1080)" without a message worth keeping. Made to explain itself, it
+  recurred as different Chrome specs timing out (1 in 3 full passes, 1 in
+  6 loops of the Chrome specs). Traced: `/json/version` answered in 5 ms,
+  then the page never loaded. Cause: headless Chromes from earlier
+  measurements outlived the 5 s SIGTERM grace and kept their debugging
+  port; `spec/chrome.ts` guessed ports from a fixed range of 200, so a
+  later launch could reach an orphan (ps showed two on port 9745, up to 75
+  minutes old). Not the layout, not the app.
+- `33b10db` — spec: new `spec/chrome-harness.test.ts` (every old-range
+  port held by a never-answering decoy; a measurement must still finish in
+  its own Chrome; red: hung). `two-ships-layout`'s side-by-side test and
+  `bothHalves()` now print viewport, font status and every measured box in
+  each assertion message.
+- `68749d5` — fix: `--remote-debugging-port=0`, the port read from the
+  profile's `DevToolsActivePort`; SIGKILL if Chrome is still running 5 s
+  after SIGTERM. Chrome specs looped six times: all pass, no orphan left.
+  Full once pass three times in a row: all green. No retries added and no
+  check loosened.
+
+Slice 6c — the maker's blocklist (plan 3, approved):
+- `d4b35f4` — ADR 0004: exact-match list from the Fly secret
+  `BLOCKED_WORDS` (NFKC, case-folded), refused as invalid (422, change not
+  used up), "That word can't be used here.", logged as `reason=blocked`
+  only; refusal order unchanged; an empty list logged once, never fatal.
+  Alternatives (none, substring, list in repo, maker removal route, client
+  filter) and limits recorded. Maker removal route deliberately not built.
+- `47d12d3` — spec: new `spec/blocklist.test.ts` (case and fullwidth
+  variants refused; a word containing a listed word allowed; log; the
+  empty-list line in a second container). Test word `blockedtestword`;
+  unset in CI fails, never skips.
+- `d4c3b69` — spec/ADR correction found against the feat: accepted words
+  are logged by contract, so only `invalid` lines must lack the word; and
+  Astro's built server loads the app's modules on the first request, not
+  at process start, so the empty-list line comes with the first request
+  (before its response), not at boot. The existing rule-mode line has
+  always behaved the same.
+- `009b1b4` — feat: `src/lib/blocklist.ts`, `word.ts` reason `blocked`,
+  the refusal sentence, `checks.yml` declares the test word on both
+  containers and both runs.
+- Not committed: a CLAUDE.md diff (local verification commands set
+  `BLOCKED_WORDS=blockedtestword`; the moderation line names ADR 0004),
+  waiting for the maker's approval.
+- Not done, by decision: a wrapper entry in the Dockerfile so the line
+  prints at process start. It would change a fixed template file.
+
+Plan 1 (phone performance) waits for the maker's real-phone test on home
+Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
+visitor cookie is dropped, so the phone can watch but not submit; submit
+from the Mac.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
 
 ```sh
 docker rm -f app; docker build -t app .
-docker run -d --rm --init --name app -p 8099:8080 -e PORT=8080 --tmpfs /data app
-RULE_MODE=once APP_URL=http://localhost:8099 pnpm check
+docker run -d --rm --init --name app -p 8099:8080 -e PORT=8080 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+RULE_MODE=once BLOCKED_WORDS=blockedtestword APP_URL=http://localhost:8099 pnpm check
 docker stop app
 
-docker run -d --rm --init --name app -p 8099:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 --tmpfs /data app
-RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
+docker run -d --rm --init --name app -p 8099:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+RULE_MODE=settle SETTLE_SECONDS=3 BLOCKED_WORDS=blockedtestword APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `5d4382d` (the app tree since is unchanged):
+At `009b1b4`:
 
-- `once` mode: **140 passed, 21 named skips, 0 failed**
-- `settle` mode: **155 passed, 6 named skips, 0 failed**
+- `once` mode: **153 passed, 21 named skips, 0 failed**
+- `settle` mode: **168 passed, 6 named skips, 0 failed**
+
+Seen in headless Chrome at `009b1b4` (not checks): three changes from
+other windows 400 ms apart gave one announcement; the kept sentence read
+"blank a blank …"; "BlockedTestWord" refused with the neutral sentence and
+the same visitor's next ordinary word accepted. Staged test words.
 
 Seen in a real browser at `5d4382d` (headless Chrome, not a check): a
 chosen word at 1920x1080 and 390x844 shows its notation clear above the
@@ -249,8 +327,9 @@ a check): a crossing from a second window, ship 1's completion with the
 line and the held ship, and the actor's own crossing after the redirect
 (the first change after the hold, into ship 2); no page errors.
 
-The layout specs (`sentence-wrap`, `two-ships-layout`, `word-field`) need
-Chrome: `CHROME=...` or the usual paths; they fail, never skip, without it.
+The layout specs (`sentence-wrap`, `two-ships-layout`, `word-field`,
+`moment-line`, `chrome-harness`) need Chrome: `CHROME=...` or the usual
+paths; they fail, never skip, without it.
 
 Every skip in both runs is named and settle/once-exclusive (confirmed by
 listing them with `--reporter=verbose`) — none is an accidental gap.
@@ -299,9 +378,27 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
 - When a word is chosen, the other words recede but the full stop stays
   full ink (it isn't a label). Pre-existing; visible in the focus state.
 
+## Merge and deploy (the maker runs it, after 2026-10-21 08:30)
+
+1. After the cutoff, tag Crit 10's state on `main` (`/comp4020:ship`).
+2. Backup, hard stop (production SQLite is WAL, so use the backup API):
+   `mise exec -- flyctl ssh console -a comp4020-final-baizhenh884-dev -C "sh -c 'cd /app && node -e \"require(\\\"better-sqlite3\\\")(\\\"/data/theseus.db\\\").backup(\\\"/data/pre-0001.db\\\").then(()=>console.log(\\\"ok\\\"))\"'"`,
+   then `mise exec -- flyctl ssh sftp get /data/pre-0001.db ~/theseus-backups/pre-0001.db -a comp4020-final-baizhenh884-dev`,
+   check it (`sqlite3 … "pragma integrity_check; select count(*) from changes;"`),
+   and a volume snapshot (`flyctl volumes snapshots create <vol-id>`).
+3. Secrets, staged: `RULE_MODE=settle`, `SETTLE_SECONDS=<chosen>`, and
+   `BLOCKED_WORDS=<the maker's list>` (`flyctl secrets set … --stage`).
+4. Merge by PR; CI runs both passes, then deploys.
+5. Verify: `flyctl logs` shows the rule mode and the blocklist line after
+   the first request; read-only `pnpm check` against the fly.dev URL; any
+   production verification change only with approval, disclosed.
+6. Rollback: `RULE_MODE=once` and redeploy the redesigned image; the
+   schema never goes back.
+
 ## What's next
 
-Slices 1-5 are built. Not done: informal tries by 2-3 classmates; the
+Slices 1-6 are built (6: accessibility, the Chrome harness, the
+blocklist). Not done: informal tries by 2-3 classmates; the
 one-way migration 0001 has still never touched production (the backup
 hard stop above stands); nothing merges to `main` before the Crit 10
 cutoff.
