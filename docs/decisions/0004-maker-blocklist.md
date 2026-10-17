@@ -21,7 +21,7 @@ A short list of words the server refuses, chosen by the maker and held
 outside the repository:
 
 - **Where it lives:** the Fly secret `BLOCKED_WORDS`, comma-separated, read
-  once at boot. Never in the repository, the logs or any public response, so
+  once when the server first loads its modules. Never in the repository, the logs or any public response, so
   the list's words are never published by the project itself. The maker
   sets and changes it with `flyctl secrets set`; no code change or migration.
 - **How a word is matched:** after the ordinary trim, the word and every
@@ -37,7 +37,10 @@ outside the repository:
   before invalid (422). A visitor who is holding a place and types a listed
   word is told they're holding a place, which reveals nothing about the list.
 - **Unset is loud, not fatal:** if `BLOCKED_WORDS` is unset or empty, the app
-  starts normally and logs one line at boot saying the blocklist is empty.
+  starts normally and logs one line saying the blocklist is empty. Astro's
+  built server loads the app's modules on the first request, not at process
+  start, so the line comes with the first request after each start, before
+  that request's response (the existing rule-mode line behaves the same).
   It never refuses to start (that would make a forgotten secret an outage)
   and never stays silent (that would make a forgotten secret look like a
   working list).
@@ -78,4 +81,4 @@ outside the repository:
   fails, rather than skips, if CI leaves it unset.
 - The maker sets the real list in production with `flyctl secrets set
   BLOCKED_WORDS=...` before the showcase. Before that, production logs that
-  the list is empty on every boot.
+  the list is empty on the first request after every start.

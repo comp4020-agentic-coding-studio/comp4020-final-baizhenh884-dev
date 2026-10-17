@@ -127,24 +127,33 @@ describe("the maker's blocklist", () => {
     const log = execSync("docker logs app", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     const mine = log.split("\n").filter((l) => l.includes(`v=${v.tag()}`));
     expect(mine.some((l) => / invalid .*reason=blocked/.test(l)), `no "invalid reason=blocked" line for v=${v.tag()}`).toBe(true);
-    expect(log.toLowerCase(), "the log contains the listed word").not.toContain(BLOCKED.toLowerCase());
+    // a refused word is never logged; an accepted word is (ADR 0002), and one may contain the listed word
+    const refusals = log.split("\n").filter((l) => / invalid /.test(l));
+    expect(refusals.filter((l) => l.toLowerCase().includes(BLOCKED.toLowerCase())), "a refusal's log line contains the listed word").toEqual([]);
   });
 
   // A second, short-lived container from the same image with no list: it
-  // starts, and says once that the blocklist is empty. Never fails, never silent.
-  dockerOnly("starts without a list, and says so once at boot", async () => {
+  // starts, and says once that the blocklist is empty. Never fails, never
+  // silent. The server loads its own modules on the first request (Astro's
+  // built entry imports pages and middleware lazily), so the line is read
+  // after one request, before any response that request could have shown.
+  dockerOnly("starts without a list, and says so once, before its first response", async () => {
     const image = execSync("docker inspect --format '{{.Config.Image}}' app", { encoding: "utf8" }).trim();
     const name = `app-noblock-${process.pid}`;
-    execSync(`docker run -d --rm --init --name ${name} -e PORT=8080 -e RULE_MODE=once --tmpfs /data ${image}`, { stdio: "ignore" });
+    execSync(`docker run -d --rm --init --name ${name} -p 127.0.0.1::8080 -e PORT=8080 -e RULE_MODE=once --tmpfs /data ${image}`, { stdio: "ignore" });
     try {
-      let log = "";
-      for (let i = 0; i < 100 && !log.includes("rule mode"); i++) {
-        log = execSync(`docker logs ${name} 2>&1`, { encoding: "utf8" });
-        await new Promise((r) => setTimeout(r, 100));
+      const port = execSync(`docker port ${name} 8080`, { encoding: "utf8" }).trim().split(":").pop();
+      let status = 0;
+      for (let i = 0; i < 100 && !status; i++) {
+        try { status = (await fetch(`http://127.0.0.1:${port}/`)).status; } catch { await new Promise((r) => setTimeout(r, 100)); }
       }
+      expect(status, "the app without a list didn't answer").toBe(200);
+      const log = execSync(`docker logs ${name} 2>&1`, { encoding: "utf8" });
+      const access = log.split("\n").findIndex((l) => /GET \/ status=/.test(l));
       const warnings = log.split("\n").filter((l) => /blocklist/i.test(l));
       expect(warnings, "boot didn't say once that the blocklist is empty").toHaveLength(1);
       expect(warnings[0]).toMatch(/blocklist is empty/i);
+      expect(log.split("\n").findIndex((l) => /blocklist/i.test(l)), "the warning came after the first response").toBeLessThan(access);
       expect(execSync(`docker inspect --format '{{.State.Running}}' ${name}`, { encoding: "utf8" }).trim(), "the app didn't start without a list").toBe("true");
     } finally {
       execSync(`docker stop ${name}`, { stdio: "ignore" });
