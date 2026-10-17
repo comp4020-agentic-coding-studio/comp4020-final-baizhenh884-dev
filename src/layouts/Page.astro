@@ -129,6 +129,9 @@ const { title } = Astro.props;
       /* the live sentence, set to its half: still the largest thing on the page */
       .two .sentence { font-size: clamp(36px, 3.8vw, 72px); }
       .stands-half .text { margin: 0; padding: 0; }
+      /* the part notation lies over the house's own empty top band, which no house at rest reaches
+         (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
+      .stands-half #part { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
       /* the row decides a house's size, never its canvas: the canvas lies over its host */
       #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
       .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
@@ -216,7 +219,7 @@ const { title } = Astro.props;
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
         .half-label { margin-bottom: 0.8rem; }
         main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
-        #house { height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
+        #house { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
         #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
         .two .sentence { font-size: 34px; }
         .kept-sentence { font-size: 26px; line-height: 1.3; }
