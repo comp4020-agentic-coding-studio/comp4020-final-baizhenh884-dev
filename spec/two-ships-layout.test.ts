@@ -1,5 +1,10 @@
+import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
+import { buildBody } from "../src/lib/house/build";
+import { place } from "../src/lib/house/camera";
+import { TERRITORIES } from "../src/lib/house/territories";
 import { measureIn, servedPage } from "./chrome";
+import { EXTREMES, SENTENCES } from "./house-sentences";
 
 // The two ships on GET / (docs/decisions/0003-settle-and-kept-ships.md),
 // measured in headless Chrome from the served markup and stylesheet. Two
@@ -83,6 +88,41 @@ async function layout(size: [number, number], longNotes = false, longWords = fal
   })()`, size)) as Layout;
 }
 
+type Notation = {
+  sentenceBottom: number; partBottom: number; footTop: number;
+  houseWidth: number; houseHeight: number; houseBottom: number;
+  hidden: { sentence: number; house: number; kept: number };
+  shown: { text: string; sentence: number; house: number; kept: number }[];
+};
+
+// The live half with the part notation hidden, then showing each of the ten
+// parts' notations in turn, as choosing a word shows it (served copy only).
+async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
+  const doc = await servedPage(baseUrl);
+  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+  const labels = TERRITORIES.map((t, i) => `${String(i + 1).padStart(2, "0")} — ${t.label}`);
+  return (await measureIn(doc, `(async () => {
+    await document.fonts.ready;
+    const q = (s) => { const el = document.querySelector(s); if (!el) throw new Error('GET / has no ' + s); return el; };
+    const part = q('#part'), house = q('.stands-half #house');
+    const at = () => ({ sentence: q('.stands-half .sentence').getBoundingClientRect().top, house: house.getBoundingClientRect().top, kept: q('#house-kept').getBoundingClientRect().top });
+    const hidden = at(), h = house.getBoundingClientRect();
+    let partBottom = 0;
+    const shown = ${JSON.stringify(labels)}.map((text) => {
+      part.hidden = false; part.textContent = text;
+      partBottom = Math.max(partBottom, part.getBoundingClientRect().bottom);
+      const s = { text, ...at() };
+      part.hidden = true; part.textContent = '';
+      return s;
+    });
+    return {
+      sentenceBottom: q('.stands-half .sentence').getBoundingClientRect().bottom, partBottom,
+      footTop: q('.stands-half .foot').getBoundingClientRect().top,
+      houseWidth: h.width, houseHeight: h.height, houseBottom: h.bottom, hidden, shown,
+    };
+  })()`, size)) as Notation;
+}
+
 function bothHalves(l: Layout): void {
   // two distinct grounds, at a glance
   expect(l.standsBg, "the two halves share one ground").not.toBe(l.keptBg);
@@ -140,6 +180,52 @@ describe("two ships on GET /", () => {
       // side by side, the kept house starts level with it; stacked, it's below by design (the pointer says so)
       if (size[0] > 900) expect(l.keptHouse.top, "the kept house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
     }, 90_000);
+  }
+
+  // The part notation ("05 — entry") and the live house. The notation lies
+  // over the canvas's own empty top band, so the house starts right under
+  // the sentence; choosing a word shows the notation without moving anything;
+  // and no house at rest ever reaches it. "At rest" is the contract: during
+  // an exchange (under a second) the old part lifts, and for the tallest
+  // bodies the grammar allows it may pass briefly under the notation (before
+  // this, the same lift was cut off by the canvas edge). The maker accepted
+  // that; settled bodies are what's checked here, on real geometry through
+  // the page's own camera at the measured canvas size.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    for (const longWords of [false, true]) {
+      it(`sets the part notation over the live house's empty band, without a jump (${name}${longWords ? ", ten long words" : ""})`, async () => {
+        const n = await notation([size[0], size[1]], longWords);
+        // no jump: showing any part's notation moves neither the sentence nor either house
+        for (const s of n.shown) for (const k of ["sentence", "house", "kept"] as const) {
+          expect(Math.abs(s[k] - n.hidden[k]), `showing "${s.text}" moves the ${k}`).toBeLessThanOrEqual(0.5);
+        }
+        // tight: the house starts right under the sentence (the notation's line is not reserved above it)
+        expect(n.hidden.house - n.sentenceBottom, "the live house is held away from its sentence").toBeLessThanOrEqual(20);
+        // never smaller: a phone's house keeps its height; a desktop's fills its row down to the notes
+        if (size[0] <= 900) expect(n.houseHeight, "the phone's house got smaller").toBeGreaterThanOrEqual(Math.min(size[0] * 0.8, 420) - 0.5);
+        else expect(n.houseBottom, "the desktop house no longer reaches its notes").toBeGreaterThanOrEqual(n.footTop - 1);
+        // level: side by side, the two houses start together
+        if (size[0] > 900) expect(Math.abs(n.hidden.kept - n.hidden.house), "the two houses aren't level").toBeLessThanOrEqual(1);
+        // never over a house at rest: every body's topmost point is at least 8px below the notation
+        const cam = new THREE.PerspectiveCamera();
+        place(cam, n.houseWidth / n.houseHeight);
+        const clear = n.partBottom - n.hidden.house + 8; // px from the canvas top
+        const v = new THREE.Vector3();
+        for (const words of [...SENTENCES, ...EXTREMES, Array(10).fill("wordmvadgycfe")]) {
+          const body = buildBody(words);
+          body.root.updateMatrixWorld(true);
+          let top = Infinity;
+          body.root.traverse((o) => {
+            const mesh = o as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            const p = mesh.geometry.attributes.position;
+            for (let i = 0; i < p.count; i++) top = Math.min(top, ((1 - v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld).project(cam).y) / 2) * n.houseHeight);
+          });
+          body.dispose();
+          expect(top, `"${words.join(" ")}" reaches the part notation`).toBeGreaterThanOrEqual(clear);
+        }
+      }, 120_000);
+    }
   }
 
   it("stacks the halves on a phone (390×844)", async () => {
