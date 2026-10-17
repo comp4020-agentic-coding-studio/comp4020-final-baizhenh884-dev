@@ -102,10 +102,21 @@ describe("Kept ships", () => {
   });
 });
 
-// The rendered markup on GET / (Slice 4): the kept ship is read-only and
-// decorative (no forms, aria-hidden), shown from the first load, and its
-// text content reflects filled-vs-gap exactly as the live sentence changes —
-// checked over HTTP against the running app, like spec/theseus.test.ts.
+// The rendered markup on GET / (Slice 4): the kept ship is read-only (no
+// forms), shown from the first load; its house is decorative (aria-hidden)
+// while its sentence is readable by a screen reader, each gap read as
+// "blank"; and its text reflects filled-vs-gap exactly as the live sentence
+// changes. Checked over HTTP against the running app, like
+// spec/theseus.test.ts.
+//
+// What a screen reader is given: the text of every node not inside an
+// aria-hidden subtree. A gap's visible span stays empty (it is drawn as a
+// blank, spec/two-ships-layout.test.ts); its "blank" is visually hidden text.
+const readable = (el: Element): string => {
+  const walk = (n: Node): string =>
+    n.nodeType === 3 ? n.textContent ?? "" : n.nodeType === 1 && (n as Element).getAttribute("aria-hidden") === "true" ? "" : [...n.childNodes].map(walk).join("");
+  return walk(el).replace(/\s+/g, " ").trim();
+};
 const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
 const changesTheSentence = (name: string, fn: () => Promise<void>) =>
@@ -158,7 +169,7 @@ const unusedWord = (all: { word: string }[]): string => {
 };
 
 describe("Kept ship markup on GET /", () => {
-  it("is read-only and decorative: no forms, aria-hidden", async () => {
+  it("is read-only, its house decorative and its sentence readable", async () => {
     const v = new Visitor();
     const doc = await v.page();
     const plate = doc.querySelector(".kept-plate");
@@ -167,9 +178,18 @@ describe("Kept ship markup on GET /", () => {
     const house = doc.querySelector("#house-kept");
     expect(house?.getAttribute("aria-hidden"), "the kept house isn't aria-hidden").toBe("true");
     const sentence = doc.querySelector(".kept-sentence");
-    expect(sentence?.getAttribute("aria-hidden"), "the kept sentence isn't aria-hidden").toBe("true");
+    expect(sentence, "GET / has no kept sentence").not.toBeNull();
+    expect(sentence!.closest('[aria-hidden="true"]'), "the kept sentence is hidden from screen readers").toBeNull();
     // a gap is a blank waiting for its word (drawn as one, spec/two-ships-layout.test.ts), never a glyph standing in for it
-    for (const gap of doc.querySelectorAll(".kept-sentence .w.gap")) expect(gap.textContent, "a gap holds text").toBe("");
+    for (const gap of doc.querySelectorAll(".kept-sentence .w.gap")) expect(gap.textContent, "a gap holds visible text").toBe("");
+  });
+
+  it("reads to a screen reader as ten words, a gap as 'blank', the way the kept ship is derived", async () => {
+    const doc = await new Visitor().page();
+    const sentence = doc.querySelector(".kept-sentence")!;
+    const words = [...sentence.querySelectorAll(".w")].map((w) => (w.classList.contains("gap") ? "blank" : w.textContent!.trim()));
+    expect(words).toHaveLength(10);
+    expect(readable(sentence), "the kept sentence doesn't read as its words and blanks").toContain(`${words.join(" ")}.`);
   });
 
   // The shared sentence accumulates every other spec file's replacements, so

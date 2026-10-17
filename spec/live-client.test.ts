@@ -644,6 +644,95 @@ describe("live page reconciliation", () => {
     });
   });
 
+  // A screen reader hears what changed: one polite live region, filled only by
+  // change events newer than what the page shows (a snapshot, a reconnect or a
+  // stale event says nothing), and a burst coalesced into one announcement
+  // 2.5 s after its last change. It names positions and words, as plain text;
+  // never a visitor, a time or a count of people.
+  describe("the announcement of others' changes", () => {
+    const region = (doc: Document) => {
+      const el = doc.querySelector('[aria-live="polite"]');
+      expect(el, "GET / has no polite live region").not.toBeNull();
+      expect(el!.closest('[aria-hidden="true"]'), "the live region is hidden from screen readers").toBeNull();
+      return el!;
+    };
+    afterEach(() => vi.useRealTimers());
+
+    localOnly("is empty on load and after a snapshot or reconnect", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      expect(region(doc).textContent?.trim(), "the live region speaks on load").toBe("");
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[0];
+      page.applySnapshot({ ...snapshotOf(doc), positions: positionsOf(doc).map((p) => (p.position === position ? { ...p, word: fresh(), version: version + 1 } : p)) });
+      vi.advanceTimersByTime(5000);
+      expect(region(doc).textContent?.trim(), "a snapshot was announced").toBe("");
+    });
+
+    localOnly("announces one change once, after it settles, as plain text", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[3];
+      page.applyChange({ position, word: MARKUP, version: version + 1 });
+      expect(region(doc).textContent?.trim(), "announced before the burst could settle").toBe("");
+      vi.advanceTimersByTime(2500);
+      const said = region(doc).textContent ?? "";
+      expect(said, "the announcement doesn't name the word").toContain(MARKUP);
+      expect(said, "the announcement doesn't name the position").toContain(String(position + 1));
+      expect(region(doc).querySelector("x-theseus"), "a visitor word became markup").toBeNull();
+      expect(said, "the announcement names a time").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute/i);
+    });
+
+    localOnly("coalesces a burst into one announcement naming every changed position", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const said: string[] = [];
+      new doc.defaultView!.MutationObserver(() => { const t = region(doc).textContent?.trim(); if (t) said.push(t); }).observe(region(doc), { childList: true, characterData: true, subtree: true });
+      const words: string[] = [];
+      for (const i of [1, 4, 8]) {
+        const { position, version } = positionsOf(doc)[i];
+        const word = fresh();
+        words.push(word);
+        page.applyChange({ position, word, version: version + 1 });
+        vi.advanceTimersByTime(300);
+      }
+      vi.advanceTimersByTime(2500);
+      await Promise.resolve(); // let the observer see the last write
+      expect(said, "a burst was announced more than once").toHaveLength(1);
+      for (const i of [2, 5, 9]) expect(said[0], `the burst's announcement leaves out word ${i}`).toContain(String(i));
+    });
+
+    localOnly("says nothing for a duplicate or stale change", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[0];
+      page.applyChange({ position, word: fresh(), version });
+      vi.advanceTimersByTime(5000);
+      expect(region(doc).textContent?.trim(), "a stale change was announced").toBe("");
+    });
+
+    localOnly("announces a change at a position holding a draft, and leaves the draft alone", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[2];
+      type(doc, position, "mydraft");
+      const word = fresh();
+      page.applyChange({ position, word, version: version + 1 });
+      vi.advanceTimersByTime(2500);
+      expect(region(doc).textContent, "a change under a draft wasn't announced").toContain(word);
+      expect(slot(doc, position).input.value, "the announcement touched the draft").toBe("mydraft");
+    });
+  });
+
   describe("the Earlier link", () => {
     localOnly("stays the sentence just before now, moving once per newer change", async () => {
       const doc = await pageWithHistory();
