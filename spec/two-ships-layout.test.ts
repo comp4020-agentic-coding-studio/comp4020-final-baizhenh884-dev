@@ -29,6 +29,8 @@ const baseUrl = inject("baseUrl");
 type Box = { left: number; top: number; right: number; bottom: number; width: number };
 type Layout = {
   viewport: number;
+  // what the page was measured at: so a failure says what Chrome actually laid out
+  context: { innerWidth: number; innerHeight: number; fonts: string; fontsLoaded: number };
   stands: Box; kept: Box;
   standsBg: string; keptBg: string; groundContrast: number;
   standsSentence: Box; standsHouse: Box; keptSentence: Box; keptHouse: Box;
@@ -70,6 +72,7 @@ async function layout(size: [number, number], longNotes = false, longWords = fal
     });
     return {
       viewport: innerWidth,
+      context: { innerWidth, innerHeight, fonts: document.fonts.status, fontsLoaded: [...document.fonts].filter((f) => f.status === 'loaded').length },
       stands: box('.stands-half'), kept: box('.kept-half'),
       standsBg, keptBg, groundContrast: contrast(rgb(standsBg), rgb(keptBg)),
       standsSentence: box('.stands-half .sentence'), standsHouse: box('.stands-half #house'),
@@ -123,26 +126,34 @@ async function notation(size: [number, number], longWords: boolean): Promise<Not
   })()`, size)) as Notation;
 }
 
+// the measured numbers, appended to every assertion message in a test that reads the whole layout
+const r = (b: Box) => `[${b.left.toFixed(1)},${b.top.toFixed(1)} → ${b.right.toFixed(1)},${b.bottom.toFixed(1)}]`;
+const measured = (l: Layout) =>
+  ` | viewport ${l.context.innerWidth}x${l.context.innerHeight}, fonts ${l.context.fonts} (${l.context.fontsLoaded} loaded)` +
+  ` | stands ${r(l.stands)} kept ${r(l.kept)} | live sentence ${r(l.standsSentence)} house ${r(l.standsHouse)}` +
+  ` | kept sentence ${r(l.keptSentence)} house ${r(l.keptHouse)} | sizes ${l.liveSize}/${l.keptSize}px`;
+
 function bothHalves(l: Layout): void {
+  const m = measured(l);
   // two distinct grounds, at a glance
-  expect(l.standsBg, "the two halves share one ground").not.toBe(l.keptBg);
-  expect(l.groundContrast, "the two grounds are too close in tone to read as two objects").toBeGreaterThanOrEqual(3);
+  expect(l.standsBg, "the two halves share one ground" + m).not.toBe(l.keptBg);
+  expect(l.groundContrast, "the two grounds are too close in tone to read as two objects" + m).toBeGreaterThanOrEqual(3);
   // each sentence sits directly above its own house, inside its own half
-  expect(l.standsSentence.bottom, "the live sentence isn't above its house").toBeLessThanOrEqual(l.standsHouse.top + 1);
-  expect(l.keptSentence.bottom, "the kept sentence isn't above its house").toBeLessThanOrEqual(l.keptHouse.top + 1);
+  expect(l.standsSentence.bottom, "the live sentence isn't above its house" + m).toBeLessThanOrEqual(l.standsHouse.top + 1);
+  expect(l.keptSentence.bottom, "the kept sentence isn't above its house" + m).toBeLessThanOrEqual(l.keptHouse.top + 1);
   for (const [name, inner, outer] of [["live sentence", l.standsSentence, l.stands], ["live house", l.standsHouse, l.stands], ["kept sentence", l.keptSentence, l.kept], ["kept house", l.keptHouse, l.kept]] as const) {
-    expect(inner.left, `the ${name} spills out of its half`).toBeGreaterThanOrEqual(outer.left - 1);
-    expect(inner.right, `the ${name} spills out of its half`).toBeLessThanOrEqual(outer.right + 1);
+    expect(inner.left, `the ${name} spills out of its half` + m).toBeGreaterThanOrEqual(outer.left - 1);
+    expect(inner.right, `the ${name} spills out of its half` + m).toBeLessThanOrEqual(outer.right + 1);
   }
   // the kept sentence is a sentence, legible on its ground, never a caption, and never larger than the live one
-  expect(l.keptSize / l.liveSize, "the kept sentence is set as a small caption").toBeGreaterThanOrEqual(0.6);
-  expect(l.keptSize, "the kept sentence outranks the live one").toBeLessThan(l.liveSize);
-  expect(l.keptTextContrast, "the kept sentence isn't legible on its ground").toBeGreaterThanOrEqual(4.5);
+  expect(l.keptSize / l.liveSize, "the kept sentence is set as a small caption" + m).toBeGreaterThanOrEqual(0.6);
+  expect(l.keptSize, "the kept sentence outranks the live one" + m).toBeLessThan(l.liveSize);
+  expect(l.keptTextContrast, "the kept sentence isn't legible on its ground" + m).toBeGreaterThanOrEqual(4.5);
   // an empty kept ship: ten blanks, each wide enough to read as a missing word, and drawn visibly
-  expect(l.gaps).toHaveLength(10);
+  expect(l.gaps, "the kept sentence has no ten gaps" + m).toHaveLength(10);
   for (const [i, g] of l.gaps.entries()) {
-    expect(g.width, `gap ${i} is too narrow to read as a missing word`).toBeGreaterThanOrEqual(1.2);
-    expect(g.ink, `gap ${i} isn't visible on the kept ground`).toBeGreaterThanOrEqual(3);
+    expect(g.width, `gap ${i} is too narrow to read as a missing word` + m).toBeGreaterThanOrEqual(1.2);
+    expect(g.ink, `gap ${i} isn't visible on the kept ground` + m).toBeGreaterThanOrEqual(3);
   }
 }
 
@@ -150,11 +161,12 @@ describe("two ships on GET /", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]]] as const) {
     it(`sets the two halves side by side and equal (${name})`, async () => {
       const l = await layout([size[0], size[1]]);
-      expect(Math.abs(l.stands.top - l.kept.top), "the halves aren't side by side").toBeLessThan(2);
-      expect(l.stands.right, "the live half isn't on the left").toBeLessThanOrEqual(l.kept.left + 1);
-      expect(Math.abs(l.stands.width - l.kept.width) / l.viewport, "the halves aren't equal").toBeLessThan(0.02);
-      expect(l.stands.width + l.kept.width, "the halves don't share the page").toBeGreaterThan(l.viewport * 0.98);
-      expect(l.pointerShown, "the pointer to the kept half shows beside it").toBe(false);
+      const m = measured(l);
+      expect(Math.abs(l.stands.top - l.kept.top), "the halves aren't side by side" + m).toBeLessThan(2);
+      expect(l.stands.right, "the live half isn't on the left" + m).toBeLessThanOrEqual(l.kept.left + 1);
+      expect(Math.abs(l.stands.width - l.kept.width) / l.viewport, "the halves aren't equal" + m).toBeLessThan(0.02);
+      expect(l.stands.width + l.kept.width, "the halves don't share the page" + m).toBeGreaterThan(l.viewport * 0.98);
+      expect(l.pointerShown, "the pointer to the kept half shows beside it" + m).toBe(false);
       bothHalves(l);
     }, 90_000);
 
