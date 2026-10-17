@@ -170,6 +170,23 @@ Slice 5b — the maker's frame-by-frame review of the videos:
   the page had laid out, at the viewport's size, encoded on real
   timestamps. Staged test words.
 
+Slice 5c — only what stands now (the maker's decision):
+- `78bf450` — spec: new `spec/present-only.test.ts` (a replaced word
+  appears nowhere in the live sentence; `?at=N` still shows it);
+  `spec/two-ships-layout.test.ts` at 1920x1080 and 390x844 on a staged
+  sentence of ten 13-letter words: no text under any live word, the live
+  house starts within 2/3 (1920) / 85% (390) of the screen, the kept house
+  too when side by side. Measured first: houses at 630 / 686 without
+  earlier words, 990 / 1407 with four under each word. `sentence-wrap`
+  and `live-client` specs adapted (see the commit).
+- `cca10fe` — `.past` span, `past` prop, `recentPast()`, the
+  `.sentence .past` CSS and its AVOID entry are gone. The own exchange
+  after Post/Redirect/Get now reads the replaced word from what the tab
+  noted at submit (it used to read `.past > span`), so the own crossing
+  and the actor's ship-1 line are unchanged (checked in a browser).
+  `.sentence.past` and `?at=N` untouched.
+- screenshots retaken (fresh/replaced, 1920x1080 and 390 wide).
+
 Working tree is clean. Nothing staged or uncommitted.
 
 ## Verified (fresh Docker build of the exact committed tree, both passes)
@@ -185,10 +202,10 @@ RULE_MODE=settle SETTLE_SECONDS=3 APP_URL=http://localhost:8099 pnpm check
 docker stop app
 ```
 
-At `474710e` (the app tree since is unchanged):
+At `cca10fe` (the app tree since is unchanged):
 
-- `once` mode: **133 passed, 21 named skips, 0 failed**
-- `settle` mode: **148 passed, 6 named skips, 0 failed**
+- `once` mode: **136 passed, 21 named skips, 0 failed**
+- `settle` mode: **151 passed, 6 named skips, 0 failed**
 
 Seen in a real browser (headless Chrome via Playwright, two windows, not
 a check): a crossing from a second window, ship 1's completion with the
@@ -253,6 +270,14 @@ Slices 1-5 are built. Not done: informal tries by 2-3 classmates; the
 one-way migration 0001 has still never touched production (the backup
 hard stop above stands); nothing merges to `main` before the Crit 10
 cutoff.
+
+Open:
+- README.md still describes the earlier words under each word (line 52,
+  "Replaced words fade beneath their position"), and CLAUDE.md's "Current
+  design" (lines 400-401) too. The README is the maker's to change; the
+  CLAUDE.md diff is proposed, not applied.
+- On a phone the kept house starts far below the fold (~1430 px with ten
+  long words) by design; the pointer line covers it.
 
 Open, seen while building Slice 5:
 - On a phone a crossing still arrives out of view (by decision: no
