@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JSDOM } from "jsdom";
@@ -28,12 +28,20 @@ function chrome(): string {
 
 // Opens the file in headless Chrome over its debugging port, runs the expression in the page, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number]): Promise<unknown> {
-  const port = 9700 + Math.floor(Math.random() * 200);
-  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", `--remote-debugging-port=${port}`, `--user-data-dir=${join(dir, "profile")}`, "about:blank"], { stdio: "ignore" });
+  // Port 0: this Chrome picks a free port and writes it into its own fresh
+  // profile, so a measurement can never reach another Chrome (one left over
+  // on a guessed port used to take a launch's page and hang it).
+  const profile = join(dir, "profile");
+  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
   let socket: WebSocket | undefined;
   try {
+    let port = 0;
+    for (let i = 0; !port; i++) {
+      try { port = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]); } catch { /* not written yet */ }
+      if (!port) { if (i > 200 || proc.exitCode !== null) throw new Error("Chrome did not start"); await sleep(100); }
+    }
     for (let i = 0; ; i++) {
-      try { await fetch(`http://127.0.0.1:${port}/json/version`); break; } catch { if (i > 200) throw new Error("Chrome did not start"); await sleep(100); }
+      try { await fetch(`http://127.0.0.1:${port}/json/version`); break; } catch { if (i > 200) throw new Error("Chrome did not answer"); await sleep(100); }
     }
     const target = await (await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(`file://${file}`)}`, { method: "PUT" })).json();
     const ws = (socket = new WebSocket(target.webSocketDebuggerUrl));
@@ -56,7 +64,11 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     socket?.close();
     const exited = new Promise((r) => proc.once("exit", r));
     proc.kill();
-    await Promise.race([exited, sleep(5000)]); // Chrome writes its profile until it is gone
+    // Chrome writes its profile until it is gone; one that ignores SIGTERM is killed, never left running
+    if ((await Promise.race([exited.then(() => true), sleep(5000).then(() => false)])) === false) {
+      proc.kill("SIGKILL");
+      await Promise.race([exited, sleep(5000)]);
+    }
   }
 }
 
