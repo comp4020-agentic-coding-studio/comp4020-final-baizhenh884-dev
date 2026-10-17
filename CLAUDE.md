@@ -124,8 +124,9 @@ outside this repo: it holds their result and its specs, not the search.
 - No preview: typing a replacement never changes the house; the new body
   appears only after the server accepts the change.
 - Red means only "this body is being rebuilt now"; nothing stays red.
-- The canvas is decorative to assistive technology; the sentence is the
-  accessible state.
+- Both canvases are decorative to assistive technology; the live sentence
+  and the kept sentence are the accessible state, and other visitors'
+  changes are announced politely, coalesced.
 
 ## Stack
 
@@ -365,6 +366,13 @@ What the code must hold to. The README says why; don't restate it here.
   geometry equals that of a fresh build of the same final sentence
   (`spec/house-live-body.test.ts`). Whether a standing neighbour is kept is
   decided on its geometry, never on its outline or a count.
+- A screen reader reaches what the page shows: the kept sentence is read as
+  its words, each gap as "blank" (`spec/kept-ship.test.ts`,
+  `spec/kept-sentence.test.ts`); others' changes are announced in one polite
+  live region, only from change events newer than what's shown (never a
+  load, snapshot or reconnect), a burst coalesced into one announcement, as
+  plain text naming positions and words, never who or when
+  (`spec/live-client.test.ts`).
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
