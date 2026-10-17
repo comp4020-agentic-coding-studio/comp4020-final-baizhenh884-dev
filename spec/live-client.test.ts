@@ -155,7 +155,7 @@ function type(doc: Document, position: number, value: string): void {
 
 // The inert notice of a change held back by a draft: an element beside the
 // position's form (not in it), naming the new word, not interactive, and not
-// hidden from screen readers (as the decorative past words beneath are).
+// hidden from screen readers (as the decorative word leaving the slot is).
 function notice(doc: Document, position: number, word: string): Element | null {
   const { form } = slot(doc, position);
   const wrapper = form.parentElement!;

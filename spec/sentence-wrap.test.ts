@@ -20,9 +20,10 @@ async function fullStops(size: [number, number]): Promise<Row[]> {
     const labels = [...sentence.querySelectorAll('form[action="/replace"] label')];
     const last = labels[labels.length - 1];
     // the full stop: the last text in the sentence holding one, outside every word's form
+    // (and outside anything else in a word's slot, such as a held draft's notice)
     const walker = document.createTreeWalker(sentence, NodeFilter.SHOW_TEXT);
     let stop = null;
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.data.includes('.') && !n.parentElement.closest('form, .past')) stop = n;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.data.includes('.') && !n.parentElement.closest('form, .pos > :not(form)')) stop = n;
     if (!stop) throw new Error('no full stop in the sentence');
     const out = [];
     for (let length = 1; length <= 24; length++) {

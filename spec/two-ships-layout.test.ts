@@ -30,10 +30,14 @@ type Layout = {
   liveSize: number; keptSize: number; keptTextContrast: number;
   gaps: { width: number; ink: number }[];
   pointer: Box | null; pointerShown: boolean;
+  // each live word, and the text shown under it in its slot (outside its form), if any
+  slots: { word: string; under: string[] }[];
 };
 
-async function layout(size: [number, number], longNotes = false): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false, longWords = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
+  // a staged long sentence, in the measured copy only: ten 13-letter words
+  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
   if (longNotes) {
     const how = doc.querySelector("#how");
     if (!how) throw new Error("GET / has no #how");
@@ -71,6 +75,10 @@ async function layout(size: [number, number], longNotes = false): Promise<Layout
       // the stacked layout's line pointing down to the kept half
       pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
       pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
+      slots: [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')].map((f) => ({
+        word: f.querySelector('label').textContent,
+        under: [...f.closest('.pos').querySelectorAll('*')].filter((el) => !f.contains(el) && el.children.length === 0 && el.textContent.trim()
+          && el.getBoundingClientRect().height > 0 && el.getBoundingClientRect().top >= f.getBoundingClientRect().bottom - 1).map((el) => el.textContent.trim()) })),
     };
   })()`, size)) as Layout;
 }
@@ -116,6 +124,21 @@ describe("two ships on GET /", () => {
       const near = size[1] * 0.15;
       expect(l.standsHouse.top - l.standsSentence.bottom, "the live house is pushed away from its sentence").toBeLessThanOrEqual(near);
       expect(l.keptHouse.top - l.keptSentence.bottom, "the kept house is pushed away from its sentence").toBeLessThanOrEqual(near);
+    }, 90_000);
+  }
+
+  // GET / shows only what stands now (the maker's decision): no earlier words
+  // under the live words, so a long sentence never pushes the houses off the
+  // first screen. The words are a staged long sentence in the measured copy;
+  // whatever the server renders under them is what's under test.
+  for (const [name, size, limit] of [["1920×1080", [1920, 1080], 2 / 3], ["phone 390×844", [390, 844], 0.85]] as const) {
+    it(`shows nothing under a live word, and keeps the houses on the first screen with ten long words (${name})`, async () => {
+      const l = await layout([size[0], size[1]], false, true);
+      expect(l.slots).toHaveLength(10);
+      for (const s of l.slots) expect(s.under, `words shown under "${s.word}"`).toEqual([]);
+      expect(l.standsHouse.top, "the live house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
+      // side by side, the kept house starts level with it; stacked, it's below by design (the pointer says so)
+      if (size[0] > 900) expect(l.keptHouse.top, "the kept house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
     }, 90_000);
   }
 
