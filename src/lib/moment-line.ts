@@ -5,7 +5,7 @@
 //
 // The line takes clear ground: both halves are veiled behind it (body
 // .moment-on, never red), and it sits in the tallest band of the screen that
-// no live sentence word, earlier word or part notation occupies, a step
+// no live sentence word, draft notice or part notation occupies, a step
 // smaller if that band is short, so no live text is ever under it. The veil
 // goes when the line goes.
 
@@ -13,8 +13,8 @@ export const LINE = "None of the first sentence stands. All of it has been kept.
 export const LINE_MS = 6500;
 export const ACK_MS = 4000;
 
-// what the line must never cover: the live sentence's words, the words beneath them, the part notation
-const AVOID = '.sentence form[action="/replace"] label, .sentence .past, .sentence .changed, #part:not([hidden])';
+// what the line must never cover: the live sentence's words, a held draft's notice, the part notation
+const AVOID = '.sentence form[action="/replace"] label, .sentence .changed, #part:not([hidden])';
 
 function place(doc: Document, line: HTMLElement): void {
   const vh = doc.documentElement.clientHeight, edge = 16;

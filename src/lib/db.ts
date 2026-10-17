@@ -92,21 +92,6 @@ export function keptShipAt(): KeptShip {
   return deriveKeptShip(changes, current);
 }
 
-// The most recent words each position held before its current one (newest
-// first), for the decorative history beneath each word.
-export function recentPast(limit = 4): Map<number, string[]> {
-  const past = new Map<number, string[]>();
-  const rows = client.prepare("SELECT position, from_word AS word FROM changes ORDER BY id DESC").all() as {
-    position: number;
-    word: string;
-  }[];
-  for (const row of rows) {
-    const list = past.get(row.position) ?? [];
-    if (list.length < limit) past.set(row.position, [...list, row.word]);
-  }
-  return past;
-}
-
 // A visitor's own change, if they've made one: their word, and whether it
 // still stands or what now stands in its place. A later change at the same
 // position means it was replaced, even if the same text came back.

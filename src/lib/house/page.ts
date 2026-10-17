@@ -51,20 +51,21 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
   const part = doc.getElementById("part");
 
   // ---- the change this visitor just made, shown as it happens (Post/Redirect/Get) ----
-  // On submit the position is noted for this tab only; after the redirect, if the
-  // server shows this visitor's word standing there, the house begins from the body
-  // the word replaced (the newest past word, which the server renders) and exchanges it.
+  // On submit the position and the word it showed are noted for this tab only; after
+  // the redirect, if the server shows this visitor's word standing there, the house
+  // begins from the body of the word it replaced (the word they saw: an accepted
+  // change always replaces the version they saw) and exchanges it.
   for (const s of slots) s.label.closest("form")!.addEventListener("submit", () => {
-    try { sessionStorage.setItem("theseus:replaced", String(s.position)); } catch { /* the animation is optional */ }
+    try { sessionStorage.setItem("theseus:replaced", JSON.stringify({ position: s.position, word: s.label.textContent!.trim() })); } catch { /* the animation is optional */ }
   });
-  let replaced: number | null = null;
+  let replaced: { position: number; word: string } | null = null;
   try {
     const v = sessionStorage.getItem("theseus:replaced");
     sessionStorage.removeItem("theseus:replaced");
-    replaced = v === null ? null : Number(v);
+    replaced = v === null ? null : (JSON.parse(v) as { position: number; word: string });
   } catch { /* no storage: no animation */ }
-  const own = replaced === null ? null : slots[replaced];
-  const before = own?.label.querySelector("mark") ? own.pos.querySelector(".past > span")?.textContent ?? null : null;
+  const own = replaced === null || !Number.isInteger(replaced.position) ? null : slots[replaced.position] ?? null;
+  const before = own?.label.querySelector("mark") && typeof replaced?.word === "string" && replaced.word !== words[own.position] ? replaced.word : null;
   if (own && before) {
     view.show(words.map((w, i) => (i === own.position ? before : w)));
     requestAnimationFrame(() => {

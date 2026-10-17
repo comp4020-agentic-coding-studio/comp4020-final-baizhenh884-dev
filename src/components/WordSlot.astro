@@ -1,14 +1,14 @@
 ---
 // One position of the current sentence: its form (the HTTP contract at the
-// top of spec/theseus.test.ts) and the words it held before, beneath it.
+// top of spec/theseus.test.ts). Only what stands now: earlier words live in
+// the earlier forms (?at=N) and, kept, in the kept half.
 interface Props {
   position: number;
   version: number;
   word: string;
   marked: boolean;
-  past: string[];
 }
-const { position, version, word, marked, past } = Astro.props;
+const { position, version, word, marked } = Astro.props;
 ---
 
 <div class="pos">
@@ -26,9 +26,4 @@ const { position, version, word, marked, past } = Astro.props;
       required
     />
   </form>
-  {past.length > 0 && (
-    <span class="past" aria-hidden="true">
-      {past.map((w) => <span>{w}</span>)}
-    </span>
-  )}
 </div>
