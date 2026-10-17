@@ -23,6 +23,7 @@ function field(form: FormData, name: string): string | null {
 let status = 422;
 let now: string | null = null;
 let eligibility: "spent" | "holding" | "not-here" | null = null;
+let blocked = false; // a word on the maker's list: refused without repeating it (docs/decisions/0004)
 const visitor = visitorId(Astro.cookies);
 const reqId = Astro.locals.requestId;
 const v = visitorTag(visitor);
@@ -59,7 +60,9 @@ if (visitor && position !== null && /^[0-9]$/.test(position) && version !== null
     now = wordAt(Number(position));
     logLine(reqId, "stale", { v, pos: position, saw: version, now });
   } else {
-    logLine(reqId, "invalid", { v, reason: invalidReason(word, before) });
+    const reason = invalidReason(word, before);
+    blocked = reason === "blocked";
+    logLine(reqId, "invalid", { v, reason });
   }
 }
 Astro.response.status = status;
@@ -98,6 +101,8 @@ const title =
           Someone changed that word while you were deciding: it's “{now}” now. Your change wasn't used; you can still
           make it.
         </>
+      ) : blocked ? (
+        <>That word can't be used here. Nothing changed, and your change wasn't used.</>
       ) : (
         <>
           That replacement wasn't valid, so nothing changed and your change wasn't used. A replacement is one new word,

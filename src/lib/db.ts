@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import "./blocklist"; // read and reported when the server first loads, beside the rule mode
 import { deriveKeptShip, type KeptShip } from "./kept-ship";
 import { positions } from "./schema";
 import { STARTING_WORDS } from "./sentence";

@@ -35,7 +35,7 @@ jobs:
         # volume; the spec runs against it
         run: |
           docker build -t app .
-          docker run -d --init --name app -p 8080:8080 -e PORT=8080 --tmpfs /data app
+          docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
       - name: Run the spec
         # RULE_MODE is explicit here (not left unset) so spec/eligibility.test.ts
         # can tell "deliberately testing once" apart from "CI forgot to say
@@ -44,6 +44,7 @@ jobs:
         env:
           APP_URL: http://localhost:8080
           RULE_MODE: once
+          BLOCKED_WORDS: blockedtestword # a meaningless test word; the real list is a Fly secret (docs/decisions/0004)
       - name: Show the app's output
         # what the container printed, so a crash or slow boot is visible
         if: ${{ failure() }}
@@ -60,12 +61,13 @@ jobs:
         # what production runs once the redesign ships, so CI must run the
         # full spec against it too, not just the default. A short
         # SETTLE_SECONDS keeps the settle-by-age checks fast.
-        run: docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 --tmpfs /data app
+        run: docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
       - name: Run the spec under settle mode
         run: pnpm check
         env:
           APP_URL: http://localhost:8080
           RULE_MODE: settle
+          BLOCKED_WORDS: blockedtestword
       - name: Show the settle-mode app's output
         if: ${{ failure() }}
         run: docker logs app
