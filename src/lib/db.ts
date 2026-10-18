@@ -216,7 +216,8 @@ export function settleTraceFor(visitor: string): SettleTrace | null {
     latest = { position: mine.position, word: mine.word, standing: false, now: wordAt(mine.position) ?? "" };
   } else {
     const ageMs = (ageMsOf.get(mine.createdAt) as { ms: number }).ms;
-    const settlesInMs = Math.max(0, SETTLE_SECONDS * 1000 - ageMs);
+    // whole milliseconds, rounded up: the page reads an integer, and never flips to free early
+    const settlesInMs = Math.max(0, Math.ceil(SETTLE_SECONDS * 1000 - ageMs));
     latest =
       settlesInMs > 0
         ? { position: mine.position, word: mine.word, standing: true, settled: false, settlesInMs }
