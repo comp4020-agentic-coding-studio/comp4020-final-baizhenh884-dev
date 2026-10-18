@@ -302,6 +302,32 @@ Slice 6d — the first ten seconds for a stranger (plan D, option B):
 - Screenshots retaken at `722f893` (fresh/replaced, 1920x1080, 390 wide).
 - Pass counts at `722f893`: once 158 / 21 named skips; settle 173 / 6.
 
+Slice 6e — settling, made visible (plan C), and a settle-trace bug:
+- `4cbdc84` — spec: a holding word's one aria-hidden `.settling` line,
+  from the elapsed share (`--from`) for `settlesInMs` (`--ms`); gone when
+  the hold ends or the word is replaced; none for a settled word, once
+  mode or reduced motion; `data-settle-ms` on GET / under settle only;
+  layout: inside the word, at most 3px, not red, moves nothing.
+- `b52f2ab` — spec fix: the layout check's colour regex was `\d` inside a
+  template literal (reached the page as `d`); now red for the right reason.
+- `287e276` — spec, a pre-existing bug found in a real browser: the server
+  sent `settlesInMs` as fractional milliseconds (julianday arithmetic),
+  and live-client's reader takes only whole ones, so an open settle-mode
+  page dropped its own trace and the local settle timer (`31b4d05`) never
+  ran: the trace said "holding" until a reload. `realtime.test.ts` now
+  asserts whole milliseconds and that `parseSnapshot` keeps the trace.
+- `b8b4af2` — fix: `Math.ceil` in `db.ts`. Seen in headless Chrome: the
+  trace flips to "You can act again" by itself after the hold.
+- `bb0f1fd` — feat: `renderSettling()` in live-client, `.settling` CSS,
+  `data-settle-ms`. Seen in headless Chrome, 3 s hold: 16 of 163 px at
+  once, 95 px at 1.5 s, gone at 3.5 s; another visitor's page has none.
+- Not committed: CLAUDE.md "Current design" names this private exception
+  to "showing how long a word stood"; waiting for the maker's approval.
+- Screenshots: unchanged by C (the line has settled by the time the
+  replaced shot is taken; a retake was byte-identical), so `c586a6b`
+  stands for `bb0f1fd` too.
+- Pass counts at `bb0f1fd`: once 164 / 22 named skips; settle 179 / 7.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
