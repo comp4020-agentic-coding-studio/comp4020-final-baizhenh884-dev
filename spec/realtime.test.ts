@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it } from "vitest";
+import { parseSnapshot } from "../src/lib/live-client";
 
 // Crit 9's realtime contract, checked over HTTP against the running app (see
 // CLAUDE.md "Product contract" and docs/decisions/0001-live-present-frozen-past.md).
@@ -396,6 +397,10 @@ describe("Theseus realtime", () => {
     expect(latest).toMatchObject({ position: slot.position, word, standing: true, settled: false });
     expect(latest.settlesInMs, "a freshly-placed word's settlesInMs isn't a positive number").toBeTypeOf("number");
     expect(latest.settlesInMs as number).toBeGreaterThan(0);
+    // the page's own reader must accept what the server sends, or an open page
+    // drops the trace and its local settle timer never runs (src/lib/live-client.ts)
+    expect(Number.isInteger(latest.settlesInMs), `settlesInMs isn't whole milliseconds (${latest.settlesInMs})`).toBe(true);
+    expect(parseSnapshot(JSON.stringify(snapshot))?.trace, "the page's own reader drops the server's settle-mode trace").toEqual(snapshot.trace);
   });
 
   localOnly("delivers a successful replacement to another open session within about a second", async () => {
