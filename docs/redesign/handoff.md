@@ -289,6 +289,19 @@ Slice 6c — the maker's blocklist (plan 3, approved):
 - Not done, by decision: a wrapper entry in the Dockerfile so the line
   prints at process start. It would change a fixed template file.
 
+Slice 6d — the first ten seconds for a stranger (plan D, option B):
+- `640de45` — CLAUDE.md: local checks set the test blocklist; the
+  moderation line names ADR 0004 (approved diff).
+- `ab69d5e` — spec: at rest the notation's slot shows an invitation (one
+  line, inside its half, aria-hidden, house still within 20px); choosing a
+  word puts the notation in the same slot and moves nothing; `?at=N` has
+  none; ship 1's line avoids it.
+- `722f893` — feat: `.invite` "Choose any word and type your own" in the
+  notation's slot, hidden by CSS while `#part` shows. First instruction
+  was at y=787 (1920) / 592 (390); now y=322 / 219, house unmoved.
+- Screenshots retaken at `722f893` (fresh/replaced, 1920x1080, 390 wide).
+- Pass counts at `722f893`: once 158 / 21 named skips; settle 173 / 6.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
