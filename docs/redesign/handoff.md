@@ -378,15 +378,14 @@ Slice 6g — the phone link to the kept half (plan 3), paused; the kept cue:
   fresh, 1232px with a three-word settle trace, 1390px with ten long
   words. The line saying so is at 555px (fresh) but 992px with ten long
   words: below the first screen.
-- `a611236` — spec: on a phone `.kept-pointer` is a link to the kept half
+- `a611236` (superseded by `71096f7`) — spec: on a phone `.kept-pointer` is a link to the kept half
   on the first screen, following it shows the kept house, a
   `.back-pointer` links back; neither shows side by side; no scroll on
   load. **Red, and its feat is not committed**: built, it fails the
   long-sentence case (the line sits at y=992 with ten long words). Moving
   the link up would change the first screen D settled, so it waits for the
   maker's decision. The built feat is in `git stash` ("plan 3 feat: phone
-  link to the kept half"). Until then both passes carry these two named
-  failures.
+  link to the kept half"). Resolved in Slice 6i.
 - `23d90e0` — spec: new `spec/house-cue.test.ts`, pure `partTone`: in the
   kept house the author's own part's edges are at least 0.4 stronger, in
   the kept ink, never red, timber lightened 0 < lift <= 0.2; every other
@@ -422,13 +421,35 @@ Slice 6h — earlier houses, `/?kept=k` (plan 1 of the second set):
   script could still subscribe. Seen in headless Chrome: a fresh tab
   loading only `/?kept=1` makes no `/events` request (an earlier "true"
   was the same tab's earlier GET /). Not yet a check.
-- Not committed: CLAUDE.md "Enforced" line for `/?kept=k`, shown to the
-  maker for approval.
+- CLAUDE.md "Enforced" line for `/?kept=k`: committed `b61b9dc`.
 - `5d5648d` — `replaced-*` retaken (the kept half ends with "Earlier
   house"; fresh stills byte-identical); `kept-house-*` new: staged, test
   words only, two full rounds then one change, `/?kept=2`.
 - Pass counts at `954a9ab`: once 180 / 23 named skips, settle 196 / 7,
   plus plan 3's two paused tests.
+
+Slice 6i — the phone header links (plan 3, the maker's placement):
+- `b61b9dc` — CLAUDE.md: earlier houses at `/?kept=k` in the enforced
+  contract (approved diff).
+- `71096f7` — spec, replacing `a611236`'s footer-link placement (which
+  failed with ten long words: the footer line sat at y=992 of 844): on a
+  phone the live half's header row reads "What stands" left and a link
+  "What was kept ↓" right in the same caps; the kept half's row links
+  "Back to what stands ↑"; the footer line stays unlinked; the sentence,
+  invitation and house exactly where they are without the links; no
+  scroll on load; neither link side by side. The stash holding the
+  footer-link feat was dropped.
+- `53067e2` — feat: `.head-row` (label + link, the label's own margin, so
+  nothing grows); `#stands` / `#kept`; smooth scroll on a tap, instant with
+  reduced motion; plain anchors, no JavaScript needed. Seen in headless
+  Chrome at 390x844: the kept house comes to y≈441, back returns to the
+  top; the footer line still acknowledges a crossing, with and without
+  reduced motion.
+- `d239ef9` — phone stills retaken with the header links; the two
+  1920 kept-mine stills also updated, for `954a9ab`'s Earlier house link
+  (they predated it); the other 1920 stills unchanged.
+- **All green, no named failures:** at `53067e2`, once 182 passed / 23
+  named skips; settle 198 passed / 7 named skips.
 
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
