@@ -34,12 +34,14 @@ export type Trace =
   | { position: number; word: string; standing: false; now: string };
 
 export type StandingItem = { position: number; word: string };
-export type ReplacedItem = { position: number; word: string; now: string };
+// where a replaced word is kept, against the kept ship shown now (settle mode)
+export type KeptWhere = "shown" | "later" | "earlier";
+export type ReplacedItem = { position: number; word: string; now: string; kept: KeptWhere };
 export type SettleTrace = {
   latest:
     | { position: number; word: string; standing: true; settled: true }
     | { position: number; word: string; standing: true; settled: false; settlesInMs: number }
-    | { position: number; word: string; standing: false; now: string };
+    | { position: number; word: string; standing: false; now: string; kept: KeptWhere };
   otherStanding: StandingItem[];
   otherReplaced: ReplacedItem[];
 };
@@ -104,6 +106,8 @@ function asPosition(v: unknown): Position | null {
   return { position: v.position, word: v.word, version: v.version };
 }
 
+const isKeptWhere = (v: unknown): v is KeptWhere => v === "shown" || v === "later" || v === "earlier";
+
 function asTrace(v: unknown): Trace | null {
   if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string") return null;
   if (v.standing === true) return { position: v.position, word: v.word, standing: true };
@@ -115,8 +119,8 @@ function asTrace(v: unknown): Trace | null {
 
 function asLatest(v: unknown): SettleTrace["latest"] | null {
   if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string") return null;
-  if (v.standing === false && typeof v.now === "string") {
-    return { position: v.position, word: v.word, standing: false, now: v.now };
+  if (v.standing === false && typeof v.now === "string" && isKeptWhere(v.kept)) {
+    return { position: v.position, word: v.word, standing: false, now: v.now, kept: v.kept };
   }
   if (v.standing === true && v.settled === true) {
     return { position: v.position, word: v.word, standing: true, settled: true };
@@ -140,8 +144,8 @@ function asKeptShip(v: unknown): KeptShip | null {
 }
 
 function asReplacedItem(v: unknown): ReplacedItem | null {
-  if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string" || typeof v.now !== "string") return null;
-  return { position: v.position, word: v.word, now: v.now };
+  if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string" || typeof v.now !== "string" || !isKeptWhere(v.kept)) return null;
+  return { position: v.position, word: v.word, now: v.now, kept: v.kept };
 }
 
 function asSettleTrace(v: Record<string, unknown>): SettleTrace | null {
@@ -172,6 +176,9 @@ export type Options = {
   // event, and every snapshot): global, so never held back by a draft
   // the kept ship, and the moment a newer change brought to it (null for a snapshot, or nothing crossing)
   onKept?: (kept: KeptShip, moment: Moment | null) => void;
+  // this visitor's replaced words in the kept ship shown now, newest first
+  // (settle mode): told whenever their own trace changes
+  onMine?: (positions: number[]) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {
@@ -348,7 +355,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       status.replaceChildren(
         "Your word “",
         del,
-        `” has since been replaced: “${parts.now}” stands in its place now. ${parts.eligibility}`,
+        `” has since been replaced: “${parts.now}” stands in its place now. ${parts.kept} ${parts.eligibility}`,
       );
     } else {
       status.textContent = `Your word “${parts.word}” still stands, marked in the sentence above. ${parts.eligibility}`;
@@ -435,7 +442,21 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     settling = { el, key };
   }
 
+  // your replaced words in the kept ship shown now, from your own trace
+  let mineSent = "";
+  function renderMine(): void {
+    const t = trace && isSettleTrace(trace) ? trace : null;
+    const mine = t
+      ? [...(!t.latest.standing && t.latest.kept === "shown" ? [t.latest.position] : []), ...t.otherReplaced.filter((r) => r.kept === "shown").map((r) => r.position)]
+      : [];
+    const key = mine.join(",");
+    if (key === mineSent) return;
+    mineSent = key;
+    options.onMine?.(mine);
+  }
+
   function render(): void {
+    renderMine();
     renderTrace();
     renderSettling();
     renderSummary();

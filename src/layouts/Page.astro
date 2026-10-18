@@ -147,6 +147,8 @@ const { title } = Astro.props;
       /* the kept sentence: a sentence in its own right, a step below the live one, which stays primary */
       .kept-sentence { font: italic 400 clamp(28px, 2.85vw, 54px)/1.16 "Instrument Serif", serif; letter-spacing: -0.01em; margin: 0 0 1.2rem; color: var(--kept-ink); }
       .kept-sentence .end { white-space: nowrap; }
+      /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
+      .kept-sentence mark { text-decoration-color: var(--kept-soft); }
       /* a gap: a blank in the sentence, waiting for the word that stands there now */
       .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }

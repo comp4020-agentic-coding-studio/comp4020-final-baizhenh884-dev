@@ -220,6 +220,8 @@ export type KeptHouse = {
   apply(kept: KeptShip, moment: Moment | null, from: DOMRect | null): void;
   // the kept ship this house shows, as read from the page when it loaded
   readonly initial: KeptShip;
+  // this visitor's own kept part, drawn a little firmer (null: none shown)
+  mine(position: number | null): void;
 };
 
 // The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): read-only,
@@ -254,5 +256,6 @@ export function mountKept(doc: Document): KeptHouse | null {
     initial,
     update: (kept) => view.keptShow(kept),
     apply: (kept, moment, from) => view.keptApply(kept, moment, from),
+    mine: (position) => view.trace(position),
   };
 }

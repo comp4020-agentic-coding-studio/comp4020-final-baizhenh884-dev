@@ -5,13 +5,19 @@
 
 import type { KeptShip } from "./kept-moment";
 
-export function renderKeptSentence(el: Element, k: KeptShip): void {
+// `mine`: positions holding this visitor's own replaced word, marked for them only
+export function renderKeptSentence(el: Element, k: KeptShip, mine: ReadonlySet<number> = new Set()): void {
   const doc = el.ownerDocument;
   const nodes: (string | Node)[] = [];
   k.words.forEach((w, i) => {
     const span = doc.createElement("span");
     span.className = k.gaps[i] ? "w gap" : "w";
-    span.textContent = k.gaps[i] ? "" : w;
+    if (k.gaps[i]) span.textContent = "";
+    else if (mine.has(i)) {
+      const mark = doc.createElement("mark");
+      mark.textContent = w;
+      span.append(mark);
+    } else span.textContent = w;
     const word: Node[] = [span];
     if (k.gaps[i]) {
       const blank = doc.createElement("span");

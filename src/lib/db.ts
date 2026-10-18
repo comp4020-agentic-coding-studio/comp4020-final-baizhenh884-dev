@@ -5,7 +5,7 @@ import { asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import "./blocklist"; // read and reported when the server first loads, beside the rule mode
-import { deriveKeptShip, type KeptShip } from "./kept-ship";
+import { deriveKeptShip, keptWhere, type KeptShip, type KeptWhere } from "./kept-ship";
 import { positions } from "./schema";
 import { STARTING_WORDS } from "./sentence";
 
@@ -190,30 +190,34 @@ export function settledPosition(visitor: string): number | null {
 // live update with — see src/lib/live-client.ts). It is never rendered as
 // visible or screen-reader text; it exists only to drive that timer.
 export type StandingItem = { position: number; word: string };
-export type ReplacedItem = { position: number; word: string; now: string };
+// `kept`: where the replaced word is kept, against the ship shown now (plan B)
+export type ReplacedItem = { position: number; word: string; now: string; kept: KeptWhere };
 export type SettleTrace = {
   latest:
     | { position: number; word: string; standing: true; settled: true }
     | { position: number; word: string; standing: true; settled: false; settlesInMs: number }
-    | { position: number; word: string; standing: false; now: string };
+    | { position: number; word: string; standing: false; now: string; kept: KeptWhere };
   otherStanding: StandingItem[];
   otherReplaced: ReplacedItem[];
 };
 
 const allChanges = client.prepare(
-  "SELECT id, position, to_word AS word, created_at AS createdAt FROM changes WHERE visitor = ? ORDER BY id DESC",
+  "SELECT id, position, to_word AS word, from_version AS fromVersion, created_at AS createdAt FROM changes WHERE visitor = ? ORDER BY id DESC",
 );
 const ageMsOf = client.prepare("SELECT (julianday('now') - julianday(?)) * 86400000 AS ms");
 
 export function settleTraceFor(visitor: string): SettleTrace | null {
-  const rows = allChanges.all(visitor) as { id: number; position: number; word: string; createdAt: string }[];
+  const rows = allChanges.all(visitor) as { id: number; position: number; word: string; fromVersion: number; createdAt: string }[];
   const mine = rows[0];
   if (!mine) return null;
+  // a visitor's word stood at fromVersion + 1 of its position: that is its kept ship
+  const shown = keptShipAt().ship;
+  const where = (row: { fromVersion: number }) => keptWhere(row.fromVersion + 1, shown);
 
   const later = laterAtPosition.get(mine.position, mine.id);
   let latest: SettleTrace["latest"];
   if (later) {
-    latest = { position: mine.position, word: mine.word, standing: false, now: wordAt(mine.position) ?? "" };
+    latest = { position: mine.position, word: mine.word, standing: false, now: wordAt(mine.position) ?? "", kept: where(mine) };
   } else {
     const ageMs = (ageMsOf.get(mine.createdAt) as { ms: number }).ms;
     // whole milliseconds, rounded up: the page reads an integer, and never flips to free early
@@ -237,7 +241,7 @@ export function settleTraceFor(visitor: string): SettleTrace | null {
     if (seen.has(row.position)) continue;
     seen.add(row.position);
     if (laterAtPosition.get(row.position, row.id)) {
-      otherReplaced.push({ position: row.position, word: row.word, now: wordAt(row.position) ?? "" });
+      otherReplaced.push({ position: row.position, word: row.word, now: wordAt(row.position) ?? "", kept: where(row) });
     } else {
       otherStanding.push({ position: row.position, word: row.word });
     }

@@ -40,6 +40,15 @@ const markedPositions = new Set<number>(
         )
       : [],
 );
+// your replaced words in the kept ship shown now: marked for you only (settle mode, plan B)
+const keptMine = new Set<number>(
+  trace?.mode === "settle" && trace.trace
+    ? [
+        ...(!trace.trace.latest.standing && trace.trace.latest.kept === "shown" ? [trace.trace.latest.position] : []),
+        ...trace.trace.otherReplaced.filter((r) => r.kept === "shown").map((r) => r.position),
+      ]
+    : [],
+);
 const how =
   trace?.mode === "settle"
     ? `Choose a word, type its replacement and press Enter. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
@@ -135,7 +144,7 @@ const how =
                       <p role="status">
                         {parts.del ? (
                           <>
-                            Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.eligibility}
+                            Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.kept} {parts.eligibility}
                           </>
                         ) : (
                           <>
@@ -170,7 +179,7 @@ const how =
             {/* the kept sentence is read as words, a gap as "blank" (src/lib/kept-sentence.ts redraws it the same way) */}
             <p class="kept-sentence">
               {kept.words.map((w, i) => {
-                const word = kept.gaps[i] ? <><span class="w gap"></span><span class="sr-only">blank</span></> : <span class="w">{w}</span>;
+                const word = kept.gaps[i] ? <><span class="w gap"></span><span class="sr-only">blank</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
                 return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
               })}
             </p>
@@ -204,8 +213,11 @@ const how =
           let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
           let beat = 0;
 
+          // your own replaced words in the kept ship shown (settle mode): as the server marked them, then from your trace
+          let mine = new Set<number>([...document.querySelectorAll(".kept-sentence .w")].flatMap((w, i) => (w.querySelector("mark") ? [i] : [])));
+          keptHouse?.mine([...mine][0] ?? null);
           function renderKept(k: KeptShip): void {
-            if (keptLabel) renderKeptSentence(keptLabel, k);
+            if (keptLabel) renderKeptSentence(keptLabel, k, mine);
           }
 
           // Ship 1 complete: the one loud line, once, live, as the last part sets down.
@@ -273,6 +285,11 @@ const how =
               const c = crossing && crossing.position === change.position ? { toward: box(keptHost) } : null;
               crossing = null;
               house?.latest(change, c);
+            },
+            onMine: (positions) => {
+              mine = new Set(positions);
+              keptHouse?.mine(positions[0] ?? null);
+              if (keptNow) renderKept(keptNow);
             },
             onKept: (k, moment) => {
               crossing = moment;

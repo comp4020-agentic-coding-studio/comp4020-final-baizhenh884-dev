@@ -31,3 +31,8 @@ export function deriveKeptShip(changes: readonly KeptChange[], current: readonly
   }
   return { ship, words, gaps };
 }
+
+// Where a replaced word is kept, against the ship shown: a word that stood at
+// version g of its position belongs to ship g. Never a number on the page.
+export type KeptWhere = "shown" | "later" | "earlier";
+export const keptWhere = (wordShip: number, shownShip: number): KeptWhere => (wordShip === shownShip ? "shown" : wordShip > shownShip ? "later" : "earlier");
