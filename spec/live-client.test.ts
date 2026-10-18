@@ -518,6 +518,79 @@ describe("live page reconciliation", () => {
     });
   });
 
+  // Settling, made visible (plan C): while this visitor's latest word is
+  // holding, one thin line under that word fills to the end of the hold
+  // (settlesInMs, from the fraction already elapsed of the settle time the
+  // page carries), and goes once it settles or is replaced. Only on their own
+  // page: it comes from their own trace. Never red; with reduced motion,
+  // none; under once mode, none. Decorative: the trace text says the same.
+  describe("the settling line under a holding word", () => {
+    afterEach(() => vi.useRealTimers());
+    const fills = (doc: Document) => [...doc.querySelectorAll(".sentence .settling")];
+    const holding = (position: number, settlesInMs: number): SettleTrace => ({
+      latest: { position, word: "held", standing: true, settled: false, settlesInMs },
+      otherStanding: [],
+      otherReplaced: [],
+    });
+    const withSettleTime = (doc: Document, ms: number) => doc.querySelector(".stands-half .sentence")!.setAttribute("data-settle-ms", String(ms));
+
+    localOnly("fills under the holding word only, from what has already elapsed to the end of the hold", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
+      withSettleTime(doc, 10_000);
+      const [a] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      const f = fills(doc);
+      expect(f, "a holding word has no settling line, or more than one").toHaveLength(1);
+      expect(f[0].closest(".pos")?.contains(slot(doc, a.position).form), "the line isn't under the holding word").toBe(true);
+      expect(f[0].getAttribute("aria-hidden"), "the line isn't decorative").toBe("true");
+      const style = (f[0] as HTMLElement).style;
+      expect(Number(style.getPropertyValue("--from")), "the line doesn't start from the elapsed share of the hold").toBeCloseTo(0.6, 2);
+      expect(style.getPropertyValue("--ms"), "the line doesn't take the rest of the hold").toBe("4000ms");
+      vi.advanceTimersByTime(4001);
+      expect(fills(doc), "the line outlived the hold").toHaveLength(0);
+    });
+
+    localOnly("goes when the word is replaced, and is never added for a settled word or a once-mode trace", async () => {
+      const doc = await (await arrive()).page("/");
+      withSettleTime(doc, 10_000);
+      const [a, b] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      expect(fills(doc)).toHaveLength(1);
+      // replaced: the new trace no longer holds
+      const replaced: SettleTrace = { latest: { position: a.position, word: "held", standing: false, now: fresh() }, otherStanding: [], otherReplaced: [] } as unknown as SettleTrace;
+      page.applySnapshot({ positions: positionsOf(doc), trace: replaced });
+      expect(fills(doc), "the line outlived its word").toHaveLength(0);
+      page.applySnapshot({ positions: positionsOf(doc), trace: { latest: { position: b.position, word: "x", standing: true, settled: true }, otherStanding: [], otherReplaced: [] } });
+      expect(fills(doc), "a settled word has a settling line").toHaveLength(0);
+      page.applySnapshot({ positions: positionsOf(doc), trace: { position: b.position, word: "x", standing: true } as Trace });
+      expect(fills(doc), "a once-mode trace has a settling line").toHaveLength(0);
+    });
+
+    settleOnly("GET / carries the settle time on the live sentence under settle mode", async () => {
+      const doc = await (await arrive()).page("/");
+      const ms = Number(process.env.SETTLE_SECONDS ?? 300) * 1000;
+      expect(doc.querySelector(".stands-half .sentence")?.getAttribute("data-settle-ms"), "the page doesn't carry the settle time").toBe(String(ms));
+    });
+
+    onceOnly("GET / carries no settle time under once mode", async () => {
+      const doc = await (await arrive()).page("/");
+      expect(doc.querySelector(".stands-half .sentence")?.hasAttribute("data-settle-ms"), "a once-mode page carries a settle time").toBe(false);
+    });
+
+    localOnly("is never added with reduced motion", async () => {
+      const doc = await (await arrive()).page("/");
+      withSettleTime(doc, 10_000);
+      doc.defaultView!.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof matchMedia;
+      const [a] = positionsOf(doc);
+      attach(doc).applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      expect(fills(doc), "reduced motion still shows a moving line").toHaveLength(0);
+      expect(traceStatus(doc)!.textContent, "the trace text no longer says it's holding").toMatch(/holding/i);
+    });
+  });
+
   // The house shows the shared truth: every newer version of a position,
   // including one a draft holds back from the word on screen, while the
   // draft, its version and the label stay exactly as above.

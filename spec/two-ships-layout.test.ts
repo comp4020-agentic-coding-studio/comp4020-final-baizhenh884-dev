@@ -282,6 +282,38 @@ describe("two ships on GET /", () => {
     }
   }
 
+  // The settling line (plan C) lies inside its word's own box, thin, never
+  // red, and moves nothing: the sentence wraps and the house stands exactly
+  // as without it. Placed in the measured copy the way live-client adds it.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`sets the settling line inside its word, thin and not red, moving nothing (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const q = (s) => document.querySelector(s);
+        const at = () => [...document.querySelectorAll('.stands-half .sentence form[action="/replace"] label')].map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top]; }).concat([[0, q('.stands-half #house').getBoundingClientRect().top]]);
+        const before = at();
+        const pos = document.querySelectorAll('.stands-half .sentence .pos')[4];
+        const line = document.createElement('span');
+        line.className = 'settling'; line.setAttribute('aria-hidden', 'true');
+        line.style.setProperty('--from', '0.4'); line.style.setProperty('--ms', '4000ms');
+        pos.append(line);
+        await new Promise((r) => setTimeout(r, 50));
+        const after = at(), lr = line.getBoundingClientRect(), wr = pos.querySelector('label').getBoundingClientRect();
+        const c = getComputedStyle(line).backgroundColor.match(/[\d.]+/g).map(Number);
+        return { moved: Math.max(...before.map((b, i) => Math.hypot(b[0] - after[i][0], b[1] - after[i][1]))), line: { left: lr.left, right: lr.right, top: lr.top, bottom: lr.bottom, height: lr.height },
+          word: { left: wr.left, right: wr.right, top: wr.top, bottom: wr.bottom }, red: c[0] > 150 && c[1] < 90 && c[2] < 90, color: c };
+      })()`, [size[0], size[1]])) as any;
+      expect(m.moved, "the settling line moved the sentence or the house").toBeLessThanOrEqual(0.5);
+      expect(m.line.height, "the settling line isn't a thin line").toBeGreaterThan(0);
+      expect(m.line.height, "the settling line isn't a thin line").toBeLessThanOrEqual(3);
+      expect(m.line.left, "the settling line runs out of its word").toBeGreaterThanOrEqual(m.word.left - 1);
+      expect(m.line.right, "the settling line runs out of its word").toBeLessThanOrEqual(m.word.right + 1);
+      expect(m.line.top, "the settling line isn't under its word").toBeGreaterThanOrEqual(m.word.bottom - 2);
+      expect(m.red, `the settling line is red (${m.color})`).toBe(false);
+    }, 90_000);
+  }
+
   it("never invites on an earlier form (?at=N)", async () => {
     const res = await fetch(new URL("/?at=0", baseUrl));
     expect(res.status).toBe(200);
