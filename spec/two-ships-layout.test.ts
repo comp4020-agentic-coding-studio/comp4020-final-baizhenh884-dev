@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
 import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
@@ -239,6 +240,54 @@ describe("two ships on GET /", () => {
       }, 120_000);
     }
   }
+
+  // The first ten seconds (plan D): at rest, the part notation's slot invites
+  // a stranger to change a word, in the notation's own quiet caps, on one line.
+  // Choosing a word swaps the notation in, in the same slot: nothing moves
+  // either way, and the house stays right under the sentence. Decorative to
+  // assistive technology (each word field is already described by #how).
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    for (const longWords of [false, true]) {
+      it(`invites a stranger to change a word at rest, in the notation's slot, moving nothing (${name}${longWords ? ", ten long words" : ""})`, async () => {
+        const doc = await servedPage(baseUrl);
+        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        const m = (await measureIn(doc, `(async () => {
+          await document.fonts.ready;
+          const q = (s) => document.querySelector(s);
+          const inv = q('.stands-half .invite'), part = q('#part');
+          if (!inv) return { missing: true };
+          const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
+          const at = () => ({ sentence: q('.stands-half .sentence').getBoundingClientRect().top, house: q('.stands-half #house').getBoundingClientRect().top, kept: q('#house-kept').getBoundingClientRect().top });
+          const rest = { inv: box(inv), visible: getComputedStyle(inv).visibility === 'visible' && getComputedStyle(inv).display !== 'none', text: inv.textContent.trim(),
+            lineHeight: parseFloat(getComputedStyle(inv).lineHeight) || 18, hidden: inv.closest('[aria-hidden="true"]') !== null, at: at(),
+            sentenceBottom: q('.stands-half .sentence').getBoundingClientRect().bottom, half: box(q('.stands-half')) };
+          part.hidden = false; part.textContent = '08 — upper-right volume';
+          const chosen = { invVisible: getComputedStyle(inv).visibility === 'visible' && getComputedStyle(inv).display !== 'none', part: box(part), at: at() };
+          return { rest, chosen };
+        })()`, [size[0], size[1]])) as any;
+        expect(m.missing, "GET / has no invitation under the sentence").toBeUndefined();
+        const { rest, chosen } = m;
+        expect(rest.visible, "the invitation isn't shown at rest").toBe(true);
+        expect(rest.text.length, "the invitation is empty").toBeGreaterThan(0);
+        expect(rest.inv.height, "the invitation wraps onto a second line").toBeLessThan(rest.lineHeight * 1.5);
+        expect(rest.inv.right, "the invitation runs out of its half").toBeLessThanOrEqual(rest.half.right + 1);
+        expect(rest.hidden, "the invitation isn't decorative to assistive technology").toBe(true);
+        expect(rest.inv.top, "the invitation isn't under the sentence").toBeGreaterThanOrEqual(rest.sentenceBottom - 1);
+        expect(rest.at.house - rest.sentenceBottom, "the invitation pushed the house away from its sentence").toBeLessThanOrEqual(20);
+        // choosing a word: the notation takes the same slot, the invitation steps aside, nothing moves
+        expect(chosen.invVisible, "the invitation stays while a part's notation is shown").toBe(false);
+        expect(Math.abs(chosen.part.top - rest.inv.top), "the notation isn't in the invitation's slot").toBeLessThanOrEqual(1);
+        for (const k of ["sentence", "house", "kept"] as const) expect(Math.abs(chosen.at[k] - rest.at[k]), `choosing a word moves the ${k}`).toBeLessThanOrEqual(0.5);
+      }, 90_000);
+    }
+  }
+
+  it("never invites on an earlier form (?at=N)", async () => {
+    const res = await fetch(new URL("/?at=0", baseUrl));
+    expect(res.status).toBe(200);
+    const doc = new JSDOM(await res.text()).window.document;
+    expect(doc.querySelector(".invite"), "an earlier form invites a change").toBeNull();
+  });
 
   it("stacks the halves on a phone (390×844)", async () => {
     const l = await layout([390, 844]);

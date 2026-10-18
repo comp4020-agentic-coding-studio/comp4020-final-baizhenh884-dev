@@ -38,7 +38,7 @@ const lineIn = async (size: [number, number], longWords: boolean) =>
     const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
     const line = showMomentLine(document, false, 1500);
     await new Promise((r) => setTimeout(r, 900)); // the line and its veil have faded in
-    const words = [...document.querySelectorAll('.sentence form[action="/replace"] label')].map((l) => ({ ...box(l), text: l.textContent }));
+    const words = [...document.querySelectorAll('.sentence form[action="/replace"] label, .stands-half .invite')].map((l) => ({ ...box(l), text: l.textContent }));
     const veilOf = () => [...document.querySelectorAll('.half')].map((h) => Number(getComputedStyle(h, '::after').opacity));
     const veil = veilOf(), rgb = getComputedStyle(line).color.match(/[\\d.]+/g).map(Number);
     const out = { line: box(line), words, viewport: [innerWidth, innerHeight], wrap: getComputedStyle(line).textWrap ?? getComputedStyle(line).textWrapStyle,
@@ -52,9 +52,9 @@ const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.t
 describe("ship 1's loud line", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
     for (const longWords of [false, true]) {
-      it(`overlaps no live sentence word while it's up (${name}${longWords ? ", every word long" : ""})`, async () => {
+      it(`overlaps no live sentence word, nor the invitation, while it's up (${name}${longWords ? ", every word long" : ""})`, async () => {
         const l = await lineIn([size[0], size[1]], longWords);
-        expect(l.words).toHaveLength(10);
+        expect(l.words, "ten words and the invitation under them").toHaveLength(11);
         for (const w of l.words) if (w.bottom > 0 && w.top < size[1]) expect(overlaps(l.line, w), `the line sits over "${w.text}"`).toBe(false);
         expect(l.line.top, "the line starts above the screen").toBeGreaterThanOrEqual(0);
         expect(l.line.bottom, "the line runs below the screen").toBeLessThanOrEqual(size[1]);
