@@ -328,6 +328,38 @@ Slice 6e — settling, made visible (plan C), and a settle-trace bug:
   stands for `bb0f1fd` too.
 - Pass counts at `bb0f1fd`: once 164 / 22 named skips; settle 179 / 7.
 
+Slice 6f — your word, kept (plan B, settle mode only):
+- Estimated first (agent-generated simulation, not user evidence; a scratch
+  driver over `sim.py`'s unchanged settle rule and random habits, 30
+  visitors over an hour, 50 seeds, not kept in the repo): at any moment
+  about 15% (12-19%) of a visitor's replaced words are in the kept ship
+  shown, about 45% wait in a later one (usually two ahead), about 40% are
+  in a ship already built; visitor words first appear on screen (ship 2)
+  after about 23 minutes.
+- `2c879e6` — spec: `keptWhere` and a real `deriveKeptShip` history (later
+  through ship 1's hold, shown in ship 2, earlier at ship 3); wire: a
+  settle replaced item is exactly `{ position, word, now, kept }`, a
+  replaced latest carries `kept`; HTTP: the author's trace names where the
+  word is kept, and once fresh visitors bring the shown ship round, says
+  "kept in the house opposite" and marks it in the kept sentence on the
+  author's page only.
+- `95446b9` — spec: two hand-built live-client settle fixtures carry
+  `kept` (one had been cast past the type checker).
+- `19a94ad` — feat: `keptWhere` (word's ship = its row's from_version + 1),
+  `kept` on the settle trace (once-mode trace and reader unchanged), the
+  three phrases in `trace-text`, `onMine` in live-client, `<mark>` in the
+  kept sentence (server and live) in the kept half's soft ink, and
+  `KeptHouse.mine` drawing the newest shown part a little firmer. Limit:
+  one position in the house, all of them in the sentence. Seen in headless
+  Chrome: the author's open page switches from "kept for a later house"
+  to "kept in the house opposite", marked, without a reload; a stranger's
+  page marks nothing.
+- Screenshots: unchanged by B (the standard scenario's replaced shot is a
+  visitor whose words all stand, and ship 1 shows; a retake was
+  byte-identical), so `c586a6b` stands for `19a94ad`. B's visible state was
+  seen only in a scratch screenshot, not kept.
+- Pass counts at `19a94ad`: once 166 / 23 named skips; settle 182 / 7.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
@@ -437,7 +469,8 @@ listing them with `--reporter=verbose`) — none is an accidental gap.
 ## What's next
 
 Slices 1-6 are built (6: accessibility, the Chrome harness, the
-blocklist). Not done: informal tries by 2-3 classmates; the
+blocklist, the invitation, the settling line and the settle-trace fix,
+your word kept). Not done: informal tries by 2-3 classmates; the
 one-way migration 0001 has still never touched production (the backup
 hard stop above stands); nothing merges to `main` before the Crit 10
 cutoff.
