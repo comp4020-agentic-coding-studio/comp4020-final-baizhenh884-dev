@@ -169,8 +169,8 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 2. **Local image:** the spec against *this* repository state, as CI runs it:
 
    ```sh
-   docker build -t app . && docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 --tmpfs /data app
-   pnpm check    # APP_URL defaults to http://localhost:8080
+   docker build -t app . && docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+   RULE_MODE=once BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
    docker stop app
    ```
 
@@ -187,8 +187,8 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
    run above:
 
    ```sh
-   docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 --tmpfs /data app
-   RULE_MODE=settle pnpm check    # APP_URL defaults to http://localhost:8080
+   docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+   RULE_MODE=settle BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
    docker stop app
    ```
 3. **Deployed:** `flyctl deploy --remote-only --ha=false -a
@@ -342,7 +342,13 @@ What the code must hold to. The README says why; don't restate it here.
 - There is no user-facing moderation. Any recovery path for harmful public
   content is an exceptional maker action outside the ordinary interaction: it
   never protects, assigns or adds words, and it needs a recorded decision
-  before it's built.
+  before it's built. The one built is the maker's blocklist
+  (`docs/decisions/0004-maker-blocklist.md`, `spec/blocklist.test.ts`): words
+  from the `BLOCKED_WORDS` Fly secret, exact after NFKC and case folding,
+  refused as invalid (422, change not used up), logged only as
+  `reason=blocked`; an empty list is logged once, never fatal. Real blocked
+  words never appear in the repo, logs, chat or responses; checks use the
+  meaningless `blockedtestword`.
 - No editing, undo, accounts, profiles, nicknames, comments, likes or other
   reactions, rooms, feeds, scores or second sentence without an explicit
   product decision recorded first.
