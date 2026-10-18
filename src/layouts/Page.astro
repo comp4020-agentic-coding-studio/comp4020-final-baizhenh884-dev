@@ -72,6 +72,13 @@ const { title } = Astro.props;
       @media (hover: hover) {
         .sentence .pos:hover label:not(:has(mark)), .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.35); }
       }
+      /* your holding word: a thin line fills under it until the hold ends (settle mode, your page only); never red */
+      .sentence .settling {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; pointer-events: none;
+        background: var(--soft); transform-origin: left; transform: scaleX(var(--from, 0));
+        animation: settling var(--ms, 0ms) linear forwards;
+      }
+      @keyframes settling { to { transform: scaleX(1); } }
       /* your word, while it stands: a hairline of dots, no badge */
       mark { background: none; color: inherit; text-decoration: underline dotted 1.5px var(--soft); text-underline-offset: 0.14em; }
       /* Where supported, grow with what's typed rather than scroll within the word,

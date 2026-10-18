@@ -410,8 +410,34 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     link.setAttribute("href", `?at=${total - 1}`);
   }
 
+  // Your holding word's line, filling to the end of its hold (settle mode,
+  // this visitor's own trace only). The same hold keeps its line, so a
+  // re-render never restarts it; anything else removes it.
+  const settleMs = Number(doc.querySelector(".sentence")?.getAttribute("data-settle-ms") ?? 0);
+  let settling: { el: HTMLElement; key: string } | null = null;
+  function renderSettling(): void {
+    const latest = trace && isSettleTrace(trace) ? trace.latest : null;
+    const hold = latest && latest.standing && !latest.settled ? latest : null;
+    const reduced = doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const pos = hold && settleMs > 0 && !reduced ? slots.get(hold.position)?.form.closest(".pos") : null;
+    const key = hold ? `${hold.position}|${hold.word}` : "";
+    if (settling && (!pos || settling.key !== key || !pos.contains(settling.el))) {
+      settling.el.remove();
+      settling = null;
+    }
+    if (!pos || !hold || settling) return;
+    const el = doc.createElement("span");
+    el.className = "settling";
+    el.setAttribute("aria-hidden", "true");
+    el.style.setProperty("--from", String(Math.min(1, Math.max(0, 1 - hold.settlesInMs / settleMs))));
+    el.style.setProperty("--ms", `${hold.settlesInMs}ms`);
+    pos.append(el);
+    settling = { el, key };
+  }
+
   function render(): void {
     renderTrace();
+    renderSettling();
     renderSummary();
     renderEarlier();
   }

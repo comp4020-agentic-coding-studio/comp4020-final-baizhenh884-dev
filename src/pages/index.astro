@@ -91,7 +91,8 @@ const how =
               <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
               {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
               <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
-              <div class="sentence">
+              {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
+              <div class="sentence" data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
                 {current.slice(0, -1).map((p) => (
                   <>
                     <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />{" "}
