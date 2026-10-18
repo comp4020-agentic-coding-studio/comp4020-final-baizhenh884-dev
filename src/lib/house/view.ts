@@ -10,7 +10,7 @@ import type { KeptShip, Moment } from "../kept-moment";
 import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
 import type { Kind } from "./motion";
-import { EDGE, EDGE_COLOUR, FIELD, INK, lights, type Look, RED } from "./theme";
+import { EDGE, FIELD, INK, lights, type Look, partTone, RED } from "./theme";
 
 export class HouseView {
   readonly canvas: HTMLCanvasElement;
@@ -234,14 +234,14 @@ export class HouseView {
     }
   }
 
-  // selection is ink, never red: the chosen territory drawn firmly, the rest receding toward the field
+  // selection is ink, never red: the chosen territory drawn firmly, the rest receding toward the field (theme.ts partTone)
   private paint(): void {
     const field = new THREE.Color(FIELD), focus = this.selected ?? this.hovered;
     this.body.groups.forEach((g, i) => {
-      const other = focus !== null && i !== focus;
-      for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.color.copy(m.userData.base as THREE.Color).lerp(field, other ? 0.62 : 0);
-      const base = EDGE[this.look] + (i === this.traced ? 0.12 : 0);
-      this.edges(g, EDGE_COLOUR[this.look], i === this.selected ? 0.9 : i === this.hovered ? 0.6 : other ? 0.05 : base);
+      const t = partTone(this.look, { selected: i === this.selected, hovered: i === this.hovered && i !== this.selected, traced: i === this.traced, other: focus !== null && i !== focus });
+      const lift = new THREE.Color(t.edgeColour);
+      for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.color.copy(m.userData.base as THREE.Color).lerp(field, t.recede).lerp(lift, m.userData.role === "opening" ? 0 : t.lift);
+      this.edges(g, t.edgeColour, t.edge);
     });
     if (this.stage) {
       // a territory arriving is solid as it comes in, never a gap

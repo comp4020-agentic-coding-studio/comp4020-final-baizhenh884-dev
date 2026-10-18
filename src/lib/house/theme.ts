@@ -22,6 +22,22 @@ export const EDGE = { present: 0.2, past: 0.32, kept: 0.42 };
 // edges are ink on the light field, and pale on the kept ship's dark ground
 export const EDGE_COLOUR = { present: INK, past: INK, kept: 0xefe6d8 };
 
+// How one part is drawn: its edges' strength and colour, how far its
+// materials are lightened toward the edge ink (`lift`), or recede toward the
+// field (`recede`); `lift` lightens solid timber only, never an opening. Chosen and pointed-at parts win; then a receding one;
+// then this visitor's own part: a step firmer in the standing house, and in
+// the kept house firm edges and slightly lighter timber, so it reads at page
+// scale (never red, never moving).
+export type PartState = { selected: boolean; hovered: boolean; traced: boolean; other: boolean };
+export function partTone(look: Look, s: PartState): { edge: number; edgeColour: number; lift: number; recede: number } {
+  const edgeColour = EDGE_COLOUR[look];
+  if (s.selected) return { edge: 0.9, edgeColour, lift: 0, recede: 0 };
+  if (s.hovered) return { edge: 0.6, edgeColour, lift: 0, recede: 0 };
+  if (s.other) return { edge: 0.05, edgeColour, lift: 0, recede: 0.62 };
+  if (s.traced && look === "kept") return { edge: 0.95, edgeColour, lift: 0.2, recede: 0 };
+  return { edge: EDGE[look] + (s.traced ? 0.12 : 0), edgeColour, lift: 0, recede: 0 };
+}
+
 const tone = (position: number, role: string, look: Look) => {
   const p = PALETTE[look];
   if (role === "opening") return p.opening;
@@ -42,6 +58,7 @@ export function dress(group: THREE.Group, position: number, look: Look): void {
     if (!m) {
       m = new THREE.MeshStandardMaterial({ color: tone(position, role, look), roughness: role === "opening" ? 0.5 : 0.92, metalness: 0 });
       m.userData.base = m.color.clone();
+      m.userData.role = role;
       made.set(role, m);
     }
     mesh.material = m;
