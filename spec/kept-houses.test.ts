@@ -103,17 +103,22 @@ describe("an earlier house, /?kept=k", () => {
     for (const k of [building, building + 1, building + 50]) expect((await new Visitor().get(`/?kept=${k}`)).status, `/?kept=${k}`).toBe(404);
   });
 
+  // On GET / the one rel="prev" is the Earlier form (the HTTP contract,
+  // spec/theseus.test.ts, and what live-client keeps current), so the way to
+  // the earlier houses is a plain link, a.earlier-house.
   localOnly("is reached from the kept half on GET /, by one Earlier house link to the last completed ship", async () => {
     await complete(1);
     const now = await new Visitor().sentence();
     const shownBuilding = Math.min(...now.map((p) => p.version));
     const { doc } = await new Visitor().get("/");
-    const link = doc.querySelector('.kept-half a[rel="prev"]');
+    const link = doc.querySelector(".kept-half a.earlier-house");
     expect(link, "GET / has no way to the earlier houses").not.toBeNull();
     expect(link!.textContent?.trim()).toBe("Earlier house");
     // the most recent completed ship (a held ship 1 is the one shown, so its house is still that ship)
     expect(link!.getAttribute("href")).toBe(`?kept=${shownBuilding - 1}`);
-    expect(doc.querySelectorAll('.kept-half a[rel="prev"]'), "the earlier houses are listed").toHaveLength(1);
+    expect(doc.querySelectorAll(".kept-half a.earlier-house"), "the earlier houses are listed").toHaveLength(1);
+    expect(link!.getAttribute("rel"), "the Earlier house link takes the Earlier form's rel=prev").toBeNull();
+    expect(doc.querySelectorAll('a[rel~="prev"]'), "GET / has more than one rel=prev").toHaveLength(1);
   }, 120_000);
 
   localOnly("steps one house at a time: Earlier house and Later house between completed ships only", async () => {
