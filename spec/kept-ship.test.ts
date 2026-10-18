@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
-import { deriveKeptShip, keptWhere, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
+import { completedShip, deriveKeptShip, keptWhere, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
 
 // Kept ships (docs/decisions/0003-settle-and-kept-ships.md): ship m0 =
 // min(version) across the ten positions is the ship being built; the ship
@@ -172,6 +172,41 @@ const unusedWord = (all: { word: string }[]): string => {
 // belongs to kept ship g. Relative to the ship the page shows, it is in it,
 // waiting in a later one, or in one already built and no longer shown. Ship
 // 1 is the maker's words, so a visitor's word is never in it.
+// Earlier houses (plan 1): a completed kept ship, reached on its own at
+// /?kept=k. Ship k is complete once every position has been replaced past
+// version k; its words are the words that stood at version k, by the same
+// rule deriveKeptShip uses. Anything else is not a house to show.
+describe("a completed kept ship", () => {
+  it("is nothing before any ship completes, and nothing for 0, negatives or fractions", () => {
+    const s = simulate([[3, "a3"]]);
+    for (const k of [0, -1, 1, 1.5, 2]) expect(completedShip(s.changes, s.current, k), `ship ${k}`).toBeNull();
+  });
+
+  it("is ship 1's ten original words once every position has been replaced", () => {
+    const s = simulate(STARTING.map((_, i) => [i, `v2-${i}`]));
+    expect(completedShip(s.changes, s.current, 1)).toEqual(STARTING);
+    expect(completedShip(s.changes, s.current, 2), "ship 2 isn't complete yet").toBeNull();
+  });
+
+  it("is the same words deriveKeptShip showed for that ship while it was being built", () => {
+    const steps: [number, string][] = [];
+    for (let round = 2; round <= 4; round++) for (let i = 0; i < 10; i++) steps.push([i, `r${round}-${i}`]);
+    steps.push([5, "one-more"]); // so the last completed ship isn't the one being shown
+    const s = simulate(steps);
+    for (const k of [1, 2, 3]) {
+      // the same ship as deriveKeptShip builds it, one change before it completes (a later ship's
+      // completion shows the next one at once), plus the one word that completing change kept
+      const before = deriveKeptShip(...(Object.values(simulate(steps.slice(0, k * 10 - 1))) as [KeptChange[], CurrentWord[]]));
+      expect(before.ship, `setup: ship ${k} isn't the one being built`).toBe(k);
+      expect(before.gaps.filter(Boolean), `setup: ship ${k} isn't one word short`).toHaveLength(1);
+      const last = steps[k * 10 - 1][0];
+      const expected = before.words.map((w, i) => (i === last ? (k === 1 ? STARTING[i] : `r${k}-${i}`) : w));
+      expect(completedShip(s.changes, s.current, k), `ship ${k}`).toEqual(expected);
+    }
+    expect(completedShip(s.changes, s.current, 4), "ship 4 is still being built").toBeNull();
+  });
+});
+
 describe("where a replaced word is kept", () => {
   it("is shown, later or earlier, against the ship the page shows", () => {
     expect(keptWhere(3, 3)).toBe("shown");
