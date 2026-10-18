@@ -300,7 +300,7 @@ describe("two ships on GET /", () => {
         pos.append(line);
         await new Promise((r) => setTimeout(r, 50));
         const after = at(), lr = line.getBoundingClientRect(), wr = pos.querySelector('label').getBoundingClientRect();
-        const c = getComputedStyle(line).backgroundColor.match(/[\d.]+/g).map(Number);
+        const c = (getComputedStyle(line).backgroundColor.match(/[\\d.]+/g) || []).map(Number);
         return { moved: Math.max(...before.map((b, i) => Math.hypot(b[0] - after[i][0], b[1] - after[i][1]))), line: { left: lr.left, right: lr.right, top: lr.top, bottom: lr.bottom, height: lr.height },
           word: { left: wr.left, right: wr.right, top: wr.top, bottom: wr.bottom }, red: c[0] > 150 && c[1] < 90 && c[2] < 90, color: c };
       })()`, [size[0], size[1]])) as any;
