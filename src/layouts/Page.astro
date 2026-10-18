@@ -131,6 +131,12 @@ const { title } = Astro.props;
       .half-head { display: flex; flex-direction: column; justify-content: end; }
       .half-label { margin: 0 0 1.6vh; color: var(--soft); }
       .kept-half .half-label { color: var(--kept-soft); }
+      /* a half's label row; on a phone it also names and links to the other half (hidden side by side) */
+      .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+      .to-kept, .to-stands { display: none; white-space: nowrap; color: var(--soft); text-decoration-color: var(--hair); }
+      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(185 171 151 / 0.4); }
+      html { scroll-behavior: smooth; }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       .stands-half .mast, .stands-half .text { max-width: none; }
       .stands-half .mast { margin-bottom: 2.4vh; }
       /* the live sentence, set to its half: still the largest thing on the page */
@@ -240,6 +246,7 @@ const { title } = Astro.props;
         .kept-pointer { display: block; }
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
         .half-label { margin-bottom: 0.8rem; }
+        .to-kept, .to-stands { display: inline; }
         main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
         #house { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
         #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }

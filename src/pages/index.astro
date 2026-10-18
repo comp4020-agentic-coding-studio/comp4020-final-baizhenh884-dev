@@ -102,12 +102,16 @@ const how =
     ) : (
       <>
         <div class="two">
-          <div class="half stands-half">
+          <div class="half stands-half" id="stands">
             <div class="half-head">
               <header class="mast">
                 <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
               </header>
-              <p class="caps half-label">What stands</p>
+              {/* on a phone the halves stack: the header row names the other half, as desktop does side by side, and goes there */}
+              <div class="head-row">
+                <p class="caps half-label">What stands</p>
+                <a class="caps to-kept" href="#kept">What was kept ↓</a>
+              </div>
             </div>
             <div class="text current">
               <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
@@ -185,9 +189,12 @@ const how =
               <p class="about caps"><a href="/readme/">About Theseus</a></p>
             </div>
           </div>
-          <div class="half kept-half kept-plate">
+          <div class="half kept-half kept-plate" id="kept">
             <div class="half-head">
-              <p class="caps half-label kept-label">What was kept</p>
+              <div class="head-row">
+                <p class="caps half-label kept-label">What was kept</p>
+                <a class="caps to-stands" href="#stands">Back to what stands ↑</a>
+              </div>
             </div>
             {/* the kept sentence is read as words, a gap as "blank" (src/lib/kept-sentence.ts redraws it the same way) */}
             <p class="kept-sentence">
