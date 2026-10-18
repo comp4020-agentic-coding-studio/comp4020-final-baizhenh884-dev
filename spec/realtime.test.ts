@@ -78,7 +78,8 @@ const KEPT_SHIP_KEYS = ["gaps", "words"];
 const TRACE_KEYS = settleModeReady ? ["latest", "otherReplaced", "otherStanding"] : ["now", "position", "standing", "word"];
 const HOLDING_LATEST_KEYS = ["position", "settled", "settlesInMs", "standing", "word"];
 const STANDING_ITEM_KEYS = ["position", "word"];
-const REPLACED_ITEM_KEYS = ["now", "position", "word"];
+// "kept": where the replaced word is kept, against the ship shown (shown | later | earlier), never a number
+const REPLACED_ITEM_KEYS = ["kept", "now", "position", "word"];
 
 type Slot = { position: number; version: number; word: string };
 type Frame = { event: string; data: unknown };
@@ -486,6 +487,7 @@ describe("Theseus realtime", () => {
       standing: false,
       now: anns,
     });
+    expect(["shown", "later", "earlier"], "a replaced latest doesn't say where it's kept").toContain(againTrace.latest.kept);
   });
 
   settleByAgeOnly(
@@ -527,8 +529,9 @@ describe("Theseus realtime", () => {
 
       const replaced = trace.otherReplaced.find((r) => (r as { position: number }).position === 0) as Record<string, unknown>;
       expect(replaced, "the first word isn't in otherReplaced").toBeDefined();
-      expect(keysOf(replaced), "a replaced item carries more than position, word and now").toEqual(REPLACED_ITEM_KEYS);
-      expect(replaced).toEqual({ position: 0, word: firstWord, now: replacement });
+      expect(keysOf(replaced), "a replaced item isn't exactly position, word, now and kept").toEqual(REPLACED_ITEM_KEYS);
+      expect(["shown", "later", "earlier"], "a replaced item's kept isn't shown, later or earlier").toContain(replaced.kept);
+      expect(replaced).toMatchObject({ position: 0, word: firstWord, now: replacement });
     },
     20_000,
   );

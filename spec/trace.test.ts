@@ -301,6 +301,48 @@ describe("Your trace", () => {
     expect(text.indexOf(secondWord)).toBeLessThan(text.indexOf(firstWord));
   });
 
+  // Your word, kept (plan B): each replaced word says where it's kept,
+  // against the kept ship shown now: in it ("kept in the house opposite"),
+  // waiting ("kept for a later house"), or already built ("kept in a house
+  // already built"). Only its author sees it, and when it's in the ship
+  // shown, its place in the kept sentence is marked on their page only.
+  settleOnly("says where a replaced word is kept, and marks it in the kept sentence on its author's page only", async () => {
+    const author = await arrive();
+    const start = await author.sentence();
+    // the author's word at the position furthest behind, so its ship comes round soonest
+    const p = [...start].sort((a, b) => a.version - b.version || a.position - b.position)[0].position;
+    const mine = unused(start);
+    expect((await author.replace(at(start, p), mine)).status).toBe(303);
+    // a fresh visitor replaces it: the author's word is now kept
+    expect((await (await arrive()).replace(at(await author.sentence(), p), unused(await author.sentence()))).status).toBe(303);
+
+    const where = async () => {
+      const { doc } = await author.page("/");
+      const text = traceSection(doc)?.textContent?.replace(/\s+/g, " ") ?? "";
+      const keptWords = [...doc.querySelectorAll(".kept-sentence .w")].map((w) => w.textContent?.trim() ?? "");
+      return { doc, text, keptWords };
+    };
+    let w = await where();
+    expect(w.text, "the replaced word isn't named").toContain(mine);
+    expect(w.text, "the trace doesn't say where it's kept").toMatch(/kept in the house opposite|kept for a later house|kept in a house already built/);
+
+    // bring the shown ship round to the author's word: fresh visitors move the positions furthest behind
+    for (let i = 0; i < 60 && w.keptWords[p] !== mine; i++) {
+      const now = await author.sentence();
+      const behind = [...now].sort((a, b) => a.version - b.version || a.position - b.position)[0];
+      expect((await (await arrive()).replace(behind, unused(now))).status).toBe(303);
+      w = await where();
+    }
+    expect(w.keptWords[p], "the kept ship never came round to the author's word").toBe(mine);
+    expect(w.text, "the trace doesn't say the word is in the house opposite").toContain("kept in the house opposite");
+    const mark = w.doc.querySelectorAll(".kept-sentence .w")[p];
+    expect(mark.querySelector("mark") ?? (mark.closest("mark") as Element | null), "the author's kept word isn't marked for them").not.toBeNull();
+
+    // nobody else sees it marked
+    const other = await (await arrive()).page("/");
+    expect(other.doc.querySelector(".kept-sentence mark"), "another visitor sees a kept word marked").toBeNull();
+  }, 120_000);
+
   onceOnly("trace rendering is unaffected by the settle-only shape: no settled/kept labels, no extra lists", async () => {
     const alice = await arrive();
     const before = await alice.sentence();

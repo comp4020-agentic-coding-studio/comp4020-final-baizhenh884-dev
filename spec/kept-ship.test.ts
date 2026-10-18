@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
-import { deriveKeptShip, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
+import { deriveKeptShip, keptWhere, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
 
 // Kept ships (docs/decisions/0003-settle-and-kept-ships.md): ship m0 =
 // min(version) across the ten positions is the ship being built; the ship
@@ -167,6 +167,39 @@ const unusedWord = (all: { word: string }[]): string => {
   } while (all.some((s) => s.word === word));
   return word;
 };
+
+// Your word, kept (plan B): a word that stood at version g of its position
+// belongs to kept ship g. Relative to the ship the page shows, it is in it,
+// waiting in a later one, or in one already built and no longer shown. Ship
+// 1 is the maker's words, so a visitor's word is never in it.
+describe("where a replaced word is kept", () => {
+  it("is shown, later or earlier, against the ship the page shows", () => {
+    expect(keptWhere(3, 3)).toBe("shown");
+    expect(keptWhere(5, 3)).toBe("later");
+    expect(keptWhere(2, 3)).toBe("earlier");
+  });
+
+  it("follows a real history: a visitor's word stays later until its ship is shown, then earlier once passed", () => {
+    // a visitor's word at position 4 (version 2), then every position moves on
+    const steps: [number, string][] = [[4, "mine"], [4, "next"]];
+    let s = simulate(steps);
+    const g = 2; // "mine" stood at version 2 of position 4
+    expect(keptWhere(g, deriveKeptShip(s.changes, s.current).ship), "while ship 1 is being built").toBe("later");
+    for (const p of [0, 1, 2, 3, 5, 6, 7, 8, 9]) steps.push([p, `w${p}`]);
+    s = simulate(steps); // ship 1 complete and held
+    expect(deriveKeptShip(s.changes, s.current).ship).toBe(1);
+    expect(keptWhere(g, deriveKeptShip(s.changes, s.current).ship), "ship 1 holds only the maker's words").toBe("later");
+    steps.push([0, "after"]);
+    s = simulate(steps);
+    expect(deriveKeptShip(s.changes, s.current).ship).toBe(2);
+    expect(keptWhere(g, deriveKeptShip(s.changes, s.current).ship), "ship 2 is shown, and holds it").toBe("shown");
+    expect(deriveKeptShip(s.changes, s.current).words[4], "ship 2 doesn't hold the visitor's word at its position").toBe("mine");
+    for (const p of [1, 2, 3, 5, 6, 7, 8, 9]) steps.push([p, `x${p}`]);
+    s = simulate(steps); // ship 2 complete: later ships never hold, so ship 3 shows
+    expect(deriveKeptShip(s.changes, s.current).ship).toBe(3);
+    expect(keptWhere(g, deriveKeptShip(s.changes, s.current).ship), "once its ship is passed").toBe("earlier");
+  });
+});
 
 describe("Kept ship markup on GET /", () => {
   it("is read-only, its house decorative and its sentence readable", async () => {
