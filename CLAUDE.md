@@ -364,6 +364,14 @@ What the code must hold to. The README says why; don't restate it here.
 - Historical `?at=N` views never update live and never subscribe to realtime
   behaviour. Their house is built from that earlier sentence alone and is
   read-only.
+- An earlier house, `GET /?kept=k`, is completed kept ship k alone: its ten
+  words and its house, read-only, never live, reached one at a time
+  (Earlier house / Later house / Back to now), never listed together. Ship
+  k is derived from `changes` by the same rule as the kept ship being built
+  (`completedShip` in `src/lib/kept-ship.ts`), nothing stored. Anything that
+  isn't a completed ship (not a whole number from 1, the ship still being
+  built, or later) is 404. Its number is navigation in the URL only, never
+  shown on the page (`spec/kept-houses.test.ts`, `spec/kept-ship.test.ts`).
 - The house follows authoritative shared state, not a held draft: a newer
   shared word reaches it once, including at a position where a draft keeps the
   word on screen back, and the draft, its expected version and the label stay
