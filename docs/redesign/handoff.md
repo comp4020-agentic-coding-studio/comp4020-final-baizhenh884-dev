@@ -373,6 +373,34 @@ Staged stills for C and B (the standard stills can't show either):
   differs from the stranger's only in edge strength; it's subtle at page
   scale.
 
+Slice 6g — the phone link to the kept half (plan 3), paused; the kept cue:
+- Measured at 390x844: the kept house starts 974px down (1.2 screens)
+  fresh, 1232px with a three-word settle trace, 1390px with ten long
+  words. The line saying so is at 555px (fresh) but 992px with ten long
+  words: below the first screen.
+- `a611236` — spec: on a phone `.kept-pointer` is a link to the kept half
+  on the first screen, following it shows the kept house, a
+  `.back-pointer` links back; neither shows side by side; no scroll on
+  load. **Red, and its feat is not committed**: built, it fails the
+  long-sentence case (the line sits at y=992 with ten long words). Moving
+  the link up would change the first screen D settled, so it waits for the
+  maker's decision. The built feat is in `git stash` ("plan 3 feat: phone
+  link to the kept half"). Until then both passes carry these two named
+  failures.
+- `23d90e0` — spec: new `spec/house-cue.test.ts`, pure `partTone`: in the
+  kept house the author's own part's edges are at least 0.4 stronger, in
+  the kept ink, never red, timber lightened 0 < lift <= 0.2; every other
+  tone unchanged.
+- `5a44c2f` — feat: `partTone` extracted from `HouseView.paint` (all old
+  tones identical); kept cue edges 0.95 (was 0.54), solid timber lightened
+  20%, openings untouched. Measured (author vs stranger, same moment):
+  before, 0 px differed visibly; after, 2404 px (1920) / 1759 px (390) of
+  the entry part, ~18 levels lighter for the author.
+- `3d42f13` — `kept-mine-author-*` retaken; the stranger stills were
+  byte-identical.
+- Pass counts at `5a44c2f`: once 172 / 23 named skips, settle 188 / 7, plus
+  the two red plan-3 tests above.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
