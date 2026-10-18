@@ -457,7 +457,7 @@ describe("live page reconciliation", () => {
       const trace: SettleTrace = {
         latest: { position: a.position, word: fresh(), standing: true, settled: false, settlesInMs: 5000 },
         otherStanding: [{ position: b.position, word: fresh() }],
-        otherReplaced: [{ position: c.position, word: fresh(), now: fresh() }],
+        otherReplaced: [{ position: c.position, word: fresh(), now: fresh(), kept: "later" }],
       };
       page.applySnapshot({ positions: positionsOf(doc), trace });
 
@@ -560,7 +560,7 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
       expect(fills(doc)).toHaveLength(1);
       // replaced: the new trace no longer holds
-      const replaced: SettleTrace = { latest: { position: a.position, word: "held", standing: false, now: fresh() }, otherStanding: [], otherReplaced: [] } as unknown as SettleTrace;
+      const replaced: SettleTrace = { latest: { position: a.position, word: "held", standing: false, now: fresh(), kept: "later" }, otherStanding: [], otherReplaced: [] };
       page.applySnapshot({ positions: positionsOf(doc), trace: replaced });
       expect(fills(doc), "the line outlived its word").toHaveLength(0);
       page.applySnapshot({ positions: positionsOf(doc), trace: { latest: { position: b.position, word: "x", standing: true, settled: true }, otherStanding: [], otherReplaced: [] } });
