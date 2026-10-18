@@ -103,6 +103,19 @@ describe("an earlier house, /?kept=k", () => {
     for (const k of [building, building + 1, building + 50]) expect((await new Visitor().get(`/?kept=${k}`)).status, `/?kept=${k}`).toBe(404);
   });
 
+  localOnly("is reached from the kept half on GET /, by one Earlier house link to the last completed ship", async () => {
+    await complete(1);
+    const now = await new Visitor().sentence();
+    const shownBuilding = Math.min(...now.map((p) => p.version));
+    const { doc } = await new Visitor().get("/");
+    const link = doc.querySelector('.kept-half a[rel="prev"]');
+    expect(link, "GET / has no way to the earlier houses").not.toBeNull();
+    expect(link!.textContent?.trim()).toBe("Earlier house");
+    // the most recent completed ship (a held ship 1 is the one shown, so its house is still that ship)
+    expect(link!.getAttribute("href")).toBe(`?kept=${shownBuilding - 1}`);
+    expect(doc.querySelectorAll('.kept-half a[rel="prev"]'), "the earlier houses are listed").toHaveLength(1);
+  }, 120_000);
+
   localOnly("steps one house at a time: Earlier house and Later house between completed ships only", async () => {
     await complete(2);
     const two = (await new Visitor().get("/?kept=2")).doc;
