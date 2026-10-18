@@ -213,6 +213,13 @@ export function mountEarlier(doc: Document): void {
   viewIn(doc.getElementById("house"), "past")?.show(words);
 }
 
+// an earlier house (/?kept=k): a completed kept ship, whole, as timber, never live
+export function mountLoneHouse(doc: Document): void {
+  const words = [...doc.querySelectorAll(".kept-sentence .w")].map((w) => w.textContent!.trim());
+  if (words.length !== 10) return;
+  viewIn(doc.getElementById("house-kept"), "kept")?.keptShow({ words, gaps: words.map(() => false) });
+}
+
 export type KeptHouse = {
   // a kept ship as a fresh load (or a reconnect) shows it: at once
   update(kept: KeptShip): void;

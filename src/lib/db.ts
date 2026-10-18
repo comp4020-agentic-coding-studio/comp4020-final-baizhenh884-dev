@@ -5,7 +5,7 @@ import { asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import "./blocklist"; // read and reported when the server first loads, beside the rule mode
-import { deriveKeptShip, keptWhere, type KeptShip, type KeptWhere } from "./kept-ship";
+import { completedShip, deriveKeptShip, keptWhere, type KeptShip, type KeptWhere } from "./kept-ship";
 import { positions } from "./schema";
 import { STARTING_WORDS } from "./sentence";
 
@@ -83,14 +83,20 @@ export function sentenceAt(n: number): string[] | null {
 // The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): derived
 // entirely from `changes` and the current `positions`, no stored state of
 // its own. See kept-ship.ts for the derivation itself.
-export function keptShipAt(): KeptShip {
-  const changes = client.prepare("SELECT position, from_version AS fromVersion, from_word AS fromWord FROM changes ORDER BY id").all() as {
+const keptChanges = () =>
+  client.prepare("SELECT position, from_version AS fromVersion, from_word AS fromWord FROM changes ORDER BY id").all() as {
     position: number;
     fromVersion: number;
     fromWord: string;
   }[];
-  const current = currentPositions().map(({ word, version }) => ({ word, version }));
-  return deriveKeptShip(changes, current);
+
+export function keptShipAt(): KeptShip {
+  return deriveKeptShip(keptChanges(), currentPositions().map(({ word, version }) => ({ word, version })));
+}
+
+// An earlier house: completed kept ship k's words, or null (src/lib/kept-ship.ts)
+export function completedShipAt(k: number): string[] | null {
+  return completedShip(keptChanges(), currentPositions().map(({ word, version }) => ({ word, version })), k);
 }
 
 // A visitor's own change, if they've made one: their word, and whether it

@@ -153,6 +153,8 @@ const { title } = Astro.props;
       .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
+      .kept-half .earlier { color: var(--kept-soft); }
+      .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
       .foot #how { margin: 0; }
       .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
@@ -160,6 +162,15 @@ const { title } = Astro.props;
       /* only when the halves stack: the kept half is far below, so say so */
       .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
 
+      /* an earlier house (/?kept=k): the kept ship alone on its own ground, read-only */
+      main:has(> .lone-house) { background: var(--kept-ground); color: #efe6d8; }
+      .lone-house { --kept-ink: #efe6d8; --kept-soft: #b9ab97; display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
+      .lone-house .mast { border-bottom-color: rgb(239 230 216 / 0.16); max-width: none; }
+      .lone-house .mast .sub, .lone-house .half-label, .lone-house .history, .lone-house .about { color: var(--kept-soft); }
+      .lone-house .kept-sentence { max-width: 30ch; }
+      .lone-house #house-kept { position: relative; flex: 1; min-height: 48vh; }
+      .lone-house #house-kept canvas { position: absolute; inset: 0; }
+      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(185 171 151 / 0.4); }
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }

@@ -1,7 +1,8 @@
 ---
+import EarlierHouse from "../components/EarlierHouse.astro";
 import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
-import { changeCount, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
 import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
 import { ensureVisitor } from "../lib/visitor";
 
@@ -11,6 +12,14 @@ const visitor = ensureVisitor(Astro.cookies, Astro.locals);
 // GET /: the current sentence, the only one that can be changed.
 // Each has its house: a body built in the browser from these same words,
 // never stored, and beside the sentence rather than instead of it.
+// GET /?kept=k: completed kept ship k on its own (an earlier house), or 404
+const keptParam = Astro.url.searchParams.get("kept");
+const lone = keptParam !== null && /^[1-9][0-9]{0,14}$/.test(keptParam) ? completedShipAt(Number(keptParam)) : null;
+if (keptParam !== null && !lone) return new Response("Not found", { status: 404 });
+const loneK = Number(keptParam);
+const lonePrev = lone && loneK > 1 ? loneK - 1 : null;
+const loneNext = lone && completedShipAt(loneK + 1) ? loneK + 1 : null;
+
 const at = Astro.url.searchParams.get("at");
 let earlier: string[] | null = null;
 if (at !== null) {
@@ -26,6 +35,8 @@ const n = Number(at);
 // kept ship isn't rendered (?at=N is a single read-only form of the sentence,
 // not a live pairing). Always computed (cheap, one read), used only below.
 const kept = keptShipAt();
+// the most recent completed kept ship, the one way into the earlier houses (0: none yet)
+const lastCompleted = earlier ? 0 : Math.min(...current.map((p) => p.version)) - 1;
 
 // Which trace shape renders is itself rule-mode config, never guessed from
 // the trace's own content (docs/decisions/0003-settle-and-kept-ships.md).
@@ -57,7 +68,9 @@ const how =
 
 <Page title="Theseus">
   {
-    earlier ? (
+    lone ? (
+      <EarlierHouse words={lone} prev={lonePrev} next={loneNext} />
+    ) : earlier ? (
       <>
         <header class="mast">
           <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
@@ -186,6 +199,8 @@ const how =
             <div id="house-kept" aria-hidden="true"></div>
             <div class="foot">
               <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
+              {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
+              {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
             </div>
           </div>
         </div>

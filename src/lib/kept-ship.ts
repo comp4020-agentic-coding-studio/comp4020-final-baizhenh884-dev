@@ -21,15 +21,27 @@ export function deriveKeptShip(changes: readonly KeptChange[], current: readonly
   // only ship 1 holds: a later ship's completion is a quiet beat on the page, never a hold
   const ship = last && last.fromVersion === m0 - 1 && m0 - 1 === 1 ? 1 : m0;
 
-  const words = current.map((c) => c.word);
-  const gaps = current.map((c) => c.version <= ship);
-  for (const c of changes) {
-    if (c.fromVersion === ship) {
-      words[c.position] = c.fromWord;
-      gaps[c.position] = false;
-    }
-  }
+  const kept = shipWords(changes, ship);
+  const words = current.map((c, i) => kept[i] ?? c.word);
+  const gaps = kept.map((w) => w === null);
   return { ship, words, gaps };
+}
+
+// Ship k: at each position the word that stood at version k, kept once it
+// was replaced (null while it still stands). The one rule both the kept
+// ship being built and an earlier, completed one are read by.
+function shipWords(changes: readonly KeptChange[], k: number): (string | null)[] {
+  const words: (string | null)[] = Array(10).fill(null);
+  for (const c of changes) if (c.fromVersion === k) words[c.position] = c.fromWord;
+  return words;
+}
+
+// An earlier house (/?kept=k): ship k's ten words, only once every position
+// has been replaced past version k; null for any other k.
+export function completedShip(changes: readonly KeptChange[], current: readonly CurrentWord[], k: number): string[] | null {
+  if (!Number.isInteger(k) || k < 1 || k >= Math.min(...current.map((c) => c.version))) return null;
+  const words = shipWords(changes, k);
+  return words.every((w): w is string => w !== null) ? words : null;
 }
 
 // Where a replaced word is kept, against the ship shown: a word that stood at
