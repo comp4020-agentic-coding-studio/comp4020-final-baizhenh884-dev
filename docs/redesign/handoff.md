@@ -401,6 +401,35 @@ Slice 6g — the phone link to the kept half (plan 3), paused; the kept cue:
 - Pass counts at `5a44c2f`: once 172 / 23 named skips, settle 188 / 7, plus
   the two red plan-3 tests above.
 
+Slice 6h — earlier houses, `/?kept=k` (plan 1 of the second set):
+- `1f71310` — spec: `completedShip` (pure: null until every position is
+  past version k; ship 1 is the maker's words; ships 1-3 match
+  `deriveKeptShip` one change before completing plus the completing
+  word); new `spec/kept-houses.test.ts` (404 for non-whole numbers, the
+  ship being built and later; a completed ship: its words, no gap, no
+  forms, no live half, aria-hidden house, no `/events` in the HTML, no
+  digit in the page text; Earlier/Later house between completed ships
+  only, one kept sentence; the last completed ship doesn't lead on).
+- `4d2343d`, corrected by `20ed8ab` — spec: GET /'s kept half has one
+  "Earlier house" link to the most recent completed ship. The first draft
+  used `rel="prev"`; GET / already has exactly one, the Earlier form's
+  (HTTP contract; live-client rewrites the first `a[rel~="prev"]`), so it
+  is a plain `a.earlier-house` and GET / keeps one rel=prev.
+- `954a9ab` — feat: `shipWords` shared by `deriveKeptShip` and
+  `completedShip`; `completedShipAt`; `EarlierHouse.astro`,
+  `mountLoneHouse`; the kept half's Earlier house link.
+- Gap noticed: the "never live" check reads the HTML only; the page's own
+  script could still subscribe. Seen in headless Chrome: a fresh tab
+  loading only `/?kept=1` makes no `/events` request (an earlier "true"
+  was the same tab's earlier GET /). Not yet a check.
+- Not committed: CLAUDE.md "Enforced" line for `/?kept=k`, shown to the
+  maker for approval.
+- `5d5648d` — `replaced-*` retaken (the kept half ends with "Earlier
+  house"; fresh stills byte-identical); `kept-house-*` new: staged, test
+  words only, two full rounds then one change, `/?kept=2`.
+- Pass counts at `954a9ab`: once 180 / 23 named skips, settle 196 / 7,
+  plus plan 3's two paused tests.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
