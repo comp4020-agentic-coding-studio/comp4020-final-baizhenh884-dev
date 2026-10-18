@@ -360,6 +360,19 @@ Slice 6f — your word, kept (plan B, settle mode only):
   seen only in a scratch screenshot, not kept.
 - Pass counts at `19a94ad`: once 166 / 23 named skips; settle 182 / 7.
 
+Staged stills for C and B (the standard stills can't show either):
+- `9b8d17e` — CLAUDE.md: the settling line is the one private exception
+  to "showing how long a word stood" (approved diff).
+- `6e3e6f6` — `settling-<viewport>.png` (SETTLE_SECONDS=60,
+  so the hold could be caught midway; shot 20 s in, line 33% filled) and
+  `kept-mine-author-<viewport>.png` / `kept-mine-stranger-<viewport>.png`
+  (SETTLE_SECONDS=3; author's "lantern" marked and "kept in the house
+  opposite", a stranger's window at the same moment unmarked). **Staged,
+  test words only, not participant evidence.** App tree at `19a94ad`.
+- Judged, not checked: the kept house's firmer part on the author's still
+  differs from the stranger's only in edge strength; it's subtle at page
+  scale.
+
 Plan 1 (phone performance) waits for the maker's real-phone test on home
 Wi-Fi; no rendering change until then. Over plain-http LAN the `Secure`
 visitor cookie is dropped, so the phone can watch but not submit; submit
