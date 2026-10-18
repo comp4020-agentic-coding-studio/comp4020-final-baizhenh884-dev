@@ -322,51 +322,79 @@ describe("two ships on GET /", () => {
   });
 
   // On a phone the kept house is one to two screens down (974px fresh, 1390px
-  // with ten long words, measured at 390x844). The line on the first screen
-  // that says so is a link to the kept half, and the kept half links back:
-  // a visitor goes there only by choosing to, the page never scrolls itself.
-  // Plain anchors, so they work without JavaScript (this copy runs none).
+  // with ten long words, measured at 390x844), and the footer line saying so
+  // can itself fall below the first screen (992px with ten long words). So
+  // the way there is in the header row, where desktop shows the two labels
+  // side by side: "What stands" on the left, a link "What was kept ↓" on the
+  // right, in the same caps; the kept half's header links back up. It reads
+  // as the page's structure, not a button. The footer line stays as it is,
+  // unlinked (the moment's acknowledgements use it). Tap-only: the page never
+  // scrolls by itself. Plain anchors, so it works without JavaScript (this
+  // copy runs none). Nothing above the sentence grows, so the invitation and
+  // the house keep their places.
   for (const longWords of [false, true]) {
-    it(`links down to the kept house and back on a phone, never scrolling by itself (390×844${longWords ? ", ten long words" : ""})`, async () => {
+    it(`links to the kept half and back from the header rows on a phone, never scrolling by itself (390×844${longWords ? ", ten long words" : ""})`, async () => {
       const doc = await servedPage(baseUrl);
       if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+      // where the sentence and house stood without the links: the header row mustn't grow
+      const withoutLinks = doc.cloneNode(true) as Document;
+      withoutLinks.querySelectorAll("a.to-kept, a.to-stands").forEach((a) => a.remove());
+      const baseline = (await measureIn(withoutLinks, `(async () => { await document.fonts.ready; const t = (s) => document.querySelector(s).getBoundingClientRect().top; return { sentence: t('.stands-half .sentence'), house: t('.stands-half #house'), invite: t('.stands-half .invite') }; })()`, [390, 844])) as { sentence: number; house: number; invite: number };
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         const settle = () => new Promise((r) => setTimeout(r, 900)); // a smooth scroll has finished
         const q = (s) => document.querySelector(s);
-        const down = q('.stands-half a.kept-pointer'), up = q('.kept-half a.back-pointer');
+        const down = q('.stands-half a.to-kept'), up = q('.kept-half a.to-stands');
         if (!down || !up) return { missing: { down: !!down, up: !!up } };
         await settle();
         const atLoad = scrollY;
-        const downBox = down.getBoundingClientRect();
+        const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+        const style = (el) => { const s = getComputedStyle(el); return [s.fontSize, s.letterSpacing, s.textTransform].join(' '); };
+        const t = (s) => q(s).getBoundingClientRect().top;
+        const placed = { sentence: t('.stands-half .sentence'), house: t('.stands-half #house'), invite: t('.stands-half .invite') };
+        const downBox = box(down), standsLabel = box(q('.stands-half .half-label')), upBox = box(up), keptLabel = box(q('.kept-half .kept-label'));
+        const sameStyle = style(down) === style(q('.stands-half .half-label')) && style(up) === style(q('.kept-half .kept-label'));
+        const footer = q('.stands-half .kept-pointer');
+        const footerLinked = !!footer && (footer.tagName === 'A' || !!footer.closest('a') || !!footer.querySelector('a'));
         const target = (a) => q(a.getAttribute('href'));
         down.click(); await settle();
-        const house = q('#house-kept').getBoundingClientRect(), keptAfterDown = { top: house.top, bottom: house.bottom };
+        const house = box(q('#house-kept'));
         const downTarget = !!target(down) && target(down).classList.contains('kept-half');
         up.click(); await settle();
-        const sentence = q('.stands-half .sentence').getBoundingClientRect();
-        return { atLoad, downTop: downBox.top, downBottom: downBox.bottom, keptAfterDown, downTarget, upTarget: !!target(up) && target(up).classList.contains('stands-half'),
-          sentenceAfterUp: { top: sentence.top, bottom: sentence.bottom }, upShown: getComputedStyle(up).display !== 'none' };
+        const sentence = box(q('.stands-half .sentence'));
+        return { atLoad, downBox, standsLabel, upBox, keptLabel, sameStyle, footerLinked, placed, house, downTarget,
+          upTarget: !!target(up) && target(up).classList.contains('stands-half'), sentence, downText: down.textContent.trim(), upText: up.textContent.trim() };
       })()`, [390, 844])) as any;
-      expect(m.missing, "the phone has no link to the kept half, or none back").toBeUndefined();
+      expect(m.missing, "the phone has no header link to the kept half, or none back").toBeUndefined();
       expect(m.atLoad, "the page scrolled by itself on load").toBe(0);
-      expect(m.downBottom, "the link to the kept half isn't on the first screen").toBeLessThanOrEqual(844);
+      // in the header rows, beside the labels, in their caps
+      expect(m.downText, "the link down isn't 'What was kept ↓'").toMatch(/^What was kept\s*↓$/i);
+      expect(m.upText, "the link back isn't 'Back to what stands ↑'").toMatch(/^Back to what stands\s*↑$/i);
+      expect(m.sameStyle, "the header links aren't in the labels' caps").toBe(true);
+      expect(Math.abs(m.downBox.top - m.standsLabel.top), "'What was kept' isn't on the 'What stands' row").toBeLessThanOrEqual(2);
+      expect(m.downBox.left, "'What was kept' isn't to the right of 'What stands'").toBeGreaterThan(m.standsLabel.right);
+      expect(Math.abs(m.upBox.top - m.keptLabel.top), "the way back isn't on the 'What was kept' row").toBeLessThanOrEqual(2);
+      expect(m.upBox.left, "the way back isn't to the right of 'What was kept'").toBeGreaterThan(m.keptLabel.right);
+      expect(m.downBox.bottom, "the link down isn't on the first screen").toBeLessThanOrEqual(844);
+      expect(m.footerLinked, "the footer line became a link").toBe(false);
+      // nothing above the sentence grew: the sentence, the invitation and the house keep their places
+      for (const k of ["sentence", "invite", "house"] as const) expect(Math.abs(m.placed[k] - baseline[k]), `the header link moved the ${k}`).toBeLessThanOrEqual(0.5);
+      // the jumps themselves
       expect(m.downTarget, "the link doesn't lead to the kept half").toBe(true);
-      expect(m.keptAfterDown.top, "following the link leaves the kept house below the screen").toBeLessThan(844);
-      expect(m.keptAfterDown.top, "following the link scrolls past the kept house").toBeGreaterThanOrEqual(0);
-      expect(m.upShown, "there's no way back from the kept half").toBe(true);
+      expect(m.house.top, "following the link leaves the kept house below the screen").toBeLessThan(844);
+      expect(m.house.top, "following the link scrolls past the kept house").toBeGreaterThanOrEqual(0);
       expect(m.upTarget, "the way back doesn't lead to what stands").toBe(true);
-      expect(m.sentenceAfterUp.top, "the way back doesn't bring the live sentence into view").toBeGreaterThanOrEqual(0);
-      expect(m.sentenceAfterUp.bottom, "the way back doesn't bring the live sentence into view").toBeLessThanOrEqual(844);
+      expect(m.sentence.top, "the way back doesn't bring the live sentence into view").toBeGreaterThanOrEqual(0);
+      expect(m.sentence.bottom, "the way back doesn't bring the live sentence into view").toBeLessThanOrEqual(844);
     }, 90_000);
   }
 
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]]] as const) {
-    it(`shows neither phone link when the halves stand side by side (${name})`, async () => {
+    it(`shows neither header link when the halves stand side by side (${name})`, async () => {
       const doc = await servedPage(baseUrl);
       const shown = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
-        return [...document.querySelectorAll('.kept-pointer, .back-pointer')].filter((a) => getComputedStyle(a).display !== 'none').length;
+        return [...document.querySelectorAll('a.to-kept, a.to-stands')].filter((a) => getComputedStyle(a).display !== 'none').length;
       })()`, [size[0], size[1]])) as number;
       expect(shown, "a phone link shows beside the halves").toBe(0);
     }, 90_000);
