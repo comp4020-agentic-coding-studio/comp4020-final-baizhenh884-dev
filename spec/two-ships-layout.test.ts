@@ -321,6 +321,57 @@ describe("two ships on GET /", () => {
     expect(doc.querySelector(".invite"), "an earlier form invites a change").toBeNull();
   });
 
+  // On a phone the kept house is one to two screens down (974px fresh, 1390px
+  // with ten long words, measured at 390x844). The line on the first screen
+  // that says so is a link to the kept half, and the kept half links back:
+  // a visitor goes there only by choosing to, the page never scrolls itself.
+  // Plain anchors, so they work without JavaScript (this copy runs none).
+  for (const longWords of [false, true]) {
+    it(`links down to the kept house and back on a phone, never scrolling by itself (390×844${longWords ? ", ten long words" : ""})`, async () => {
+      const doc = await servedPage(baseUrl);
+      if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const settle = () => new Promise((r) => setTimeout(r, 900)); // a smooth scroll has finished
+        const q = (s) => document.querySelector(s);
+        const down = q('.stands-half a.kept-pointer'), up = q('.kept-half a.back-pointer');
+        if (!down || !up) return { missing: { down: !!down, up: !!up } };
+        await settle();
+        const atLoad = scrollY;
+        const downBox = down.getBoundingClientRect();
+        const target = (a) => q(a.getAttribute('href'));
+        down.click(); await settle();
+        const house = q('#house-kept').getBoundingClientRect(), keptAfterDown = { top: house.top, bottom: house.bottom };
+        const downTarget = !!target(down) && target(down).classList.contains('kept-half');
+        up.click(); await settle();
+        const sentence = q('.stands-half .sentence').getBoundingClientRect();
+        return { atLoad, downTop: downBox.top, downBottom: downBox.bottom, keptAfterDown, downTarget, upTarget: !!target(up) && target(up).classList.contains('stands-half'),
+          sentenceAfterUp: { top: sentence.top, bottom: sentence.bottom }, upShown: getComputedStyle(up).display !== 'none' };
+      })()`, [390, 844])) as any;
+      expect(m.missing, "the phone has no link to the kept half, or none back").toBeUndefined();
+      expect(m.atLoad, "the page scrolled by itself on load").toBe(0);
+      expect(m.downBottom, "the link to the kept half isn't on the first screen").toBeLessThanOrEqual(844);
+      expect(m.downTarget, "the link doesn't lead to the kept half").toBe(true);
+      expect(m.keptAfterDown.top, "following the link leaves the kept house below the screen").toBeLessThan(844);
+      expect(m.keptAfterDown.top, "following the link scrolls past the kept house").toBeGreaterThanOrEqual(0);
+      expect(m.upShown, "there's no way back from the kept half").toBe(true);
+      expect(m.upTarget, "the way back doesn't lead to what stands").toBe(true);
+      expect(m.sentenceAfterUp.top, "the way back doesn't bring the live sentence into view").toBeGreaterThanOrEqual(0);
+      expect(m.sentenceAfterUp.bottom, "the way back doesn't bring the live sentence into view").toBeLessThanOrEqual(844);
+    }, 90_000);
+  }
+
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]]] as const) {
+    it(`shows neither phone link when the halves stand side by side (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const shown = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        return [...document.querySelectorAll('.kept-pointer, .back-pointer')].filter((a) => getComputedStyle(a).display !== 'none').length;
+      })()`, [size[0], size[1]])) as number;
+      expect(shown, "a phone link shows beside the halves").toBe(0);
+    }, 90_000);
+  }
+
   it("stacks the halves on a phone (390×844)", async () => {
     const l = await layout([390, 844]);
     expect(l.kept.top, "the kept half isn't below the live one").toBeGreaterThanOrEqual(l.stands.bottom - 1);
