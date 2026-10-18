@@ -419,7 +419,10 @@ hold.
 - Not built (as of Crit 9): an "as you left it" jump, a client-side
   confirmation step, and showing how long a word stood. Each change still
   records when it happened, for logging; that time is never shown to other
-  visitors.
+  visitors. The one exception is private: under settle mode, a visitor's
+  own holding word fills a thin line until it settles (how much of their
+  hold is left), on their own page only, never red, and not with reduced
+  motion (`spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
 - The visual treatment (fading, layout) is judged, not specified. Its
   direction is Monograph, an architectural-study field: the sentence is the
   protagonist and the house its body; a standing house stays restrained; red
