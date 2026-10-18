@@ -13,8 +13,8 @@ export const LINE = "None of the first sentence stands. All of it has been kept.
 export const LINE_MS = 6500;
 export const ACK_MS = 4000;
 
-// what the line must never cover: the live sentence's words, a held draft's notice, the part notation
-const AVOID = '.sentence form[action="/replace"] label, .sentence .changed, #part:not([hidden])';
+// what the line must never cover: the live sentence's words, a held draft's notice, the part notation or the invitation in its slot
+const AVOID = '.sentence form[action="/replace"] label, .sentence .changed, #part:not([hidden]), .invite';
 
 function place(doc: Document, line: HTMLElement): void {
   const vh = doc.documentElement.clientHeight, edge = 16;

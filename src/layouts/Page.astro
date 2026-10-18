@@ -131,7 +131,9 @@ const { title } = Astro.props;
       .stands-half .text { margin: 0; padding: 0; }
       /* the part notation lies over the house's own empty top band, which no house at rest reaches
          (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
-      .stands-half #part { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
+      .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
+      .stands-half .invite { color: var(--soft); white-space: nowrap; }
+      .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
       /* the row decides a house's size, never its canvas: the canvas lies over its host */
       #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
       .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
