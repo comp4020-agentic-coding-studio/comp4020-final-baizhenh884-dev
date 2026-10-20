@@ -1,140 +1,59 @@
 # Process overview
 
-This file is rewritten at each crit; the `crit-8` tag keeps the Crit 8
-version. At Crit 9 it covers the project as it stands, and what is still
-unverified.
+This file is rewritten at each crit. By Crit 10, Theseus was already a deployed multi-user application: one shared sentence, one house derived from it, persistent history and realtime updates. This week the main work was making that multi-user behaviour explicit enough that I could understand what two people were doing from the server logs, without relying on the interface.
 
 ## How I worked with the agent
 
-I set the product and its rules; Claude Code planned, implemented and checked
-within them. Every plan was read-only until I approved it, each behaviour was
-specified as a failing check before the code that passes it, and any change to
-`CLAUDE.md`, `README.md` or `spec/` was shown to me first. I treated "it works"
-and "it looks good" as claims to be shown; the corrections that mattered most
-came from running the page, not green suites.
+I set the boundaries first, then used the agent to inspect, implement and test inside them. At the end of the Crit 10 work I reviewed `CLAUDE.md` rather than just appending to it: rules that still held stayed, and the scope moved to Crit 10 with the logging contract ([`30aa71a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/30aa71a)).
 
-## What Theseus is
+I also had to correct the agent when the process drifted. In one case it implemented code before writing the failing test. I stopped that pattern and added the rule to `CLAUDE.md` that the failing check comes first ([`3933e0a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/3933e0a)). I also changed the CI expectations so tests run in both rule modes of the redesign rather than quietly skipping one ([`5fa620e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/5fa620e)); if the mode is unclear, the test reports an error instead of skipping it ([`176e6e2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/176e6e2)).
 
-One shared sentence, rewritten one word at a time, one change per visitor,
-ever. The harness came first
-([`bdeaef5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/bdeaef5)).
-Theseus beat _Pass the Pen_ and _Loom_, whose rule a simulation showed mostly
-made noise. A five-person probe, me included, was inconclusive about
-deliberation, but showed that words kept beneath a position can't rebuild the
-whole sentence, so earlier forms exist. It later became one object in two
-forms: the sentence, and a house of ten parts.
+That mattered more to me than simply getting another green run. I wanted the correction to remain in the harness so the same mistake would be harder to repeat.
 
-## Stack
+## What counts as a person
 
-The course's Week 7 stack: Astro on `@astrojs/node`, SQLite on the Fly volume,
-plain forms and Post/Redirect/Get. A replacement is one transaction with
-per-position versions and a log unique per visitor. For realtime I chose
-server-sent events: writes are already POSTs, `CLAUDE.md` rules out WebSockets,
-and polling would cost reads without adding truth. The house adds one client
-library, `three`, which only draws.
+The first useful realisation was that multi-user support already existed. Independent browsers already received different visitor cookies, and the database already enforced the interaction rules. What was missing was a clear explanation of what Theseus considers a person.
 
-## Only the present is live
+I recorded that decision in [ADR 0002](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0002-pseudonymous-visitor-and-logging.md) ([`2234f0b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/2234f0b)).
 
-**Only the present is live; the past stays frozen**
-([decision 0001](docs/decisions/0001-live-present-frozen-past.md),
-[`9090740`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/9090740)).
-I wanted the sentence itself to show that others are acting. Presence counts
-would add social metadata, and a feed would turn the history into another
-product. A reconnecting page re-reads current SQLite; nothing is replayed.
+For Theseus, one browser holding the `theseus_visitor` cookie is one anonymous visitor. I considered stronger alternatives. Accounts would introduce signup and login to something that should work immediately from a URL. A chosen nickname would create a public identity surface that the project does not otherwise need. Device fingerprinting would identify more than is necessary.
 
-The hard case is a remote change to the word you are editing. Overwriting your
-draft loses your work; rebasing it lets you submit against a version you never
-saw. So the draft and its expected version stay, the page names the new
-word, and a submit then fails as stale. Reviewing the plan, I caught that
-applying it on blur would defeat this, because clicking submit blurs
-first and would let a stale draft past the 409.
+The browser cookie is deliberately weaker. Two separate browser profiles count as separate visitors, but the public page still has no names, profiles or activity feed. That is enough identity for the server to enforce the rules without changing the character of the piece.
 
-Each layer was specified red, then built green
-([`e4bc25d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/e4bc25d),
-[`a0a58c8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/a0a58c8)).
-With everything green, the agent raised a case its checks hadn't covered: one
-visitor, two tabs. A real browser run showed the second tab never gained "Your
-trace", because change events carry no trace by design. The agent stopped rather
-than weaken that contract; I chose a per-connection refresh
-([`6896612`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/6896612)).
+## Making the server behaviour visible
 
-## One sentence, one house
+Before adding logging, I defined what the logs needed to show and had the agent write a failing logging contract ([`d69cdf7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/d69cdf7)).
 
-The prototypes lived outside this repo, so it holds their result, not the
-search: ten fixed territories, one per position. A word's position decides where
-it acts, and its written form (length, vowels, letter shapes) its character,
-never its meaning. I froze that grammar as a fixture before any code
-([`9fc4b69`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/9fc4b69)),
-with a continuous length rule, because the four-step one saturated at seven
-letters and made long words look alike. The house is never stored; an earlier
-form's house is built from that sentence alone.
+The implementation then landed as four separate commits, one for each kind of evidence: request information ([`0d5dc93`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/0d5dc93)), new and returning visitors ([`417c3ee`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/417c3ee)), replacement outcomes and the number of streams reached ([`07bd2a8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/07bd2a8)), and the lifecycle of realtime streams ([`c9c0242`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/c9c0242)).
 
-The geometry spec checks 500 seeded sentences and extremes
-([`8d51ad9`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/8d51ad9)),
-but it can't judge architecture, so I judged renders. Masses read as fins,
-pegs and fence panels, and six refinements changed geometry without touching
-the grammar
-([`4df7bea...6090b8b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/compare/4df7bea...6090b8b)).
-A review caught a view keeping its own group list that could drift from the
-body's; `LiveBody` now owns it
-([`ae5c6f1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/ae5c6f1)).
-Then I froze the grammar and geometry.
+A request gets an id so related lines can be followed together. New and returning visitors can be distinguished, and an accepted replacement records enough information to explain what changed.
 
-## Making word and house one thing
+Rejected replacements are handled differently. The log records only the outcome: `spent`, `stale`, or `invalid` with a reason category. It never records the rejected word itself because that word never became public state.
 
-The question was how to make sentence and house feel causally linked without a
-diagram or a game. I compared three treatments behind a query switch. The one
-that explained fastest competed with the sentence, so the sentence stayed the
-protagonist and the idea moved under the house. My decisive correction:
-pointing alone must not draw the long line. Hover marks a word and its part by
-paired emphasis; the thin line appears only for a word at work, and turns red
-only while that part is rebuilt; a phone has none
-([`198f337`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/198f337)).
-The prototype screenshots weren't kept. The README now opens with the same idea
-in prose
-([`0228bb8`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/0228bb8)).
+The visitor identifier in the log is also not the cookie. It is a deterministic one-way tag. I do not log the raw cookie, IP address, user-agent string or browser fingerprint because none of those are needed to understand the interaction.
 
-## When a difference is too faint to see
+## Checking the evidence, not just the result
 
-Replacing _people_ with _garden_ at the entry rebuilt that part, but the settled
-house looked almost the same. I asked for settled before and after evidence,
-never the exchange animation: the real house rendered at page size, compared for
-37 words at every territory. The entry was the one territory where faint results
-were systematic, because openness only set a recess hidden behind the threshold.
-Making openness raise the opening first looked like an improvement. A stricter
-comparison, holding the threshold still, showed that much of the gain was the
-neighbouring threshold moving, as it already does to clear the entry, not the
-entry becoming more visible; without it the entry was still too subtle. I
-rejected the experiment. The weakness is known and unsolved; the scratch
-measurements aren't repository evidence and weren't kept.
+One recurring problem this week was deciding whether a passing run really explained an earlier failure.
 
-That comparison exposed an older bug: a live change could settle on a different
-house than a reload. `LiveBody` kept a neighbour when its bounding box and mesh
-count matched, but a solid can move inside the same outline, so a change at the
-entry could leave the hall stale. The regression specs ran the real show,
-change and settle path first; they fail with the old signature and pass once it
-covers every solid's vertices
-([`e2413ad`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/e2413ad)).
-Hand checks also found what green suites missed: a focused field was invisible
-without `field-sizing`
-([`5a71bf5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/5a71bf5)).
+A browser test failed once and then passed. I did not want to treat the second run as enough, so I asked for the measurements to be printed and for repeated runs without retries or weaker checks. The cause turned out to be leftover headless Chrome processes, not an application bug. I then fixed the test tooling itself rather than hiding the failure ([`33b10db`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/33b10db), [`68749d5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/68749d5)).
 
-## Evidence, and what isn't verified
+A separate timing problem followed the same pattern. I first added a regression test that demonstrated the millisecond-level bug ([`287e276`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/287e276)), then fixed the behaviour ([`b8b4af2`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/b8b4af2)).
 
-Locally, `pnpm check` passes 71 of 71 and typecheck is clean. Headless Chrome
-checks used staged words: test data, not visitors' changes. The motion spec was
-written after its code and pins it
-([`72e865d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/72e865d)).
-Crit 9 is deployed
-([`85cfccb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/commit/85cfccb)).
-On Fly, `/events` streamed: an observer saw a change in about 350 ms, a cut
-connection caught up in 916 ms, history stayed frozen, and the three genuine
-earlier changes survived. My added change, _many_ to _every_, was verification,
-not participant evidence. Safari and the house with real participants are
-unverified.
+These examples changed how I used the agent. A green result was useful, but if I could not explain why the earlier result was red, I kept investigating.
 
-## The trade-off
+## Redesign work alongside Crit 10
 
-I accept a little client script, a machine kept awake while a tab is open, and
-drafts that wait on their visitor. In return the sentence is live without
-becoming a feed, and SQLite stays the only truth.
+After the Crit 9 version was complete, I also started a separate redesign branch. I kept it isolated because it changes the participation rule and adds a second, kept house rather than simply polishing the deployed version.
+
+The redesign decisions are recorded separately in [ADR 0003](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/final/theseus-redesign/docs/decisions/0003-settle-and-kept-ships.md). I did not merge them before the Crit 10 checkpoint because the Crit 10 version was the thing being assessed, and the redesign includes database changes that are harder to reverse once deployed. The branch is therefore part of the next iteration, not evidence that the Crit 10 production behaviour had already changed.
+
+## Stack and trade-offs
+
+The core stack stayed the same: Astro on Node, SQLite on the Fly volume, POST requests for writes and SSE for realtime updates.
+
+POST already handles the replacement action, so realtime only needs the server to send changes back to connected pages. I chose SSE rather than WebSockets because the communication is one-way. Polling would repeatedly read the database without providing better truth, while the existing project rules also ruled out adding WebSockets without a reason.
+
+SQLite remains the authoritative state. The realtime layer reports changes but does not replace the database.
+
+The main trade-off in Crit 10 is that the server now knows enough to distinguish anonymous visitors in its logs, but I deliberately stop there. The system records enough information to explain what happened and debug failures, without collecting extra information about the person behind the browser.
