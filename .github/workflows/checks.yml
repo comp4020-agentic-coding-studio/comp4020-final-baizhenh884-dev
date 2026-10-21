@@ -49,12 +49,18 @@ jobs:
         # what the container printed, so a crash or slow boot is visible
         if: ${{ failure() }}
         run: docker logs app
-      - name: Stop the once-mode container
+      - name: Remove the once-mode container
         # settle mode needs a container of its own: switching RULE_MODE on a
         # running container isn't possible (it's read once at boot), and the
-        # two modes mustn't share a database
+        # two modes mustn't share a database. `rm -f`, not `stop`: a stopped
+        # container still holds its name, and the settle-mode `docker run
+        # --name app` below collides with it ("Conflict. The container name
+        # '/app' is already in use"). This never showed before because the
+        # once-mode spec had never passed on this branch: every prior run
+        # failed inside "Run the spec" first, so the settle-mode build step
+        # was skipped and never reached the collision.
         if: ${{ always() }}
-        run: docker stop app || true
+        run: docker rm -f app || true
       - name: Build and start the app under settle mode
         # production's actual mode (docs/decisions/0003-settle-and-kept-ships.md):
         # the once-mode run above never exercises it, and RULE_MODE=settle is
