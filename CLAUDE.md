@@ -188,7 +188,7 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 
    ```sh
    docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
-   RULE_MODE=settle BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
+   RULE_MODE=settle SETTLE_SECONDS=3 BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
    docker stop app
    ```
 3. **Deployed:** `flyctl deploy --remote-only --ha=false -a
