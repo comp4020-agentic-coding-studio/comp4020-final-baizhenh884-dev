@@ -4,7 +4,7 @@ import { describe, expect, inject, it } from "vitest";
 import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
 import { TERRITORIES } from "../src/lib/house/territories";
-import { measureIn, servedPage } from "./chrome";
+import { measureIn, QUERY_JS, servedPage } from "./chrome";
 import { EXTREMES, SENTENCES } from "./house-sentences";
 
 // The two ships on GET / (docs/decisions/0003-settle-and-kept-ships.md),
@@ -53,7 +53,7 @@ async function layout(size: [number, number], longNotes = false, longWords = fal
   }
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
-    const q = (s) => { const el = document.querySelector(s); if (!el) throw new Error('GET / has no ' + s); return el; };
+    const q = ${QUERY_JS};
     const box = (s) => { const r = q(s).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width }; };
     const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
     // WCAG relative luminance and contrast, over the half's own ground
@@ -107,7 +107,7 @@ async function notation(size: [number, number], longWords: boolean): Promise<Not
   const labels = TERRITORIES.map((t, i) => `${String(i + 1).padStart(2, "0")} — ${t.label}`);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
-    const q = (s) => { const el = document.querySelector(s); if (!el) throw new Error('GET / has no ' + s); return el; };
+    const q = ${QUERY_JS};
     const part = q('#part'), house = q('.stands-half #house');
     const at = () => ({ sentence: q('.stands-half .sentence').getBoundingClientRect().top, house: house.getBoundingClientRect().top, kept: q('#house-kept').getBoundingClientRect().top });
     const hidden = at(), h = house.getBoundingClientRect();

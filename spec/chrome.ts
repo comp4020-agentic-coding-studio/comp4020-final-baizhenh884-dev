@@ -12,6 +12,21 @@ import { JSDOM } from "jsdom";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// A query helper for use inside a measureIn() expression (it runs in the
+// measured page, not in Node, so it's a string of browser JS, not a
+// function). A missing element is a dead end mid-measurement with no way to
+// say more than "not found" unless the failure carries its own context: an
+// unreproduced CI failure once reported a missing element with nothing to
+// show whether the page had even loaded. This names the selector and what
+// the document actually was at that moment (URL, ready state, title, the
+// start of its body) so a recurrence explains itself without a retry.
+export const QUERY_JS = `(s) => {
+  const el = document.querySelector(s);
+  if (el) return el;
+  throw new Error('GET / has no ' + s + ' | url=' + document.URL + ' readyState=' + document.readyState +
+    ' title=' + JSON.stringify(document.title) + ' body(300)=' + JSON.stringify(document.body ? document.body.innerHTML.slice(0, 300) : null));
+}`;
+
 function chrome(): string {
   const candidates = [
     process.env.CHROME,
@@ -50,7 +65,16 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     const pending = new Map<number, (m: any) => void>();
     ws.onmessage = (m) => { const x = JSON.parse(String(m.data)); if (x.id && pending.has(x.id)) { pending.get(x.id)!(x); pending.delete(x.id); } };
     const send = (method: string, params: object = {}) => new Promise<any>((r) => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
-    await send("Emulation.setDeviceMetricsOverride", { width: size[0], height: size[1], deviceScaleFactor: 1, mobile: false });
+    // A phone-sized viewport (the app's own breakpoint, 900px) is measured the
+    // way the marking environment actually sees it: Chrome DevTools' device
+    // toolbar, which emulates a touch device (mobile: true) for every phone
+    // preset. Desktop-mode emulation at a narrow width is a different, unmarked
+    // device: on classic scrollbars (Linux, Windows) it reserves a scrollbar
+    // track `innerWidth` doesn't report, so a full-width element measures short
+    // of the viewport (spec/chrome-harness.test.ts).
+    const mobile = size[0] <= 900;
+    await send("Emulation.setDeviceMetricsOverride", { width: size[0], height: size[1], deviceScaleFactor: 1, mobile });
+    if (mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     for (let i = 0; ; i++) {
       const ready = await send("Runtime.evaluate", { expression: "document.readyState", returnByValue: true });
       if (ready.result?.result?.value === "complete") break;
@@ -76,7 +100,17 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
 // out so only the markup and CSS are under test. Reads only; never changes
 // the shared sentence.
 export async function servedPage(baseUrl: string): Promise<Document> {
-  const home = await (await fetch(new URL("/", baseUrl))).text();
+  const res = await fetch(new URL("/", baseUrl));
+  const home = await res.text();
+  // A layout check builds a page from this markup: if GET / didn't actually
+  // serve one (a non-200, or not HTML — an unreproduced CI failure once found
+  // a layout check reporting a missing element with no sign the page itself
+  // was ever at fault), say so here, not as a confusing "no such element"
+  // three steps later.
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!res.ok || !contentType.includes("text/html")) {
+    throw new Error(`GET / is not a 200 HTML page: status=${res.status} content-type=${contentType || "(none)"} body(300)=${home.slice(0, 300)}`);
+  }
   const doc = new JSDOM(home).window.document;
   let css = "";
   for (const link of doc.querySelectorAll('link[rel="stylesheet"]')) {
