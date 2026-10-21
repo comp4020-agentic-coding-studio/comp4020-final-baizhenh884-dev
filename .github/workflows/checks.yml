@@ -69,10 +69,15 @@ jobs:
         # SETTLE_SECONDS keeps the settle-by-age checks fast.
         run: docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
       - name: Run the spec under settle mode
+        # Every variable both the app and the spec read is set identically on
+        # the container above and here: the spec runs in its own process and
+        # reads its own environment, so a value given only to the container
+        # (as SETTLE_SECONDS once was) leaves the spec assuming the default.
         run: pnpm check
         env:
           APP_URL: http://localhost:8080
           RULE_MODE: settle
+          SETTLE_SECONDS: 3
           BLOCKED_WORDS: blockedtestword
       - name: Show the settle-mode app's output
         if: ${{ failure() }}
