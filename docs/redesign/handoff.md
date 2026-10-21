@@ -579,3 +579,45 @@ Open, seen while building Slice 5:
   auto-scroll); the pointer now says that a part went below.
 - The line's placement inside its free band (30% down) and its timing (it appears ~2.4 s after the change, as the last part
   sets down) is judged, not specified.
+
+## PR #1's first CI run: two failures, one fixed, one still open (2026-10-21)
+
+Opening the merge PR surfaced two failures in `spec/two-ships-layout.test.ts`
+that neither local Mac runs nor the Docker build-and-run check had caught
+(CI run `39521648192`, `once` mode):
+
+- **"the live half isn't full width" (fixed, harness bug, not a page bug).**
+  Reproduced in real Linux headless Chrome (Docker, arm64 Chromium, networked
+  against the real app image) via the raw CDP protocol.
+  `spec/chrome.ts`'s `inChrome()` always called
+  `Emulation.setDeviceMetricsOverride` with `mobile: false`, including for
+  phone-sized viewports. At 390×844 that's desktop-mode emulation at a narrow
+  width, not a phone: on classic scrollbars (Linux, Windows — the marking
+  environment's own Chrome included) it reserves a ~15px vertical scrollbar
+  track that `innerWidth` doesn't report, so a 100%-wide element measured
+  375px, not 390px. Chrome DevTools' own device toolbar emulates
+  `mobile: true` (touch, no reserved track) for every phone preset, so the
+  page was correct under the environment that actually marks it; the harness
+  was measuring a device nobody marks with. macOS hid this because its
+  overlay scrollbars don't reserve a track under `mobile: false` either —
+  right answer, wrong reason. Fixed in `spec/chrome.ts` (`mobile: true` plus
+  touch emulation for any viewport ≤900px, the app's own breakpoint), pinned
+  first in `spec/chrome-harness.test.ts`. Verified: the full suite green
+  under both rule modes, multiple runs, real Linux headless Chrome.
+
+- **"GET / has no #part" (unreproduced, not fixed speculatively).** Tried,
+  all in real Linux headless Chrome against the real image: the failing test
+  alone, 3×; the full suite under default Docker resources; the full suite
+  under `--cpus=2 --memory=7g` (GitHub Actions' own runner spec); a dedicated
+  stress test of `inChrome()`'s `document.readyState` poll (the most
+  plausible race — observing `about:blank`'s "complete" before the `file://`
+  navigation starts) hammered 40 times at the harness's real 100ms poll
+  interval, landing on the real page every time. CI's own `docker logs app`
+  showed nothing abnormal (no 5xx, no crash) around the failure. No fix was
+  attempted for something that never reproduced. Instead, the failure mode
+  now explains itself if it recurs: `servedPage()` checks GET /'s status and
+  content-type and fails with them if it isn't a 200 HTML page, and the two
+  throwing element lookups in `spec/two-ships-layout.test.ts` (`QUERY_JS` in
+  `spec/chrome.ts`) report the document's URL, readyState, title and the
+  first 300 characters of its body on a missing element. If it recurs, that
+  output is the next thing to read, not another local repro attempt.
