@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duration, frameAt, type Kind } from "../src/lib/house/motion";
+import { arrivalAt, duration, frameAt, type Kind } from "../src/lib/house/motion";
 
 // How a territory is exchanged, as numbers over time (motion.ts). Pure, so it
 // runs the same against any APP_URL. The rules (CLAUDE.md House scope):
@@ -7,6 +7,11 @@ import { duration, frameAt, type Kind } from "../src/lib/house/motion";
 //     is never gone and back again
 //   - red only while the body is being rebuilt; nothing is red at the end
 //   - reduced motion: nothing moves, the new body is simply there
+//   - a crossing (docs/decisions/0003, Slice 5): the old part travels out of
+//     the standing house toward the kept one, and only once it has left does
+//     it arrive in the kept house's gap. Calm at rest, loud at the change: it
+//     runs longer than an ordinary exchange. Reduced motion: nothing travels,
+//     the parts simply swap.
 
 const samples = (kind: Kind, reduced = false) => {
   const end = duration(kind, reduced), out = [];
@@ -15,7 +20,7 @@ const samples = (kind: Kind, reduced = false) => {
 };
 
 describe("House exchange motion", () => {
-  for (const kind of ["own", "remote"] as const) {
+  for (const kind of ["own", "remote", "cross"] as const) {
     it(`${kind}: the old body becomes its drawing, which is never gone and back`, () => {
       const f = samples(kind);
       const first = f.findIndex((x) => x.trace > 0), last = f.findLastIndex((x) => x.trace > 0);
@@ -50,6 +55,44 @@ describe("House exchange motion", () => {
       expect(frameAt(kind, duration(kind, true), true).incomingRed).toBe(0);
     });
   }
+
+  it("cross: the old part travels away and never comes back; an ordinary exchange never travels", () => {
+    const f = samples("cross");
+    expect(f.some((x) => x.travel >= 0.999), "the old part never left").toBe(true);
+    for (let i = 1; i < f.length; i++) expect(f[i].travel, `the old part came back at ${f[i].t}ms`).toBeGreaterThanOrEqual(f[i - 1].travel - 1e-9);
+    // it's still there, visibly, while it travels: it leaves rather than fading where it stood
+    expect(f.filter((x) => x.travel > 0 && x.travel < 0.6).every((x) => x.outgoing > 0.5), "the part faded before it had gone far").toBe(true);
+    for (const kind of ["own", "remote"] as const) expect(samples(kind).every((x) => x.travel === 0), `an ${kind} exchange travelled`).toBe(true);
+  });
+
+  it("cross: it arrives in the kept house only once it has left the standing one, then sets down, not red", () => {
+    const end = duration("cross", false);
+    let arrived = false, last = Infinity;
+    for (let t = 0; t <= end + 50; t += 10) {
+      const a = arrivalAt(t), s = frameAt("cross", t);
+      if (a.opacity > 0) {
+        expect(s.travel, `the part arrived at ${t}ms before it had left`).toBeGreaterThan(0.9);
+        arrived = true;
+      }
+      if (arrived) {
+        expect(a.travel, `the arriving part went back out at ${t}ms`).toBeLessThanOrEqual(last + 1e-9);
+        last = a.travel;
+      }
+    }
+    expect(arrived, "the part never arrived").toBe(true);
+    expect(arrivalAt(end)).toMatchObject({ travel: 0, opacity: 1, red: 0 });
+    const a = Array.from({ length: Math.ceil(end / 10) }, (_, i) => arrivalAt(i * 10));
+    expect(a.some((x) => x.red > 0), "the arrival was never marked as rebuilding").toBe(true);
+  });
+
+  it("cross is loud: it runs longer than any ordinary exchange", () => {
+    expect(duration("cross", false)).toBeGreaterThan(duration("remote", false));
+  });
+
+  it("cross, reduced motion: nothing travels; the kept part is simply there", () => {
+    expect(samples("cross", true).every((x) => x.travel === 0)).toBe(true);
+    for (let t = 0; t <= duration("cross", true) + 50; t += 10) expect(arrivalAt(t, true)).toMatchObject({ travel: 0, opacity: 1 });
+  });
 
   it("an own change runs faster than another visitor's", () => {
     expect(duration("own", false)).toBeLessThan(duration("remote", false));

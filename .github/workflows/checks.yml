@@ -35,13 +35,51 @@ jobs:
         # volume; the spec runs against it
         run: |
           docker build -t app .
-          docker run -d --init --name app -p 8080:8080 -e PORT=8080 --tmpfs /data app
+          docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
       - name: Run the spec
+        # RULE_MODE is explicit here (not left unset) so spec/eligibility.test.ts
+        # can tell "deliberately testing once" apart from "CI forgot to say
+        # which mode this run is" — the latter fails instead of skipping.
         run: pnpm check
         env:
           APP_URL: http://localhost:8080
+          RULE_MODE: once
+          BLOCKED_WORDS: blockedtestword # a meaningless test word; the real list is a Fly secret (docs/decisions/0004)
       - name: Show the app's output
         # what the container printed, so a crash or slow boot is visible
+        if: ${{ failure() }}
+        run: docker logs app
+      - name: Remove the once-mode container
+        # settle mode needs a container of its own: switching RULE_MODE on a
+        # running container isn't possible (it's read once at boot), and the
+        # two modes mustn't share a database. `rm -f`, not `stop`: a stopped
+        # container still holds its name, and the settle-mode `docker run
+        # --name app` below collides with it ("Conflict. The container name
+        # '/app' is already in use"). This never showed before because the
+        # once-mode spec had never passed on this branch: every prior run
+        # failed inside "Run the spec" first, so the settle-mode build step
+        # was skipped and never reached the collision.
+        if: ${{ always() }}
+        run: docker rm -f app || true
+      - name: Build and start the app under settle mode
+        # production's actual mode (docs/decisions/0003-settle-and-kept-ships.md):
+        # the once-mode run above never exercises it, and RULE_MODE=settle is
+        # what production runs once the redesign ships, so CI must run the
+        # full spec against it too, not just the default. A short
+        # SETTLE_SECONDS keeps the settle-by-age checks fast.
+        run: docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+      - name: Run the spec under settle mode
+        # Every variable both the app and the spec read is set identically on
+        # the container above and here: the spec runs in its own process and
+        # reads its own environment, so a value given only to the container
+        # (as SETTLE_SECONDS once was) leaves the spec assuming the default.
+        run: pnpm check
+        env:
+          APP_URL: http://localhost:8080
+          RULE_MODE: settle
+          SETTLE_SECONDS: 3
+          BLOCKED_WORDS: blockedtestword
+      - name: Show the settle-mode app's output
         if: ${{ failure() }}
         run: docker logs app
       - name: Check the process evidence

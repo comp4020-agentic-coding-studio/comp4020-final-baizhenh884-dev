@@ -1,6 +1,8 @@
 // Monograph: a light architectural-study field, a restrained plaster model
 // drawn with faint ink edges. Red has one job, a body being rebuilt now.
-// An earlier form is an unfired white study model (H1).
+// An earlier form is an unfired white study model (H1). The kept ship
+// (docs/decisions/0003-settle-and-kept-ships.md) is salvaged timber on a dark
+// umber ground, drawn with pale edges: a second object, not a second plaster.
 
 import * as THREE from "three";
 
@@ -8,31 +10,55 @@ export const FIELD = 0xf1eee8;
 export const INK = 0x191714;
 export const RED = 0xc3331c;
 
+// which body a view draws: the standing house, an earlier form, or the kept ship
+export type Look = "present" | "past" | "kept";
+
 // each territory's base colour: walls in near-field plaster, the ground and roof a step darker
 const PRESENT = { mass: 0xeee9df, ground: 0xd9d2c5, roof: 0xc9b9a6, opening: 0x8f9799 };
 const PAST = { mass: 0xf3f0e9, ground: 0xe9e6de, roof: 0xe9e6de, opening: 0xd6d7d2 };
-export const EDGE = { present: 0.2, past: 0.32 };
+const KEPT = { mass: 0xb58d62, ground: 0x8f6c49, roof: 0x7a5a3c, opening: 0x3a2d22 };
+const PALETTE = { present: PRESENT, past: PAST, kept: KEPT };
+export const EDGE = { present: 0.2, past: 0.32, kept: 0.42 };
+// edges are ink on the light field, and pale on the kept ship's dark ground
+export const EDGE_COLOUR = { present: INK, past: INK, kept: 0xefe6d8 };
 
-const tone = (position: number, role: string, past: boolean) => {
-  const p = past ? PAST : PRESENT;
+// How one part is drawn: its edges' strength and colour, how far its
+// materials are lightened toward the edge ink (`lift`), or recede toward the
+// field (`recede`); `lift` lightens solid timber only, never an opening. Chosen and pointed-at parts win; then a receding one;
+// then this visitor's own part: a step firmer in the standing house, and in
+// the kept house firm edges and slightly lighter timber, so it reads at page
+// scale (never red, never moving).
+export type PartState = { selected: boolean; hovered: boolean; traced: boolean; other: boolean };
+export function partTone(look: Look, s: PartState): { edge: number; edgeColour: number; lift: number; recede: number } {
+  const edgeColour = EDGE_COLOUR[look];
+  if (s.selected) return { edge: 0.9, edgeColour, lift: 0, recede: 0 };
+  if (s.hovered) return { edge: 0.6, edgeColour, lift: 0, recede: 0 };
+  if (s.other) return { edge: 0.05, edgeColour, lift: 0, recede: 0.62 };
+  if (s.traced && look === "kept") return { edge: 0.95, edgeColour, lift: 0.2, recede: 0 };
+  return { edge: EDGE[look] + (s.traced ? 0.12 : 0), edgeColour, lift: 0, recede: 0 };
+}
+
+const tone = (position: number, role: string, look: Look) => {
+  const p = PALETTE[look];
   if (role === "opening") return p.opening;
   return position === 0 || position === 9 ? p.ground : position === 6 ? p.roof : p.mass;
 };
 
 // Dress one territory: its own materials (so it can fade alone) and ink edges.
-export function dress(group: THREE.Group, position: number, past: boolean): void {
+export function dress(group: THREE.Group, position: number, look: Look): void {
   const made = new Map<string, THREE.MeshStandardMaterial>();
   const edges: THREE.LineSegments[] = [];
   // one ink for the whole territory's edges, so it draws, fades and is selected as one
-  const ink = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: past ? EDGE.past : EDGE.present, depthWrite: false });
+  const ink = new THREE.LineBasicMaterial({ color: EDGE_COLOUR[look], transparent: true, opacity: EDGE[look], depthWrite: false });
   group.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const role = (mesh.userData.role as string) ?? "mass";
     let m = made.get(role);
     if (!m) {
-      m = new THREE.MeshStandardMaterial({ color: tone(position, role, past), roughness: role === "opening" ? 0.5 : 0.92, metalness: 0 });
+      m = new THREE.MeshStandardMaterial({ color: tone(position, role, look), roughness: role === "opening" ? 0.5 : 0.92, metalness: 0 });
       m.userData.base = m.color.clone();
+      m.userData.role = role;
       made.set(role, m);
     }
     mesh.material = m;

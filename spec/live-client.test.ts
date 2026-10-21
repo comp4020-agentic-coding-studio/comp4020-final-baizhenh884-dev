@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, inject, it } from "vitest";
-import { attach, deriveTotal, type Position, type Snapshot, type Trace } from "../src/lib/live-client";
+import { afterEach, describe, expect, inject, it, vi } from "vitest";
+import { attach, deriveTotal, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -24,6 +24,24 @@ const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
 const localOnly = (name: string, fn: () => Promise<void>) =>
   it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn);
+
+// Most of this file drives src/lib/live-client.ts directly with hand-built
+// Snapshot/Trace objects, so its rendering is exercised independently of
+// whatever rule mode the real backing app happens to run — the client
+// discriminates a trace's shape structurally, not from the server's mode.
+// The one exception is any test that compares the client's own rendering
+// against what GET / actually serves: that comparison is only valid when
+// the real server's trace shape matches what was hand-fed, which depends on
+// RULE_MODE. Gated the same way spec/eligibility.test.ts gates.
+const inCI = !!process.env.CI;
+const settleModeReady = local && process.env.RULE_MODE === "settle";
+if (local && inCI && !process.env.RULE_MODE) {
+  throw new Error("RULE_MODE must be 'once' or 'settle' in CI, never unset: checks.yml runs both passes explicitly");
+}
+const onceOnly = (name: string, fn: () => Promise<void>) =>
+  it.skipIf(!local || settleModeReady)(local && !settleModeReady ? name : `${name} [skipped: not once mode]`, fn);
+const settleOnly = (name: string, fn: () => Promise<void>) =>
+  it.skipIf(!settleModeReady)(settleModeReady ? name : `${name} [skipped: not settle mode]`, fn);
 
 // a word that looks like an element; unique per run, so no earlier state on
 // the page can already contain it
@@ -137,7 +155,7 @@ function type(doc: Document, position: number, value: string): void {
 
 // The inert notice of a change held back by a draft: an element beside the
 // position's form (not in it), naming the new word, not interactive, and not
-// hidden from screen readers (as the decorative past words beneath are).
+// hidden from screen readers (as the decorative word leaving the slot is).
 function notice(doc: Document, position: number, word: string): Element | null {
   const { form } = slot(doc, position);
   const wrapper = form.parentElement!;
@@ -313,8 +331,12 @@ describe("live page reconciliation", () => {
     });
 
     // The same visitor with two tabs open: they make their change in the other
-    // one, so this page loaded with no trace at all.
-    localOnly("creates the trace when a snapshot first brings one, as GET / would render it", async () => {
+    // one, so this page loaded with no trace at all. Compares the client's own
+    // rendering against what GET / actually serves, so it's valid only when
+    // the once-mode Trace shape (hand-fed below) matches the real server's
+    // mode; spec/live-client.test.ts's settle-mode describe block below
+    // covers the equivalent settle-mode rendering without that comparison.
+    onceOnly("creates the trace when a snapshot first brings one, as GET / would render it", async () => {
       const ann = await arrive();
       const doc = await ann.page("/");
       expect(traceStatus(doc), "a visitor who hasn't changed anything has a trace").toBeNull();
@@ -354,6 +376,40 @@ describe("live page reconciliation", () => {
       expect(doc.querySelectorAll('section [role="status"], aside [role="status"]').length, "more than one trace").toBe(1);
     });
 
+    // Same scenario as above, but under settle mode: the server's own
+    // SettleTrace shape is the model, compared the same way.
+    settleOnly("creates the settle-mode trace when a snapshot first brings one, as GET / would render it", async () => {
+      const ann = await arrive();
+      const doc = await ann.page("/");
+      expect(traceStatus(doc), "a visitor who hasn't changed anything has a trace").toBeNull();
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      expect(traceStatus(doc), "a snapshot with no trace created one").toBeNull();
+
+      const mine = positionsOf(doc)[0];
+      const anns = fresh();
+      expect(await ann.replace(mine, anns)).toBe(303); // in the other tab
+      const positions = positionsOf(doc).map((p) =>
+        p.position === mine.position ? { ...p, word: anns, version: p.version + 1 } : p,
+      );
+      const trace: SettleTrace = {
+        latest: { position: mine.position, word: anns, standing: true, settled: false, settlesInMs: 300_000 },
+        otherStanding: [],
+        otherReplaced: [],
+      };
+      page.applySnapshot({ positions, trace });
+
+      // what GET / renders for ann now is the model (settlesInMs ticks down
+      // on the server between these two reads, so it's never compared)
+      const served = await ann.page("/");
+      const section = (d: Document) => traceStatus(d)?.closest("section, aside") ?? null;
+      const withoutTimerDrift = (s: string) => s.replace(/\d+/g, "#"); // defensive: no numbers are expected either way
+      const text = (el: Element | null) => withoutTimerDrift((el?.textContent ?? "").replace(/\s+/g, " ").trim());
+      expect(section(doc), "the snapshot's trace didn't create a trace on the page").not.toBeNull();
+      expect(text(section(doc))).toBe(text(section(served)));
+      expect(slot(doc, mine.position).label.querySelector("mark")?.textContent, "the standing word isn't marked").toBe(anns);
+    });
+
     localOnly("brings the trace up to date from a reconnect snapshot", async () => {
       const ann = await arrive();
       const mine = positionsOf(await ann.page("/"))[0];
@@ -374,6 +430,164 @@ describe("live page reconciliation", () => {
       expect(status.querySelector("del")?.textContent?.trim()).toBe(anns);
       expect(status.textContent).toContain(now);
       expect(labelWord(doc, mine.position)).toBe(now);
+    });
+  });
+
+  // SettleTrace is a hand-built shape here (not fetched over HTTP, same as
+  // the once-mode trace tests above): these drive src/lib/live-client.ts
+  // directly, so they exercise its rendering and timer logic independent of
+  // the server's actual rule mode. spec/trace.test.ts and
+  // spec/realtime.test.ts cover the server side (the rendered page, and the
+  // wire shape) under a real settle-mode app.
+  describe("the visitor's own trace under the settle rule", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const settleTrace = (overrides: Partial<Extract<SettleTrace["latest"], { standing: true }>> = {}): SettleTrace => ({
+      latest: { position: 0, word: "held", standing: true, settled: false, settlesInMs: 5000, ...overrides },
+      otherStanding: [],
+      otherReplaced: [],
+    });
+
+    localOnly("marks every standing word's position in the sentence, and lists the others", async () => {
+      const doc = await (await arrive()).page("/");
+      const [a, b, c] = positionsOf(doc);
+      const page = attach(doc);
+      const trace: SettleTrace = {
+        latest: { position: a.position, word: fresh(), standing: true, settled: false, settlesInMs: 5000 },
+        otherStanding: [{ position: b.position, word: fresh() }],
+        otherReplaced: [{ position: c.position, word: fresh(), now: fresh(), kept: "later" }],
+      };
+      page.applySnapshot({ positions: positionsOf(doc), trace });
+
+      expect(slot(doc, a.position).label.querySelector("mark"), "the latest standing word isn't marked").not.toBeNull();
+      expect(slot(doc, b.position).label.querySelector("mark"), "the other standing word isn't marked").not.toBeNull();
+      expect(slot(doc, c.position).label.querySelector("mark"), "a replaced word is marked").toBeNull();
+
+      const section = traceStatus(doc)!.closest("section, aside")!;
+      expect(section.textContent, "the other standing word is missing from the trace").toContain(trace.otherStanding[0].word);
+      expect(section.textContent, "the other standing word isn't labelled settled").toMatch(/settled/i);
+      expect(section.textContent, "the replaced word is missing from the trace").toContain(trace.otherReplaced[0].word);
+      expect(section.textContent, "the replaced word's replacement is missing").toContain(trace.otherReplaced[0].now);
+      expect(section.textContent, "the replaced word isn't labelled kept").toMatch(/kept/i);
+    });
+
+    localOnly("a holding trace becomes free on the page after SETTLE_SECONDS without any other change or reload", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
+      const [a] = positionsOf(doc);
+      const page = attach(doc);
+      const trace = settleTrace({ position: a.position, settlesInMs: 3000 });
+      page.applySnapshot({ positions: positionsOf(doc), trace });
+
+      const before = traceStatus(doc)!.textContent;
+      expect(before, "a holding trace shows the settled wording already").toMatch(/holding/i);
+
+      vi.advanceTimersByTime(2999);
+      expect(traceStatus(doc)!.textContent, "the trace settled before its timer elapsed").toBe(before);
+
+      vi.advanceTimersByTime(2);
+      const after = traceStatus(doc)!.textContent;
+      expect(after, "the trace never flipped once its timer elapsed").not.toBe(before);
+      expect(after, "the settled trace still claims it's holding").not.toMatch(/holding/i);
+      expect(slot(doc, a.position).label.querySelector("mark"), "the settled word is no longer marked as standing").not.toBeNull();
+    });
+
+    localOnly("a newer trace cancels the pending local timer instead of firing late over it", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
+      const [a, b] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: settleTrace({ position: a.position, settlesInMs: 3000 }) });
+
+      // freed by a real replacement elsewhere, before the local timer would fire
+      const freedWord = fresh();
+      const freedTrace: SettleTrace = {
+        latest: { position: b.position, word: freedWord, standing: true, settled: false, settlesInMs: 5000 },
+        otherStanding: [],
+        otherReplaced: [],
+      };
+      page.applySnapshot({ positions: positionsOf(doc), trace: freedTrace });
+      const afterFreed = traceStatus(doc)!.textContent;
+
+      vi.advanceTimersByTime(3000);
+
+      expect(traceStatus(doc)!.textContent, "a stale timer clobbered the newer trace").toBe(afterFreed);
+      expect(traceStatus(doc)!.textContent).toContain(freedWord);
+    });
+  });
+
+  // Settling, made visible (plan C): while this visitor's latest word is
+  // holding, one thin line under that word fills to the end of the hold
+  // (settlesInMs, from the fraction already elapsed of the settle time the
+  // page carries), and goes once it settles or is replaced. Only on their own
+  // page: it comes from their own trace. Never red; with reduced motion,
+  // none; under once mode, none. Decorative: the trace text says the same.
+  describe("the settling line under a holding word", () => {
+    afterEach(() => vi.useRealTimers());
+    const fills = (doc: Document) => [...doc.querySelectorAll(".sentence .settling")];
+    const holding = (position: number, settlesInMs: number): SettleTrace => ({
+      latest: { position, word: "held", standing: true, settled: false, settlesInMs },
+      otherStanding: [],
+      otherReplaced: [],
+    });
+    const withSettleTime = (doc: Document, ms: number) => doc.querySelector(".stands-half .sentence")!.setAttribute("data-settle-ms", String(ms));
+
+    localOnly("fills under the holding word only, from what has already elapsed to the end of the hold", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers();
+      withSettleTime(doc, 10_000);
+      const [a] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      const f = fills(doc);
+      expect(f, "a holding word has no settling line, or more than one").toHaveLength(1);
+      expect(f[0].closest(".pos")?.contains(slot(doc, a.position).form), "the line isn't under the holding word").toBe(true);
+      expect(f[0].getAttribute("aria-hidden"), "the line isn't decorative").toBe("true");
+      const style = (f[0] as HTMLElement).style;
+      expect(Number(style.getPropertyValue("--from")), "the line doesn't start from the elapsed share of the hold").toBeCloseTo(0.6, 2);
+      expect(style.getPropertyValue("--ms"), "the line doesn't take the rest of the hold").toBe("4000ms");
+      vi.advanceTimersByTime(4001);
+      expect(fills(doc), "the line outlived the hold").toHaveLength(0);
+    });
+
+    localOnly("goes when the word is replaced, and is never added for a settled word or a once-mode trace", async () => {
+      const doc = await (await arrive()).page("/");
+      withSettleTime(doc, 10_000);
+      const [a, b] = positionsOf(doc);
+      const page = attach(doc);
+      page.applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      expect(fills(doc)).toHaveLength(1);
+      // replaced: the new trace no longer holds
+      const replaced: SettleTrace = { latest: { position: a.position, word: "held", standing: false, now: fresh(), kept: "later" }, otherStanding: [], otherReplaced: [] };
+      page.applySnapshot({ positions: positionsOf(doc), trace: replaced });
+      expect(fills(doc), "the line outlived its word").toHaveLength(0);
+      page.applySnapshot({ positions: positionsOf(doc), trace: { latest: { position: b.position, word: "x", standing: true, settled: true }, otherStanding: [], otherReplaced: [] } });
+      expect(fills(doc), "a settled word has a settling line").toHaveLength(0);
+      page.applySnapshot({ positions: positionsOf(doc), trace: { position: b.position, word: "x", standing: true } as Trace });
+      expect(fills(doc), "a once-mode trace has a settling line").toHaveLength(0);
+    });
+
+    settleOnly("GET / carries the settle time on the live sentence under settle mode", async () => {
+      const doc = await (await arrive()).page("/");
+      const ms = Number(process.env.SETTLE_SECONDS ?? 300) * 1000;
+      expect(doc.querySelector(".stands-half .sentence")?.getAttribute("data-settle-ms"), "the page doesn't carry the settle time").toBe(String(ms));
+    });
+
+    onceOnly("GET / carries no settle time under once mode", async () => {
+      const doc = await (await arrive()).page("/");
+      expect(doc.querySelector(".stands-half .sentence")?.hasAttribute("data-settle-ms"), "a once-mode page carries a settle time").toBe(false);
+    });
+
+    localOnly("is never added with reduced motion", async () => {
+      const doc = await (await arrive()).page("/");
+      withSettleTime(doc, 10_000);
+      doc.defaultView!.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof matchMedia;
+      const [a] = positionsOf(doc);
+      attach(doc).applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
+      expect(fills(doc), "reduced motion still shows a moving line").toHaveLength(0);
+      expect(traceStatus(doc)!.textContent, "the trace text no longer says it's holding").toMatch(/holding/i);
     });
   });
 
@@ -430,6 +644,165 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ positions, trace: null });
 
       expect(heard).toEqual([{ position: a.position, word, version: a.version + 1 }]);
+    });
+  });
+
+  // The kept ship (docs/decisions/0003-settle-and-kept-ships.md) is global,
+  // not per-visitor: unlike the trace, it's told on every change event
+  // itself, never held back by a draft, and never needs a follow-up
+  // snapshot the way the trace sometimes does.
+  describe("the kept ship", () => {
+    const ship = (n: number): KeptShip => ({ words: Array(10).fill(`ship${n}`), gaps: Array(10).fill(n === 0) });
+
+    localOnly("is told on an initial snapshot", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      expect(heard).toEqual([ship(1)]);
+    });
+
+    localOnly("is told again on every change event, even under an unrelated draft", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      const { position, version } = positionsOf(doc)[0];
+      const other = positionsOf(doc)[1].position;
+      type(doc, other, "mydraft"); // an unsubmitted draft elsewhere never holds this back
+
+      page.applyChange({ position, word: fresh(), version: version + 1, keptShip: ship(2) });
+
+      expect(heard).toEqual([ship(1), ship(2)]);
+      expect(slot(doc, other).input.value, "the kept ship touched an unrelated draft").toBe("mydraft");
+    });
+
+    // The moment of a replacement (spec/kept-moment.test.ts) comes only with a
+    // change event, never a snapshot: a reload or reconnect never replays it.
+    localOnly("brings a moment only with a change event, never a snapshot", async () => {
+      const doc = await (await arrive()).page("/");
+      const moments: unknown[] = [];
+      const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
+      const { position, version } = positionsOf(doc)[0];
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+
+      page.applyChange({ position, word: fresh(), version: version + 1, keptShip: filled });
+      expect(moments, "a crossing change brought no moment").toEqual([null, { position, kind: "cross" }]);
+
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty }); // a reconnect onto a different kept ship
+      expect(moments.at(-1), "a snapshot brought a moment").toBeNull();
+    });
+
+    localOnly("brings no moment for a duplicate or stale change", async () => {
+      const doc = await (await arrive()).page("/");
+      const moments: unknown[] = [];
+      const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
+      const { position, version } = positionsOf(doc)[0];
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+      page.applyChange({ position, word: fresh(), version, keptShip: filled }); // not newer than what's shown
+      expect(moments.filter((m) => m !== null), "a stale change brought a moment").toEqual([]);
+    });
+
+    localOnly("isn't told twice for a reconnect snapshot whose kept ship didn't change", async () => {
+      const doc = await (await arrive()).page("/");
+      const heard: KeptShip[] = [];
+      const page = attach(doc, { onKept: (k) => heard.push(k) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) }); // a reconnect, nothing new
+      expect(heard, "an unchanged kept ship was announced more than once").toEqual([ship(1)]);
+    });
+  });
+
+  // A screen reader hears what changed: one polite live region, filled only by
+  // change events newer than what the page shows (a snapshot, a reconnect or a
+  // stale event says nothing), and a burst coalesced into one announcement
+  // 2.5 s after its last change. It names positions and words, as plain text;
+  // never a visitor, a time or a count of people.
+  describe("the announcement of others' changes", () => {
+    const region = (doc: Document) => {
+      const el = doc.querySelector('[aria-live="polite"]');
+      expect(el, "GET / has no polite live region").not.toBeNull();
+      expect(el!.closest('[aria-hidden="true"]'), "the live region is hidden from screen readers").toBeNull();
+      return el!;
+    };
+    afterEach(() => vi.useRealTimers());
+
+    localOnly("is empty on load and after a snapshot or reconnect", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      expect(region(doc).textContent?.trim(), "the live region speaks on load").toBe("");
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[0];
+      page.applySnapshot({ ...snapshotOf(doc), positions: positionsOf(doc).map((p) => (p.position === position ? { ...p, word: fresh(), version: version + 1 } : p)) });
+      vi.advanceTimersByTime(5000);
+      expect(region(doc).textContent?.trim(), "a snapshot was announced").toBe("");
+    });
+
+    localOnly("announces one change once, after it settles, as plain text", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[3];
+      page.applyChange({ position, word: MARKUP, version: version + 1 });
+      expect(region(doc).textContent?.trim(), "announced before the burst could settle").toBe("");
+      vi.advanceTimersByTime(2500);
+      const said = region(doc).textContent ?? "";
+      expect(said, "the announcement doesn't name the word").toContain(MARKUP);
+      expect(said, "the announcement doesn't name the position").toContain(String(position + 1));
+      expect(region(doc).querySelector("x-theseus"), "a visitor word became markup").toBeNull();
+      expect(said, "the announcement names a time").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute/i);
+    });
+
+    localOnly("coalesces a burst into one announcement naming every changed position", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const said: string[] = [];
+      new doc.defaultView!.MutationObserver(() => { const t = region(doc).textContent?.trim(); if (t) said.push(t); }).observe(region(doc), { childList: true, characterData: true, subtree: true });
+      const words: string[] = [];
+      for (const i of [1, 4, 8]) {
+        const { position, version } = positionsOf(doc)[i];
+        const word = fresh();
+        words.push(word);
+        page.applyChange({ position, word, version: version + 1 });
+        vi.advanceTimersByTime(300);
+      }
+      vi.advanceTimersByTime(2500);
+      await Promise.resolve(); // let the observer see the last write
+      expect(said, "a burst was announced more than once").toHaveLength(1);
+      for (const i of [2, 5, 9]) expect(said[0], `the burst's announcement leaves out word ${i}`).toContain(String(i));
+    });
+
+    localOnly("says nothing for a duplicate or stale change", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[0];
+      page.applyChange({ position, word: fresh(), version });
+      vi.advanceTimersByTime(5000);
+      expect(region(doc).textContent?.trim(), "a stale change was announced").toBe("");
+    });
+
+    localOnly("announces a change at a position holding a draft, and leaves the draft alone", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version } = positionsOf(doc)[2];
+      type(doc, position, "mydraft");
+      const word = fresh();
+      page.applyChange({ position, word, version: version + 1 });
+      vi.advanceTimersByTime(2500);
+      expect(region(doc).textContent, "a change under a draft wasn't announced").toContain(word);
+      expect(slot(doc, position).input.value, "the announcement touched the draft").toBe("mydraft");
     });
   });
 

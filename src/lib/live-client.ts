@@ -1,19 +1,60 @@
+import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
+import { latestParts, replacedText, standingText } from "./trace-text";
+
 // Keeps an open current page (GET /) true to the live sentence: it applies
 // the `snapshot` and `change` events from GET /events to the page's own
 // markup. A position's update applies only if its version is newer than the
 // one shown, and never over a draft the visitor is typing.
+//
+// The trace a snapshot carries has one of two shapes, depending on which
+// rule mode the server is running (docs/decisions/0003-settle-and-kept-
+// ships.md) — this module can't know which at build time, so it tells them
+// apart structurally ("latest" in trace). Under `once`, Trace is unchanged
+// from Crit 9. Under `settle`, SettleTrace's `latest`, when holding, carries
+// settlesInMs: settling by age has no server event to push a live update
+// with, so this module schedules its own local timer from that value and
+// flips the trace's display once it elapses — presentation only; the server
+// remains sole authority on any actual submit.
 
 export type Position = { position: number; word: string; version: number };
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md), global
+// rather than per-visitor: unlike the visitor's own trace, which needs a
+// follow-up snapshot, it rides on every change event itself, since every
+// open stream already gets every change and the kept ship changes on each
+// one. Optional on the type (so existing position-reconciliation tests that
+// have nothing to do with kept ships can keep building a bare Position):
+// parseChange, which reads the real wire format, still rejects an event
+// missing it.
+export type { KeptShip, Moment };
+export type ChangeEvent = Position & { keptShip?: KeptShip };
 
 export type Trace =
   | { position: number; word: string; standing: true }
   | { position: number; word: string; standing: false; now: string };
 
-export type Snapshot = { positions: Position[]; trace: Trace | null };
+export type StandingItem = { position: number; word: string };
+// where a replaced word is kept, against the kept ship shown now (settle mode)
+export type KeptWhere = "shown" | "later" | "earlier";
+export type ReplacedItem = { position: number; word: string; now: string; kept: KeptWhere };
+export type SettleTrace = {
+  latest:
+    | { position: number; word: string; standing: true; settled: true }
+    | { position: number; word: string; standing: true; settled: false; settlesInMs: number }
+    | { position: number; word: string; standing: false; now: string; kept: KeptWhere };
+  otherStanding: StandingItem[];
+  otherReplaced: ReplacedItem[];
+};
+
+const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
+// longer than a crossing (1.9 s, house/motion.ts), so one burst is one announcement
+export const ANNOUNCE_MS = 2500;
+
+export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
 
 export interface LivePage {
   applySnapshot(snapshot: Snapshot): void;
-  applyChange(change: Position): void;
+  applyChange(change: ChangeEvent): void;
 }
 
 // Successful changes so far: each one moves exactly one position's version
@@ -24,8 +65,13 @@ export function deriveTotal(positions: readonly Pick<Position, "version">[]): nu
 
 // Event data arrives as text from the network: anything that isn't the
 // expected shape is dropped rather than applied.
-export function parseChange(raw: string): Position | null {
-  return asPosition(parse(raw));
+export function parseChange(raw: string): ChangeEvent | null {
+  const data = parse(raw);
+  const position = asPosition(data);
+  if (!position || !isObject(data)) return null;
+  const keptShip = asKeptShip(data.keptShip);
+  if (!keptShip) return null;
+  return { ...position, keptShip };
 }
 
 export function parseSnapshot(raw: string): Snapshot | null {
@@ -33,9 +79,15 @@ export function parseSnapshot(raw: string): Snapshot | null {
   if (!isObject(data) || !Array.isArray(data.positions)) return null;
   const positions = data.positions.map(asPosition);
   if (positions.some((p) => p === null)) return null;
-  const trace = data.trace === null ? null : asTrace(data.trace);
-  if (data.trace !== null && trace === null) return null;
-  return { positions: positions as Position[], trace };
+  let trace: Trace | SettleTrace | null = null;
+  if (data.trace !== null) {
+    if (!isObject(data.trace)) return null;
+    trace = "latest" in data.trace ? asSettleTrace(data.trace) : asTrace(data.trace);
+    if (trace === null) return null;
+  }
+  const keptShip = asKeptShip(data.keptShip);
+  if (!keptShip) return null;
+  return { positions: positions as Position[], trace, keptShip };
 }
 
 function parse(raw: string): unknown {
@@ -54,6 +106,8 @@ function asPosition(v: unknown): Position | null {
   return { position: v.position, word: v.word, version: v.version };
 }
 
+const isKeptWhere = (v: unknown): v is KeptWhere => v === "shown" || v === "later" || v === "earlier";
+
 function asTrace(v: unknown): Trace | null {
   if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string") return null;
   if (v.standing === true) return { position: v.position, word: v.word, standing: true };
@@ -61,6 +115,48 @@ function asTrace(v: unknown): Trace | null {
     return { position: v.position, word: v.word, standing: false, now: v.now };
   }
   return null;
+}
+
+function asLatest(v: unknown): SettleTrace["latest"] | null {
+  if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string") return null;
+  if (v.standing === false && typeof v.now === "string" && isKeptWhere(v.kept)) {
+    return { position: v.position, word: v.word, standing: false, now: v.now, kept: v.kept };
+  }
+  if (v.standing === true && v.settled === true) {
+    return { position: v.position, word: v.word, standing: true, settled: true };
+  }
+  if (v.standing === true && v.settled === false && isIndex(v.settlesInMs, 0)) {
+    return { position: v.position, word: v.word, standing: true, settled: false, settlesInMs: v.settlesInMs };
+  }
+  return null;
+}
+
+function asStandingItem(v: unknown): StandingItem | null {
+  if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string") return null;
+  return { position: v.position, word: v.word };
+}
+
+function asKeptShip(v: unknown): KeptShip | null {
+  if (!isObject(v) || !Array.isArray(v.words) || !Array.isArray(v.gaps)) return null;
+  if (v.words.length !== 10 || v.gaps.length !== 10) return null;
+  if (v.words.some((w) => typeof w !== "string") || v.gaps.some((g) => typeof g !== "boolean")) return null;
+  return { words: v.words as string[], gaps: v.gaps as boolean[] };
+}
+
+function asReplacedItem(v: unknown): ReplacedItem | null {
+  if (!isObject(v) || !isIndex(v.position, 0) || typeof v.word !== "string" || typeof v.now !== "string" || !isKeptWhere(v.kept)) return null;
+  return { position: v.position, word: v.word, now: v.now, kept: v.kept };
+}
+
+function asSettleTrace(v: Record<string, unknown>): SettleTrace | null {
+  if (!Array.isArray(v.otherStanding) || !Array.isArray(v.otherReplaced)) return null;
+  const latest = asLatest(v.latest);
+  if (!latest) return null;
+  const otherStanding = v.otherStanding.map(asStandingItem);
+  if (otherStanding.some((s) => s === null)) return null;
+  const otherReplaced = v.otherReplaced.map(asReplacedItem);
+  if (otherReplaced.some((r) => r === null)) return null;
+  return { latest, otherStanding: otherStanding as StandingItem[], otherReplaced: otherReplaced as ReplacedItem[] };
 }
 
 type Slot = {
@@ -76,6 +172,13 @@ export type Options = {
   // told every newer version of a position, held back by a draft or not:
   // what the house shows is the shared truth
   onLatest?: (change: Position) => void;
+  // told the kept ship every time it's known to have changed (every change
+  // event, and every snapshot): global, so never held back by a draft
+  // the kept ship, and the moment a newer change brought to it (null for a snapshot, or nothing crossing)
+  onKept?: (kept: KeptShip, moment: Moment | null) => void;
+  // this visitor's replaced words in the kept ship shown now, newest first
+  // (settle mode): told whenever their own trace changes
+  onMine?: (positions: number[]) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {
@@ -89,16 +192,29 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     const word = label.textContent?.trim() ?? "";
     slots.set(position, { form, version, label, input, latest: { position, word, version: Number(version.value) }, notice: null });
   }
-  let trace: Trace | null = null;
+  let trace: Trace | SettleTrace | null = null;
   let traceChanged = false;
+  // Settling by age has no server event: the only way this page learns its
+  // own holding trace has settled is this local timer, armed from the
+  // settlesInMs the server last computed. Any newer trace (a real
+  // replacement, a reconnect snapshot) clears and re-arms it, so there's
+  // never more than one pending.
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let keptSent: KeptShip | undefined; // the kept ship last told to onKept, so a reconnect snapshot doesn't repeat it
 
   const hasDraft = (slot: Slot) => slot.input.value !== "";
   const shownVersion = (slot: Slot) => Number(slot.version.value);
 
+  function isMarked(position: number): boolean {
+    if (!trace) return false;
+    if (!isSettleTrace(trace)) return trace.standing && trace.position === position;
+    if (trace.latest.standing && trace.latest.position === position) return true;
+    return trace.otherStanding.some((s) => s.position === position);
+  }
+
   function show(slot: Slot): void {
     const { word, version } = slot.latest;
-    const mark = trace?.standing && trace.position === slot.latest.position;
-    if (mark) {
+    if (isMarked(slot.latest.position)) {
       const el = doc.createElement("mark");
       el.textContent = word;
       slot.label.replaceChildren(el);
@@ -146,7 +262,14 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     if (!slot || change.version <= slot.latest.version) return;
     slot.latest = { ...change };
     options.onLatest?.({ ...change });
-    if (trace && trace.position === change.position) {
+    // Once-mode only: a change event carries no trace, so this is how an
+    // open once-mode page learns its own word was just replaced, without
+    // waiting on the server's follow-up snapshot. Settle mode's richer
+    // shape (multiple standing words, settling-by-age) isn't safely
+    // derivable from one change event alone, so it waits for the ordinary
+    // applySnapshot path instead — already immediate (events.ts sends the
+    // follow-up snapshot in the same callback turn as the broadcast).
+    if (trace && !isSettleTrace(trace) && trace.position === change.position) {
       trace = { position: trace.position, word: trace.word, standing: false, now: change.word };
       traceChanged = true;
     }
@@ -154,9 +277,11 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     else show(slot);
   }
 
-  // the trace GET / renders after the sentence, for a page that loaded
+  // the trace GET / renders under the how-text, for a page that loaded
   // before this visitor had made their change
-  function createTrace(): Element | null {
+  function ensureTraceSection(): Element | null {
+    const existing = doc.querySelector('section[aria-labelledby="trace-heading"]');
+    if (existing) return existing;
     const sentence = slots.values().next().value?.form.closest(".sentence");
     if (!sentence) return null;
     const section = doc.createElement("section");
@@ -167,22 +292,100 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
     section.append(heading, status);
-    sentence.after(section);
+    // where GET / renders it: under the how-text, in the live half's foot
+    (doc.getElementById("how") ?? sentence).after(section);
+    return section;
+  }
+
+  function statusOf(section: Element): HTMLElement {
+    let status = section.querySelector<HTMLElement>('[role="status"]');
+    if (!status) {
+      status = doc.createElement("p");
+      status.setAttribute("role", "status");
+      section.append(status);
+    }
     return status;
+  }
+
+  function ensureList(section: Element, className: string): HTMLElement {
+    let ul = section.querySelector<HTMLElement>(`ul.${className}`);
+    if (!ul) {
+      ul = doc.createElement("ul");
+      ul.className = className;
+      section.append(ul);
+    }
+    return ul;
+  }
+
+  function renderList(section: Element, className: string, texts: string[]): void {
+    if (texts.length === 0) {
+      section.querySelector(`ul.${className}`)?.remove();
+      return;
+    }
+    const ul = ensureList(section, className);
+    ul.replaceChildren(
+      ...texts.map((text) => {
+        const li = doc.createElement("li");
+        li.textContent = text;
+        return li;
+      }),
+    );
   }
 
   function renderTrace(): void {
     if (!trace || !traceChanged) return;
-    const status = doc.querySelector('section[aria-labelledby="trace-heading"] [role="status"]') ?? createTrace();
-    if (!status) return;
+    const section = ensureTraceSection();
+    if (!section) return;
     traceChanged = false;
-    if (trace.standing) {
-      status.textContent = `Your word “${trace.word}” still stands, marked in the sentence above.`;
-    } else {
-      const del = doc.createElement("del");
-      del.textContent = trace.word;
-      status.replaceChildren("Your word “", del, `” has since been replaced: “${trace.now}” stands in its place now.`);
+    const status = statusOf(section);
+    if (!isSettleTrace(trace)) {
+      if (trace.standing) {
+        status.textContent = `Your word “${trace.word}” still stands, marked in the sentence above.`;
+      } else {
+        const del = doc.createElement("del");
+        del.textContent = trace.word;
+        status.replaceChildren("Your word “", del, `” has since been replaced: “${trace.now}” stands in its place now.`);
+      }
+      return;
     }
+    const parts = latestParts(trace.latest);
+    if (parts.del) {
+      const del = doc.createElement("del");
+      del.textContent = parts.del;
+      status.replaceChildren(
+        "Your word “",
+        del,
+        `” has since been replaced: “${parts.now}” stands in its place now. ${parts.kept} ${parts.eligibility}`,
+      );
+    } else {
+      status.textContent = `Your word “${parts.word}” still stands, marked in the sentence above. ${parts.eligibility}`;
+    }
+    renderList(section, "trace-standing", trace.otherStanding.map(standingText));
+    renderList(section, "trace-replaced", trace.otherReplaced.map(replacedText));
+  }
+
+  // Settling by age has no server event to push: this page learns its own
+  // holding trace has settled only by waiting out the same span the server
+  // last reported (settlesInMs). Any newer trace (a real replacement, a
+  // reconnect snapshot) clears and re-arms this before possibly scheduling
+  // a different one, so there's never more than one pending.
+  function clearSettleTimer(): void {
+    if (settleTimer !== null) {
+      clearTimeout(settleTimer);
+      settleTimer = null;
+    }
+  }
+
+  function armSettleTimer(): void {
+    clearSettleTimer();
+    if (!trace || !isSettleTrace(trace) || !trace.latest.standing || trace.latest.settled) return;
+    const { position, word, settlesInMs } = trace.latest;
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      trace = { ...(trace as SettleTrace), latest: { position, word, standing: true, settled: true } };
+      traceChanged = true;
+      render();
+    }, settlesInMs);
   }
 
   function renderSummary(): void {
@@ -204,15 +407,58 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       link.rel = "prev";
       link.textContent = "Earlier form";
       p.append(link);
+      // where GET / renders it: after the trace, or the how-text
+      const after = doc.querySelector('section[aria-labelledby="trace-heading"]') ?? doc.getElementById("how");
       const readme = doc.querySelector('a[href="/readme/"]')?.closest("p");
-      if (readme) readme.before(p);
+      if (after) after.after(p);
+      else if (readme) readme.before(p);
       else doc.querySelector("main")?.append(p);
     }
     link.setAttribute("href", `?at=${total - 1}`);
   }
 
+  // Your holding word's line, filling to the end of its hold (settle mode,
+  // this visitor's own trace only). The same hold keeps its line, so a
+  // re-render never restarts it; anything else removes it.
+  const settleMs = Number(doc.querySelector(".sentence")?.getAttribute("data-settle-ms") ?? 0);
+  let settling: { el: HTMLElement; key: string } | null = null;
+  function renderSettling(): void {
+    const latest = trace && isSettleTrace(trace) ? trace.latest : null;
+    const hold = latest && latest.standing && !latest.settled ? latest : null;
+    const reduced = doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const pos = hold && settleMs > 0 && !reduced ? slots.get(hold.position)?.form.closest(".pos") : null;
+    const key = hold ? `${hold.position}|${hold.word}` : "";
+    if (settling && (!pos || settling.key !== key || !pos.contains(settling.el))) {
+      settling.el.remove();
+      settling = null;
+    }
+    if (!pos || !hold || settling) return;
+    const el = doc.createElement("span");
+    el.className = "settling";
+    el.setAttribute("aria-hidden", "true");
+    el.style.setProperty("--from", String(Math.min(1, Math.max(0, 1 - hold.settlesInMs / settleMs))));
+    el.style.setProperty("--ms", `${hold.settlesInMs}ms`);
+    pos.append(el);
+    settling = { el, key };
+  }
+
+  // your replaced words in the kept ship shown now, from your own trace
+  let mineSent = "";
+  function renderMine(): void {
+    const t = trace && isSettleTrace(trace) ? trace : null;
+    const mine = t
+      ? [...(!t.latest.standing && t.latest.kept === "shown" ? [t.latest.position] : []), ...t.otherReplaced.filter((r) => r.kept === "shown").map((r) => r.position)]
+      : [];
+    const key = mine.join(",");
+    if (key === mineSent) return;
+    mineSent = key;
+    options.onMine?.(mine);
+  }
+
   function render(): void {
+    renderMine();
     renderTrace();
+    renderSettling();
     renderSummary();
     renderEarlier();
   }
@@ -227,22 +473,77 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     keepAllInside(); // typing can move words, and the notices under them
   });
 
+  // The positions one trace shape refers to: one, under once mode; up to
+  // several, under settle mode.
+  function tracePositions(t: Trace | SettleTrace): number[] {
+    return isSettleTrace(t)
+      ? [t.latest.position, ...t.otherStanding.map((s) => s.position), ...t.otherReplaced.map((r) => r.position)]
+      : [t.position];
+  }
+
+  // Guards against a snapshot that was computed before a newer change this
+  // page already applied to one of the trace's own positions (via a faster-
+  // arriving `change` event) — never roll the trace back to stale state for
+  // a position this page already knows is newer.
+  function traceIsFresh(snapshot: Snapshot, t: Trace | SettleTrace): boolean {
+    return tracePositions(t).every((position) => {
+      const slot = slots.get(position);
+      const at = snapshot.positions.find((p) => p.position === position);
+      return !slot || !at || at.version >= slot.latest.version;
+    });
+  }
+
+  // Others' changes, said once a burst has settled: positions and words,
+  // never who or when. Only change events reach this, so a load, snapshot or
+  // reconnect stays silent.
+  const news = doc.getElementById("news");
+  const heard = new Map<number, string>();
+  let speakTimer: ReturnType<typeof setTimeout> | null = null;
+  function announce(change: Position): void {
+    if (!news) return;
+    heard.delete(change.position);
+    heard.set(change.position, change.word);
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = setTimeout(() => {
+      speakTimer = null;
+      const said = [...heard].sort((a, b) => a[0] - b[0]);
+      heard.clear();
+      const words = [...slots.values()].sort((a, b) => a.latest.position - b.latest.position).map((s) => s.latest.word);
+      const n = (p: number) => String(p + 1);
+      news.textContent =
+        said.length === 1
+          ? `Changed: word ${n(said[0][0])} is now “${said[0][1]}”.`
+          : said.length <= 3
+            ? `Changed: words ${said.slice(0, -1).map(([p]) => n(p)).join(", ")} and ${n(said.at(-1)![0])}. The sentence now reads: ${words.join(" ")}.`
+            : `Several words changed. The sentence now reads: ${words.join(" ")}.`;
+    }, ANNOUNCE_MS);
+  }
+
+  function tellKept(kept: KeptShip | undefined, moment: Moment | null = null): void {
+    if (!kept || JSON.stringify(kept) === JSON.stringify(keptSent)) return;
+    keptSent = kept;
+    options.onKept?.(kept, moment);
+  }
+
   return {
     applySnapshot(snapshot) {
       for (const change of snapshot.positions) offer(change);
-      if (snapshot.trace) {
-        const slot = slots.get(snapshot.trace.position);
-        const at = snapshot.positions.find((p) => p.position === snapshot.trace!.position);
-        if (!slot || !at || at.version >= slot.latest.version) {
-          traceChanged ||= JSON.stringify(trace) !== JSON.stringify(snapshot.trace);
-          trace = snapshot.trace;
-        }
+      if (snapshot.trace && traceIsFresh(snapshot, snapshot.trace)) {
+        traceChanged ||= JSON.stringify(trace) !== JSON.stringify(snapshot.trace);
+        trace = snapshot.trace;
+        armSettleTimer();
       }
       for (const slot of slots.values()) if (!hasDraft(slot) && !slot.notice) show(slot);
+      tellKept(snapshot.keptShip);
       render();
     },
     applyChange(change) {
+      // the moment is told first, so the house knows how this change moves before onLatest exchanges it
+      const slot = slots.get(change.position);
+      const newer = !!slot && change.version > slot.latest.version;
+      if (change.keptShip) tellKept(change.keptShip, newer ? classifyMoment(keptSent, change.keptShip, change.position) : null);
       offer(change);
+      if (newer) announce(change);
       render();
     },
   };

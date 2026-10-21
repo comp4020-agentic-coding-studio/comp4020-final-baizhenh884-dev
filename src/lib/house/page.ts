@@ -5,6 +5,8 @@
 // accepted it. Nothing here runs while a visitor types (no preview).
 
 import { TERRITORIES } from "./territories";
+import type { KeptShip, Moment } from "../kept-moment";
+import type { Look } from "./theme";
 import { HouseView } from "./view";
 import { TIMING, type Kind } from "./motion";
 
@@ -13,10 +15,10 @@ const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 export const partLabel = (position: number) => `${String(position + 1).padStart(2, "0")} — ${TERRITORIES[position].label}`;
 
 // a browser that can't draw WebGL keeps the sentence and loses only the house
-function viewIn(host: HTMLElement | null, past: boolean): HouseView | null {
+function viewIn(host: HTMLElement | null, look: Look): HouseView | null {
   if (!host) return null;
   try {
-    const view = new HouseView(host, past);
+    const view = new HouseView(host, look);
     // a page leaving for good releases everything it drew
     addEventListener("pagehide", (e) => { if (!e.persisted) view.destroy(); });
     return view;
@@ -28,9 +30,13 @@ function viewIn(host: HTMLElement | null, past: boolean): HouseView | null {
 
 type Slot = { position: number; pos: HTMLElement; label: HTMLLabelElement; input: HTMLInputElement };
 
-export type CurrentHouse = { latest(change: { position: number; word: string }): void };
+// A change that crosses (docs/decisions/0003, Slice 5) sends its old part out
+// toward the kept house: `toward` is that house's box on the page.
+export type Crossing = { toward: DOMRect | null };
+export type CurrentHouse = { latest(change: { position: number; word: string }, crossing?: Crossing | null): void };
 
-export function mountCurrent(doc: Document): CurrentHouse | null {
+// `ownCrossing`: whether this visitor's own change, just made (Post/Redirect/Get), crossed
+export function mountCurrent(doc: Document, ownCrossing: (position: number) => Crossing | null = () => null): CurrentHouse | null {
   const slots: Slot[] = [];
   for (const form of doc.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"]')) {
     const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
@@ -38,38 +44,40 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
     if (Number.isInteger(position) && label && input && pos) slots.push({ position, pos, label, input });
   }
   if (slots.length !== 10) return null;
-  const view = viewIn(doc.getElementById("house"), false);
+  const view = viewIn(doc.getElementById("house"), "present");
   if (!view) return null;
   // the words the house shows: the shared truth, held drafts or not
   const words = slots.map((s) => s.label.textContent!.trim());
   const part = doc.getElementById("part");
 
   // ---- the change this visitor just made, shown as it happens (Post/Redirect/Get) ----
-  // On submit the position is noted for this tab only; after the redirect, if the
-  // server shows this visitor's word standing there, the house begins from the body
-  // the word replaced (the newest past word, which the server renders) and exchanges it.
+  // On submit the position and the word it showed are noted for this tab only; after
+  // the redirect, if the server shows this visitor's word standing there, the house
+  // begins from the body of the word it replaced (the word they saw: an accepted
+  // change always replaces the version they saw) and exchanges it.
   for (const s of slots) s.label.closest("form")!.addEventListener("submit", () => {
-    try { sessionStorage.setItem("theseus:replaced", String(s.position)); } catch { /* the animation is optional */ }
+    try { sessionStorage.setItem("theseus:replaced", JSON.stringify({ position: s.position, word: s.label.textContent!.trim() })); } catch { /* the animation is optional */ }
   });
-  let replaced: number | null = null;
+  let replaced: { position: number; word: string } | null = null;
   try {
     const v = sessionStorage.getItem("theseus:replaced");
     sessionStorage.removeItem("theseus:replaced");
-    replaced = v === null ? null : Number(v);
+    replaced = v === null ? null : (JSON.parse(v) as { position: number; word: string });
   } catch { /* no storage: no animation */ }
-  const own = replaced === null ? null : slots[replaced];
-  const before = own?.label.querySelector("mark") ? own.pos.querySelector(".past > span")?.textContent ?? null : null;
+  const own = replaced === null || !Number.isInteger(replaced.position) ? null : slots[replaced.position] ?? null;
+  const before = own?.label.querySelector("mark") && typeof replaced?.word === "string" && replaced.word !== words[own.position] ? replaced.word : null;
   if (own && before) {
     view.show(words.map((w, i) => (i === own.position ? before : w)));
     requestAnimationFrame(() => {
-      view.change(own.position, words, "own");
-      arrive(own, before, "own");
+      const crossing = ownCrossing(own.position);
+      view.change(own.position, words, crossing ? "cross" : "own", crossing?.toward ?? null);
+      arrive(own, before, crossing ? "cross" : "own");
     });
   } else view.show(words);
 
   // ---- the sentence's word leaves and the new one arrives with its body ----
   function arrive(s: Slot, old: string, kind: Kind): void {
-    const dur = kind === "own" ? 900 : 1300;
+    const dur = TIMING[kind].exchange;
     // the word and its territory are singled out together: the line stands while the part is exchanged, the emphasis until it has settled
     const T = reduced() ? TIMING.reduced : TIMING[kind];
     hold(s.position, T.exchange || T.hold, T.exchange + T.hold);
@@ -82,7 +90,7 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
     ghost.animate([{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(-0.35em)", offset: kind === "own" ? 0.4 : 0.25 }, { opacity: 0 }], { duration: dur, easing: "cubic-bezier(.6,0,.2,1)" }).finished.then(() => ghost.remove(), () => ghost.remove());
     const red = "rgb(195 51 28)", clear = "rgb(195 51 28 / 0)", ink = "rgb(25 23 20)";
     s.label.animate(
-      kind === "own"
+      kind !== "remote"
         ? [{ color: clear }, { color: clear, offset: 0.38 }, { color: red, offset: 0.62 }, { color: red, offset: 0.8 }, { color: ink }]
         : [{ color: clear }, { color: clear, offset: 0.22 }, { color: red, offset: 0.34 }, { color: red, offset: 0.55 }, { color: ink }],
       { duration: dur, easing: "cubic-bezier(.6,0,.2,1)" },
@@ -187,12 +195,13 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
   return {
     // another visitor's change, from the live stream: the house shows it at once,
     // and the word arrives with it unless a draft is holding that word back
-    latest({ position, word }) {
+    latest({ position, word }, crossing = null) {
       const old = words[position];
       if (old === word) return;
       words[position] = word;
-      view.change(position, words, "remote");
-      queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, "remote"); refreshTrace(); });
+      const kind: Kind = crossing ? "cross" : "remote";
+      view.change(position, words, kind, crossing?.toward ?? null);
+      queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, kind); refreshTrace(); });
     },
   };
 }
@@ -201,5 +210,59 @@ export function mountCurrent(doc: Document): CurrentHouse | null {
 export function mountEarlier(doc: Document): void {
   const words = [...doc.querySelectorAll(".sentence .w")].map((w) => w.textContent!.trim());
   if (words.length !== 10) return;
-  viewIn(doc.getElementById("house"), true)?.show(words);
+  viewIn(doc.getElementById("house"), "past")?.show(words);
+}
+
+// an earlier house (/?kept=k): a completed kept ship, whole, as timber, never live
+export function mountLoneHouse(doc: Document): void {
+  const words = [...doc.querySelectorAll(".kept-sentence .w")].map((w) => w.textContent!.trim());
+  if (words.length !== 10) return;
+  viewIn(doc.getElementById("house-kept"), "kept")?.keptShow({ words, gaps: words.map(() => false) });
+}
+
+export type KeptHouse = {
+  // a kept ship as a fresh load (or a reconnect) shows it: at once
+  update(kept: KeptShip): void;
+  // a kept ship from a change event, with its moment; a crossing part comes in from `from` (the standing house)
+  apply(kept: KeptShip, moment: Moment | null, from: DOMRect | null): void;
+  // the kept ship this house shows, as read from the page when it loaded
+  readonly initial: KeptShip;
+  // this visitor's own kept part, drawn a little firmer (null: none shown)
+  mine(position: number | null): void;
+};
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): read-only,
+// never selected or hovered, its gaps a faint outline from the first load. A
+// gap's word, for the body's own geometry, is the position's current live
+// word (deriveKeptShip's own convention: a gap position's word is the current
+// one, until it's replaced away and kept); the gap flag alone decides whether
+// that territory is drawn solid or as a faint outline. The initial state is
+// read entirely from the server-rendered markup — the .kept-sentence spans
+// index.astro already wrote, and the live sentence's own word labels — the
+// same way mountEarlier reads an earlier form's words, never passed in as a
+// script variable, so this script stays a plain ES module. `.update()` shows
+// a kept ship at once (a reconnect's catch-up); `.apply()` moves it for a
+// change event's moment (kept-stage.ts): a crossing part arriving, a later
+// ship's quiet beat. Neither ever leaves the page on a stale kept ship.
+export function mountKept(doc: Document): KeptHouse | null {
+  const keptSpans = [...doc.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+  // keptShipAt() already sets a gap position's word to the position's
+  // current live word (src/lib/kept-ship.ts) — the server's own convention,
+  // reused here: read it from the live sentence, since the kept-sentence
+  // markup itself leaves a gap blank.
+  const currentWords = [...doc.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"] label')].map((l) =>
+    l.textContent!.trim(),
+  );
+  if (keptSpans.length !== 10 || currentWords.length !== 10) return null;
+  const view = viewIn(doc.getElementById("house-kept"), "kept");
+  if (!view) return null;
+  const initialGaps = keptSpans.map((s) => s.classList.contains("gap"));
+  const initial: KeptShip = { words: initialGaps.map((gap, i) => (gap ? currentWords[i] : keptSpans[i].textContent!.trim())), gaps: initialGaps };
+  view.keptShow(initial);
+  return {
+    initial,
+    update: (kept) => view.keptShow(kept),
+    apply: (kept, moment, from) => view.keptApply(kept, moment, from),
+    mine: (position) => view.trace(position),
+  };
 }

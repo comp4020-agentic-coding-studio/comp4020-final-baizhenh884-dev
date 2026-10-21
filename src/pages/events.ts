@@ -1,34 +1,58 @@
 import type { APIRoute } from "astro";
-import { currentPositions, traceFor, type Trace } from "../lib/db";
+import { currentPositions, currentTrace, keptShipAt, type CurrentTrace } from "../lib/db";
 import { subscribe, type Change } from "../lib/live";
 import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 
 // GET /events: the current sentence as a stream. It opens with a `snapshot`
-// of SQLite ({ positions, trace }), then sends each successful replacement as
-// a `change` ({ position, word, version }). Changes carry no trace, so when a
-// change alters this connection's own visitor's trace (their change made in
-// another tab, or their word replaced) the connection also gets a fresh
-// snapshot. A reconnect is a new request, so it catches up from a fresh
-// snapshot rather than from any replay.
+// of SQLite ({ positions, trace, keptShip }), then sends each successful
+// replacement as a `change` ({ position, word, version, keptShip }). Changes
+// carry no trace, so when a change alters this connection's own visitor's
+// trace (their change made in another tab, or their word replaced) the
+// connection also gets a fresh snapshot. A reconnect is a new request, so it
+// catches up from a fresh snapshot rather than from any replay.
+//
+// `trace` carries whichever shape rules.mode is currently serving
+// (docs/decisions/0003-settle-and-kept-ships.md): the once-mode Trace, or
+// the richer settle-mode SettleTrace — the client (live-client.ts)
+// discriminates structurally, since the bundled client JS can't know the
+// server's mode at build time. Settling by age never changes this value by
+// itself (it has no server event to push with): the client's own local
+// timer handles that entirely on the page, never by the server sending more
+// snapshots.
+//
+// `keptShip` (docs/decisions/0003) is global, not per-visitor: unlike the
+// trace, it rides on every `change` event itself, since every open stream
+// already gets every change and the kept ship changes on each one — no
+// follow-up snapshot needed for it the way the trace sometimes needs one.
 
 const HEARTBEAT_MS = 20_000;
 const encoder = new TextEncoder();
 
 const positionsNow = () => currentPositions().map(({ position, word, version }) => ({ position, word, version }));
+// the ship number is an internal derivation detail, never exposed: no
+// numeric "ship id" is part of the product contract, only which words are
+// kept vs. gaps
+const keptShipNow = () => { const { words, gaps } = keptShipAt(); return { words, gaps }; };
 
-const sameTrace = (a: Trace | null, b: Trace | null) =>
-  a === b ||
-  (a !== null &&
-    b !== null &&
-    a.position === b.position &&
-    a.word === b.word &&
-    a.standing === b.standing &&
-    (a.standing || b.standing || a.now === b.now));
+// settlesInMs is recomputed from the current time on every read, so it never
+// equals a prior read even when nothing a visitor would notice has changed:
+// comparing it directly would resend a snapshot on every single broadcast
+// anywhere, for every connection with a holding trace. It drives only the
+// client's own local timer (never rendered), so it's excluded from the
+// comparison that decides whether to resend.
+function withoutSettleTimer(trace: CurrentTrace["trace"]): unknown {
+  if (!trace || !("latest" in trace) || !trace.latest.standing || trace.latest.settled) return trace;
+  const { settlesInMs: _settlesInMs, ...latest } = trace.latest;
+  return { ...trace, latest };
+}
+
+const sameTrace = (a: CurrentTrace["trace"], b: CurrentTrace["trace"]) =>
+  a === b || JSON.stringify(withoutSettleTimer(a)) === JSON.stringify(withoutSettleTimer(b));
 
 export const GET: APIRoute = ({ cookies, locals }) => {
   const visitor = visitorId(cookies);
-  const traceNow = () => (visitor ? traceFor(visitor) : null);
+  const traceNow = (): CurrentTrace["trace"] => (visitor ? currentTrace(visitor).trace : null);
   const reqId = locals.requestId;
   const v = visitorTag(visitor);
   let stop = () => {};
@@ -43,17 +67,17 @@ export const GET: APIRoute = ({ cookies, locals }) => {
       const send = (chunk: string) => controller.enqueue(encoder.encode(chunk));
       const event = (name: string, data: unknown) => send(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
 
-      let sent: Trace | null = null; // the trace this connection last received
+      let sent: CurrentTrace["trace"] = null; // the trace this connection last received
       const unsubscribe = subscribe((change: Change) => {
-        event("change", change);
+        event("change", { ...change, keptShip: keptShipNow() });
         const trace = traceNow();
         if (sameTrace(trace, sent)) return;
         sent = trace;
-        event("snapshot", { positions: positionsNow(), trace });
+        event("snapshot", { positions: positionsNow(), trace, keptShip: keptShipNow() });
         logLine(reqId, "stream-resnapshot", { v });
       });
       sent = traceNow();
-      event("snapshot", { positions: positionsNow(), trace: sent });
+      event("snapshot", { positions: positionsNow(), trace: sent, keptShip: keptShipNow() });
       logLine(reqId, "stream-open", { v });
 
       // a comment line, ignored by clients, so a dead socket surfaces

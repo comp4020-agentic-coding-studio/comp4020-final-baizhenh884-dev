@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>B · Two ships</title>
+<!-- Isolated redesign sketch. Not wired into the app. Words below are staged sketch data, not visitor changes. -->
+<style>
+  :root { --stand: #1d2b3a; --stand-ink: #f3efe6; --kept: #e7dccb; --kept-ink: #2a2118; --red: #e2482b; --gold: #d9a441; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--stand); color: var(--stand-ink); font: 16px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; overflow-x: hidden; }
+  .spread { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; position: relative; }
+  .side { padding: 28px clamp(16px, 3vw, 40px) 28px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; min-width: 0; }
+  .stand { background: var(--stand); color: var(--stand-ink); }
+  .kept { background: var(--kept); color: var(--kept-ink); }
+  .eyebrow { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .7; font-weight: 600; }
+  h2 { margin: 0; font: italic 400 clamp(22px, 2.4vw, 30px)/1.1 Georgia, serif; }
+  .sentence { font: 700 clamp(24px, 3vw, 40px)/1.12 -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: -.01em; }
+  .kept .sentence { font-family: Georgia, serif; font-weight: 400; font-style: italic; }
+  .w { display: inline-block; transition: color .25s, opacity .25s; }
+  .w.hot { color: var(--red); }
+  .w.blank { opacity: .25; }
+  .w.mine { box-shadow: inset 0 -.18em 0 var(--gold); }
+  canvas { width: 100%; height: 100%; min-height: 300px; display: block; }
+  .foot { font-size: 14px; opacity: .85; max-width: 32em; }
+  .foot b { font-weight: 600; }
+  #fly { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
+  .event { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--red); color: #fff; padding: 14px 22px; font: 700 18px/1.2 -apple-system, sans-serif; opacity: 0; pointer-events: none; white-space: nowrap; transition: opacity .4s; }
+  .event.on { opacity: 1; }
+  .ctl { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; align-items: center; }
+  button { font: 600 14px -apple-system, sans-serif; background: var(--red); color: #fff; border: 0; padding: 10px 14px; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .hint { font-size: 11px; background: rgba(0,0,0,.55); color: #fff; padding: 4px 8px; }
+  @media (max-width: 760px) {
+    .spread { grid-template-columns: 1fr; }
+    .side { min-height: 0; }
+    canvas { min-height: 220px; height: 240px; }
+    .ctl { position: static; padding: 12px 16px 20px; background: var(--kept); flex-wrap: wrap; }
+    .event { white-space: normal; width: calc(100% - 32px); text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="spread">
+  <section class="side stand">
+    <p class="eyebrow">Sketch B · Two ships (substantial departure) · what stands</p>
+    <div class="sentence" id="s-now"></div>
+    <canvas id="c-now" aria-hidden="true"></canvas>
+    <p class="foot" id="trace"><b>Your trace.</b> You can replace a word.</p>
+  </section>
+  <section class="side kept">
+    <p class="eyebrow">What was kept: each first part, as it came away</p>
+    <div class="sentence" id="s-kept" aria-label="The kept sentence: the first words that have come away"></div>
+    <canvas id="c-kept" aria-hidden="true"></canvas>
+    <p class="foot">Hobbes: if someone kept every plank as it came away and built them back together, which ship is Theseus's?</p>
+  </section>
+  <canvas id="fly" aria-hidden="true"></canvas>
+  <div class="event" id="event" role="status"></div>
+</div>
+<div class="ctl"><span class="hint">staged words, not visitors · R</span><button id="go">Play one replacement</button><button id="all">Run to the end</button></div>
+<script src="iso.js"></script>
+<script>
+const { STARTING, LABELS, parts, faces, order, grown, centre, fitCanvas, poly, ease, phase, reduced } = ISO;
+const SCRIPT = [[4, "strangers", true], [0, "Keep", false], [7, "when", false], [2, "sentence", false], [4, "neighbours", false], [9, "vanished", false], [1, "the", false], [3, "everyone", false], [5, "could", false], [6, "find", false], [8, "this", false]];
+let words = [...STARTING], kept = Array(10).fill(false), step = 0, anim = null, mine = null;
+const NOW = { top: "#3b5168", left: "#2a3c50", right: "#22323f" };
+const KEPT = { top: "#cdb48f", left: "#b39670", right: "#9c7f5b" };
+
+function renderSentences(hot = -1) {
+  document.getElementById("s-now").innerHTML = words.map((w, i) => `<span class="w${i === hot ? " hot" : ""}${i === mine ? " mine" : ""}">${w}</span>`).join(" ") + ".";
+  document.getElementById("s-kept").innerHTML = STARTING.map((w, i) => `<span class="w${kept[i] ? "" : " blank"}">${kept[i] ? w : "____"}</span>`).join(" ") + ".";
+}
+
+function geom(canvas) { const { ctx, w, h } = fitCanvas(canvas); const s = Math.min(w / 15, h / 12); return { ctx, w, h, s, ox: w / 2 + s * 0.6, oy: h * 0.2 }; }
+
+function drawHouse(canvas, ws, pal, show, fx) {
+  const g = geom(canvas); const { ctx, s, ox, oy } = g;
+  ctx.clearRect(0, 0, g.w, g.h);
+  const ps = parts(ws);
+  for (const i of order(ps)) {
+    if (!show(i)) continue;
+    const { part, alpha = 1, red = false } = fx?.(i, ps[i]) ?? { part: ps[i] };
+    ctx.globalAlpha = alpha;
+    for (const f of faces(part)) { poly(ctx, f.pts, ox, oy, s); ctx.fillStyle = red ? (f.shade === "top" ? "#ff7a5c" : f.shade === "left" ? "#e2482b" : "#b9351d") : pal[f.shade]; ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = .7; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  return g;
+}
+
+function screenOf(canvas, part) {
+  const g = geom(canvas), r = canvas.getBoundingClientRect(), root = document.getElementById("fly").getBoundingClientRect();
+  const [cx, cy] = centre(part);
+  return [r.left - root.left + g.ox + cx * g.s, r.top - root.top + g.oy + cy * g.s];
+}
+
+function frame(t) {
+  const cNow = document.getElementById("c-now"), cKept = document.getElementById("c-kept");
+  const fl = fitCanvas(document.getElementById("fly")); fl.ctx.clearRect(0, 0, fl.w, fl.h);
+  if (!anim) {
+    drawHouse(cNow, words, NOW, () => true);
+    drawHouse(cKept, STARTING, KEPT, (i) => kept[i]);
+    return;
+  }
+  const { pos, oldWords, toKept, start, from } = anim;
+  const u = Math.min(1, (t - start) / (reduced() ? 1 : 3600));
+  const ps0 = parts(oldWords)[pos], ps1 = parts(words)[pos];
+  // .00–.18 the old part flares red and breaks loose · .18–.55 its pieces cross the gutter
+  // · .55–.70 they lock into the kept ship (or scatter, if it wasn't a first part) · .55–.92 the new part is built
+  if (u < 0.18) drawHouse(cNow, oldWords, NOW, () => true, (i, p) => i === pos ? { part: p, red: true } : { part: p });
+  else drawHouse(cNow, words, NOW, (i) => i !== pos || u > 0.55, (i, p) => i === pos ? { part: grown(p, ease(phase(u, 0.55, 0.92))), red: u < 0.97 } : { part: p });
+  const arrive = phase(u, 0.55, 0.7);
+  drawHouse(cKept, STARTING, KEPT, (i) => kept[i] || (toKept && i === pos && arrive > 0), (i, p) => i === pos && toKept ? { part: p, alpha: arrive, red: arrive < 1 } : { part: p });
+  if (u >= 0.18 && u < 0.7) {
+    const a = screenOf(cNow, ps0), b = toKept ? screenOf(cKept, parts(STARTING)[pos]) : [a[0] + 60, fl.h + 40];
+    const k = ease(phase(u, 0.18, 0.62));
+    for (let j = 0; j < 14; j++) {
+      const jx = Math.sin(j * 12.9898 + pos) * 30, jy = Math.cos(j * 78.233 + pos) * 22, arc = Math.sin(k * Math.PI) * -80;
+      const x = a[0] + (b[0] - a[0]) * k + jx * (1 - k), y = a[1] + (b[1] - a[1]) * k + jy * (1 - k) + arc;
+      fl.ctx.fillStyle = j % 3 ? "#e2482b" : "#d9a441"; fl.ctx.fillRect(x - 5, y - 4, 10, 8);
+    }
+    fl.ctx.font = "italic 22px Georgia, serif"; fl.ctx.fillStyle = "#fff"; fl.ctx.textAlign = "center";
+    fl.ctx.fillText(from, a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k - 26 + Math.sin(k * Math.PI) * -80);
+  }
+  if (u >= 1) {
+    if (toKept) kept[pos] = true;
+    anim = null; renderSentences(); frame(t);
+    if (kept.every(Boolean)) { const ev = document.getElementById("event"); ev.textContent = "The last first word has come away. The kept ship is whole."; ev.classList.add("on"); setTimeout(() => ev.classList.remove("on"), 4200); }
+    return;
+  }
+  requestAnimationFrame(frame);
+}
+
+function play() {
+  if (anim || step >= SCRIPT.length) return false;
+  const [pos, word, isMine] = SCRIPT[step++];
+  const oldWords = [...words], from = words[pos], toKept = !kept[pos] && from === STARTING[pos];
+  words[pos] = word;
+  const tr = document.getElementById("trace");
+  if (mine === pos && !isMine) { mine = null; tr.innerHTML = `<b>Your trace.</b> “<del>strangers</del>” was replaced by “${word}”. You can act again, anywhere but there.`; }
+  if (isMine) { mine = pos; tr.innerHTML = `<b>Your trace.</b> “${word}” holds your place for now.`; }
+  renderSentences(pos);
+  anim = { pos, oldWords, toKept, from, start: performance.now() };
+  requestAnimationFrame(frame);
+  return true;
+}
+document.getElementById("go").onclick = play;
+document.getElementById("all").onclick = function run() { if (step >= SCRIPT.length) return; if (!anim) play(); setTimeout(run, 400); };
+addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") play(); });
+addEventListener("resize", () => frame(performance.now()));
+renderSentences(); frame(0);
+ISO.demo(play, 11);
+</script>
+</body>
+</html>

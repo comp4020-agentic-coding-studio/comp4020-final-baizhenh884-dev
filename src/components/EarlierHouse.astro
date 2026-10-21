@@ -1,0 +1,35 @@
+---
+// An earlier house (/?kept=k): one completed kept ship on its own, read-only,
+// never live, reached one at a time like an earlier form. Its number is in
+// the URL only, never on the page (no counts, CLAUDE.md). Built from that
+// ship's words alone; nothing about it is stored.
+interface Props {
+  words: string[];
+  prev: number | null; // the completed ship before it, if any
+  next: number | null; // the completed ship after it, if any
+}
+const { words, prev, next } = Astro.props;
+---
+
+<div class="lone-house">
+  <header class="mast">
+    <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+  </header>
+  <p class="caps half-label kept-label">A house that was kept (read-only)</p>
+  <p class="kept-sentence">
+    {words.map((w, i) => (i < words.length - 1 ? <><span class="w">{w}</span>{" "}</> : <span class="end"><span class="w">{w}</span>.</span>))}
+  </p>
+  <div id="house-kept" aria-hidden="true"></div>
+  <nav class="history caps" aria-label="Earlier houses">
+    {prev !== null && <a rel="prev" href={`?kept=${prev}`}>Earlier house</a>}
+    {next !== null && <a rel="next" href={`?kept=${next}`}>Later house</a>}
+    <a href="/">Back to now</a>
+  </nav>
+  <p class="about caps"><a href="/readme/">About Theseus</a></p>
+</div>
+<script>
+  // drawn once from these words, as timber, whole; never goes live
+  import { mountLoneHouse } from "../lib/house/page";
+
+  mountLoneHouse(document);
+</script>

@@ -60,6 +60,40 @@ from what `README.md` argues "good" means (see "Product contract").
 - No new product surface: no accounts, no visible identity, no presence,
   no change to the one-change-per-visitor rule.
 
+## Scope (Final Project redesign: settle rule + kept ships)
+
+Branch `final/theseus-redesign` only; `main` stays exactly as deployed for
+Crit 10 until the redesign is ready to merge, and nothing merges before the
+Crit 10 cutoff. Decided in
+`docs/decisions/0003-settle-and-kept-ships.md`, which supersedes
+[0002](docs/decisions/0002-pseudonymous-visitor-and-logging.md)'s "What each
+person may change" section only.
+
+- **The rule is configuration, not a schema fork.** One setting
+  (`rules.mode`, `once` or `settle`) selects the enforced behaviour; flipping
+  it back to `once` needs no migration rollback. Production's mode is a Fly
+  secret, set explicitly, never a deploy-time flag (CI redeploys on every
+  push to `main` and would silently drop a flag). Default when unset is
+  `once` — today's behaviour, unchanged.
+- **No formal playtest gate for this round** (explicit project decision,
+  schedule-driven): build directly, correct as you go from informal tries by
+  2-3 classmates whenever something is playable, rather than gating behind a
+  structured test.
+- **The migration is one-way and needs a confirmed backup first.** Before
+  migration `0001` (drops the visitor uniqueness constraint, adds the
+  `rules` table and a mode-aware trigger) ever reaches the production
+  volume, give the exact `flyctl` backup steps and wait for explicit
+  confirmation the backup exists. This is a hard stop, not a formality, and
+  stated here because it is easy to skip under deadline pressure.
+- **Kept ships need no new stored state.** The second Theseus (ship *k* = the
+  word that stood at version *k* of each position) is derived entirely from
+  the existing `changes` log; don't add a table, a counter, or any field only
+  to make this easier to build or test.
+- Scope stays narrow even inside this redesign: no accounts, no visible
+  identity change, no presence — the redesign touches the eligibility rule
+  and adds one new reading of the same sentence, nothing else from the
+  existing product contract.
+
 ## Scope (Final Project: House integration)
 
 The Final Project deliberately pivots to the House of Theseus. This section
@@ -90,8 +124,9 @@ outside this repo: it holds their result and its specs, not the search.
 - No preview: typing a replacement never changes the house; the new body
   appears only after the server accepts the change.
 - Red means only "this body is being rebuilt now"; nothing stays red.
-- The canvas is decorative to assistive technology; the sentence is the
-  accessible state.
+- Both canvases are decorative to assistive technology; the live sentence
+  and the kept sentence are the accessible state, and other visitors'
+  changes are announced politely, coalesced.
 
 ## Stack
 
@@ -134,8 +169,8 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 2. **Local image:** the spec against *this* repository state, as CI runs it:
 
    ```sh
-   docker build -t app . && docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 --tmpfs /data app
-   pnpm check    # APP_URL defaults to http://localhost:8080
+   docker build -t app . && docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+   RULE_MODE=once BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
    docker stop app
    ```
 
@@ -145,6 +180,17 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
    fly.dev URL tests the last deploy, not the working tree (`/readme/` compares
    the local `README.md` with what's served). `--tmpfs /data` wipes data, so a
    persistence claim needs a named volume (`-v data:/data`) and a restart.
+
+   **On `final/theseus-redesign` (`RULE_MODE=settle` in production), run it
+   a second time against a settle-mode container**, exactly as `checks.yml`
+   does, since production's actual mode is never exercised by the default
+   run above:
+
+   ```sh
+   docker run -d --rm --init --name app -p 8080:8080 -e PORT=8080 -e RULE_MODE=settle -e SETTLE_SECONDS=3 -e BLOCKED_WORDS=blockedtestword --tmpfs /data app
+   RULE_MODE=settle BLOCKED_WORDS=blockedtestword pnpm check    # APP_URL defaults to http://localhost:8080
+   docker stop app
+   ```
 3. **Deployed:** `flyctl deploy --remote-only --ha=false -a
    comp4020-final-baizhenh884-dev`, then
    `APP_URL=https://comp4020-final-baizhenh884-dev.fly.dev pnpm check`. Against
@@ -167,7 +213,21 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 - Never weaken or skip a local/CI check because production can't run it.
 - New checks go in `spec/*.test.ts` (`spec/README.md` covers the shipped
   ones), assert the contract rather than the implementation, and are written
-  before the code, failing for the right reason.
+  before the code, failing for the right reason. **The spec commit itself
+  must land before the feat commit it covers**, not just be written first and
+  committed alongside or after (the settle-rule migration, commits
+  `0118706..5feee78`, landed before `spec/eligibility.test.ts`, commit
+  `53b8a5d` — the spec existed and was green locally before each feat commit,
+  but the commit *order* didn't show that, so the history can't prove it on
+  its own). History is never rewritten to fix this after the fact; it's a
+  rule for commits from here on.
+- **A check gated on configuration the test runner doesn't control on its own
+  (a rule mode, a feature flag) must never be silently skippable in CI.**
+  Follow `spec/logging.test.ts`'s `dockerOnly` pattern: skip, named, when the
+  gating condition is genuinely absent from a local or non-CI run, but fail
+  loudly when CI's own environment should have declared it and didn't. CI
+  must declare every such variable explicitly on every run it does — never
+  leave it unset and rely on a check's default to paper over the gap.
 - Don't replace judgement with a proxy: no keyword checks, and no fields added
   only so something can be tested.
 
@@ -229,10 +289,28 @@ What the code must hold to. The README says why; don't restate it here.
 - The HTTP contract at the top of `spec/theseus.test.ts` (routes, fields,
   status codes, the word `<label>` and the `rel="prev"` link) is binding.
   Change it only together with the spec.
-- One successful replacement per visitor, ever: no undo and no second change.
-  A visitor is a browser holding the site's visitor cookie. Enforce it
-  atomically in the database (a uniqueness constraint), never by
+- **Under rule mode `once`** (production default, and the only mode before
+  the redesign's migration `0001` lands): one successful replacement per
+  visitor, ever: no undo and no second change. A visitor is a browser
+  holding the site's visitor cookie. Enforce it atomically in the database
+  (a uniqueness constraint on `changes.visitor`, before `0001`), never by
   check-then-write and never only in the page.
+- **Under rule mode `settle`** (the redesign on `final/theseus-redesign`,
+  `docs/decisions/0003-settle-and-kept-ships.md`, after migration `0001`): a
+  visitor may act when they have no prior change, their latest change has
+  been replaced, or it has stood at least `SETTLE_SECONDS` — and never at
+  the exact position of their own latest change (move-on) until they've
+  changed elsewhere. **Once `0001` is applied, the uniqueness constraint no
+  longer exists in either mode** — it is dropped, not conditionally
+  bypassed. From that point on, both `once` and `settle` are enforced by the
+  same single database-level guard, a `BEFORE INSERT` trigger on `changes`
+  that reads the current `rules.mode` and applies whichever predicate is
+  active (reproducing the old unique-index behaviour exactly when
+  `mode = 'once'`). Never assume the unique index still exists once `0001`
+  has run, in either mode. Which mode is active is itself configuration (see
+  "Scope" above), never hardcoded behaviour that needs a schema change to
+  switch. In both cases: atomic in the database, never check-then-write and
+  never only in the page.
 - A replacement names the word position and the version of it the visitor saw.
   Versions belong to one position: a change elsewhere never makes a word stale.
   If that position has changed since, refuse it. Compare versions, not word
@@ -264,7 +342,13 @@ What the code must hold to. The README says why; don't restate it here.
 - There is no user-facing moderation. Any recovery path for harmful public
   content is an exceptional maker action outside the ordinary interaction: it
   never protects, assigns or adds words, and it needs a recorded decision
-  before it's built.
+  before it's built. The one built is the maker's blocklist
+  (`docs/decisions/0004-maker-blocklist.md`, `spec/blocklist.test.ts`): words
+  from the `BLOCKED_WORDS` Fly secret, exact after NFKC and case folding,
+  refused as invalid (422, change not used up), logged only as
+  `reason=blocked`; an empty list is logged once, never fatal. Real blocked
+  words never appear in the repo, logs, chat or responses; checks use the
+  meaningless `blockedtestword`.
 - No editing, undo, accounts, profiles, nicknames, comments, likes or other
   reactions, rooms, feeds, scores or second sentence without an explicit
   product decision recorded first.
@@ -280,6 +364,14 @@ What the code must hold to. The README says why; don't restate it here.
 - Historical `?at=N` views never update live and never subscribe to realtime
   behaviour. Their house is built from that earlier sentence alone and is
   read-only.
+- An earlier house, `GET /?kept=k`, is completed kept ship k alone: its ten
+  words and its house, read-only, never live, reached one at a time
+  (Earlier house / Later house / Back to now), never listed together. Ship
+  k is derived from `changes` by the same rule as the kept ship being built
+  (`completedShip` in `src/lib/kept-ship.ts`), nothing stored. Anything that
+  isn't a completed ship (not a whole number from 1, the ship still being
+  built, or later) is 404. Its number is navigation in the URL only, never
+  shown on the page (`spec/kept-houses.test.ts`, `spec/kept-ship.test.ts`).
 - The house follows authoritative shared state, not a held draft: a newer
   shared word reaches it once, including at a position where a draft keeps the
   word on screen back, and the draft, its expected version and the label stay
@@ -288,20 +380,30 @@ What the code must hold to. The README says why; don't restate it here.
   geometry equals that of a fresh build of the same final sentence
   (`spec/house-live-body.test.ts`). Whether a standing neighbour is kept is
   decided on its geometry, never on its outline or a count.
+- A screen reader reaches what the page shows: the kept sentence is read as
+  its words, each gap as "blank" (`spec/kept-ship.test.ts`,
+  `spec/kept-sentence.test.ts`); others' changes are announced in one polite
+  live region, only from change events newer than what's shown (never a
+  load, snapshot or reconnect), a burst coalesced into one announcement, as
+  plain text naming positions and words, never who or when
+  (`spec/live-client.test.ts`).
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
-  existing per-position version/stale-check and one-change-per-visitor rules
-  are never bypassed, weakened, or duplicated by the realtime channel. No
-  automatic event rebases a draft onto a newer version; if it's submitted,
-  the existing stale rule applies exactly as before.
+  existing per-position version/stale-check and whichever eligibility rule
+  is currently active (`once` or `settle` — see "Enforced" above) are never
+  bypassed, weakened, or duplicated by the realtime channel. No automatic
+  event rebases a draft onto a newer version; if it's submitted, the
+  existing stale rule applies exactly as before.
 - No presence, online/visitor counts, visitor identity, or activity/change
   feed is added for realtime; the existing no-who/when/counts rule extends to
   whatever the realtime channel carries.
 - The realtime layer never weakens an existing server-enforced product rule.
   Existing server-side validation, persistence and output-safety guarantees
-  remain authoritative; stale, invalid or second replacements continue to be
-  refused by the server. Realtime presentation and navigation behaviour are
-  page-side only and never override those server guarantees.
+  remain authoritative; stale, invalid, or ineligible replacements (whatever
+  the active rule mode currently refuses — a second change under `once`, a
+  holding or not-here attempt under `settle`) continue to be refused by the
+  server. Realtime presentation and navigation behaviour are page-side only
+  and never override those server guarantees.
 - The server logs who did what, server-side, to stdout, so it outlives the
   crit (`docs/decisions/0002-pseudonymous-visitor-and-logging.md`). Logging
   is observation only: it never changes a response, the replacement
@@ -317,14 +419,18 @@ What the code must hold to. The README says why; don't restate it here.
 These can change without a contract change, as long as the enforced rules
 hold.
 
-- Beneath each word, a few of the most recent words it replaced (currently
-  four), receding, hidden from screen readers.
+- Only what stands now under the live sentence (`GET /`): no earlier words
+  beneath its words. Replaced words are shown kept in the kept half; the
+  whole history is one step away under "Earlier form" (`?at=N`).
 - Earlier whole sentences, reached one step at a time (Earlier / Later / Now),
   one on screen at once and never listed together.
 - Not built (as of Crit 9): an "as you left it" jump, a client-side
   confirmation step, and showing how long a word stood. Each change still
   records when it happened, for logging; that time is never shown to other
-  visitors.
+  visitors. The one exception is private: under settle mode, a visitor's
+  own holding word fills a thin line until it settles (how much of their
+  hold is left), on their own page only, never red, and not with reduced
+  motion (`spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
 - The visual treatment (fading, layout) is judged, not specified. Its
   direction is Monograph, an architectural-study field: the sentence is the
   protagonist and the house its body; a standing house stays restrained; red
@@ -334,8 +440,10 @@ hold.
   by paired emphasis, with no line. A focused or selected word gets a thin
   line to its territory and the part notation ("05 — entry"). An accepted
   change draws that line red while exactly that part is exchanged, then
-  everything returns to neutral. A phone has no line. Under the house: "Ten
-  words. Ten parts of one house. Change a word, and its part is rebuilt." At
+  everything returns to neutral. A phone has no line. Under the standing
+  house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
+  Under the kept house: "Replaced words are kept here, and built back into
+  a house." At
   the foot beside About: "If every word and every part is replaced, is it
   still the same thing?" With reduced motion nothing moves and the cue stands
   still for a moment, then clears.

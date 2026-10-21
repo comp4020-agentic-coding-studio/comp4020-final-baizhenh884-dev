@@ -1,6 +1,9 @@
 ---
+import EarlierHouse from "../components/EarlierHouse.astro";
+import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
-import { changeCount, currentPositions, recentPast, sentenceAt, traceFor } from "../lib/db";
+import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
 import { ensureVisitor } from "../lib/visitor";
 
 const visitor = ensureVisitor(Astro.cookies, Astro.locals);
@@ -9,6 +12,14 @@ const visitor = ensureVisitor(Astro.cookies, Astro.locals);
 // GET /: the current sentence, the only one that can be changed.
 // Each has its house: a body built in the browser from these same words,
 // never stored, and beside the sentence rather than instead of it.
+// GET /?kept=k: completed kept ship k on its own (an earlier house), or 404
+const keptParam = Astro.url.searchParams.get("kept");
+const lone = keptParam !== null && /^[1-9][0-9]{0,14}$/.test(keptParam) ? completedShipAt(Number(keptParam)) : null;
+if (keptParam !== null && !lone) return new Response("Not found", { status: 404 });
+const loneK = Number(keptParam);
+const lonePrev = lone && loneK > 1 ? loneK - 1 : null;
+const loneNext = lone && completedShipAt(loneK + 1) ? loneK + 1 : null;
+
 const at = Astro.url.searchParams.get("at");
 let earlier: string[] | null = null;
 if (at !== null) {
@@ -16,20 +27,54 @@ if (at !== null) {
   if (!earlier) return new Response("Not found", { status: 404 });
 }
 const current = earlier ? [] : currentPositions();
-const past = earlier ? new Map<number, string[]>() : recentPast();
 const changes = changeCount();
 const n = Number(at);
-const trace = earlier ? null : traceFor(visitor);
-const yours = trace?.standing ? trace.position : null;
+
+// The second Theseus (docs/decisions/0003-settle-and-kept-ships.md): derived,
+// never stored, and only for the live current sentence — an earlier form's
+// kept ship isn't rendered (?at=N is a single read-only form of the sentence,
+// not a live pairing). Always computed (cheap, one read), used only below.
+const kept = keptShipAt();
+// the most recent completed kept ship, the one way into the earlier houses (0: none yet)
+const lastCompleted = earlier ? 0 : Math.min(...current.map((p) => p.version)) - 1;
+
+// Which trace shape renders is itself rule-mode config, never guessed from
+// the trace's own content (docs/decisions/0003-settle-and-kept-ships.md).
+// Under `once` the markup below is unchanged, byte for byte, from Crit 9.
+const trace = earlier ? null : currentTrace(visitor);
+const markedPositions = new Set<number>(
+  trace?.mode === "once" && trace.trace?.standing
+    ? [trace.trace.position]
+    : trace?.mode === "settle" && trace.trace
+      ? [trace.trace.latest.standing ? trace.trace.latest.position : null, ...trace.trace.otherStanding.map((s) => s.position)].filter(
+          (p): p is number => p !== null,
+        )
+      : [],
+);
+// your replaced words in the kept ship shown now: marked for you only (settle mode, plan B)
+const keptMine = new Set<number>(
+  trace?.mode === "settle" && trace.trace
+    ? [
+        ...(!trace.trace.latest.standing && trace.trace.latest.kept === "shown" ? [trace.trace.latest.position] : []),
+        ...trace.trace.otherReplaced.filter((r) => r.kept === "shown").map((r) => r.position),
+      ]
+    : [],
+);
+const how =
+  trace?.mode === "settle"
+    ? `Choose a word, type its replacement and press Enter. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
+    : "Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
 ---
 
 <Page title="Theseus">
-  <header class="mast">
-    <span class="name">Theseus</span><span class="sub caps">One sentence, one house</span>
-  </header>
   {
-    earlier ? (
+    lone ? (
+      <EarlierHouse words={lone} prev={lonePrev} next={loneNext} />
+    ) : earlier ? (
       <>
+        <header class="mast">
+          <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+        </header>
         <div class="text">
           <p class="form-state caps">An earlier form (read-only)</p>
           <p class="sentence past">
@@ -56,66 +101,223 @@ const yours = trace?.standing ? trace.position : null;
       </>
     ) : (
       <>
-        <div class="text current">
-          <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
-          <div class="sentence">
-            {current.map((p, i) => (
-              <>
-                <div class="pos">
-                  <form method="post" action="/replace">
-                    <input type="hidden" name="position" value={p.position} />
-                    <input type="hidden" name="version" value={p.version} />
-                    <label for={`word-${p.position}`}>{p.position === yours ? <mark>{p.word}</mark> : p.word}</label>
-                    <input
-                      id={`word-${p.position}`}
-                      name="word"
-                      aria-describedby="how"
-                      placeholder={p.word}
-                      autocomplete="off"
-                      spellcheck="false"
-                      required
-                    />
-                  </form>
-                  {(past.get(p.position) ?? []).length > 0 && (
-                    <span class="past" aria-hidden="true">
-                      {(past.get(p.position) ?? []).map((w) => <span>{w}</span>)}
-                    </span>
-                  )}
-                </div>
-                {i < current.length - 1 && " "}
-              </>
-            ))}.
-          </div>
-          <p id="part" class="caps" aria-hidden="true" hidden></p>
-          <p id="how">
-            Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.
-          </p>
-          {trace && (
-            <section aria-labelledby="trace-heading">
-              <h2 id="trace-heading">Your trace</h2>
-              <p role="status">
-                {trace.standing ? (
-                  <>Your word “{trace.word}” still stands, marked in the sentence above.</>
-                ) : (
+        <div class="two">
+          <div class="half stands-half" id="stands">
+            <div class="half-head">
+              <header class="mast">
+                <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+              </header>
+              {/* on a phone the halves stack: the header row names the other half, as desktop does side by side, and goes there */}
+              <div class="head-row">
+                <p class="caps half-label">What stands</p>
+                <a class="caps to-kept" href="#kept">What was kept ↓</a>
+              </div>
+            </div>
+            <div class="text current">
+              <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+              {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
+              <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
+              {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
+              <div class="sentence" data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
+                {current.slice(0, -1).map((p) => (
                   <>
-                    Your word “<del>{trace.word}</del>” has since been replaced: “{trace.now}” stands in its place now.
+                    <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />{" "}
                   </>
-                )}
-              </p>
-            </section>
-          )}
-          {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+                ))}
+                {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
+                {current.slice(-1).map((p) => (
+                  <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />.</span>
+                ))}
+              </div>
+              <p id="part" class="caps" aria-hidden="true" hidden></p>
+              {/* at rest the notation's slot invites a change; choosing a word puts the notation there instead */}
+              <p class="invite caps" aria-hidden="true">Choose any word and type your own</p>
+            </div>
+            <div id="house" aria-hidden="true"></div>
+            <div class="foot">
+              {/* the kept half is far below on a phone: one quiet line says it's there */}
+              <p class="kept-pointer">What was replaced is kept below.</p>
+              <p id="how">{how}</p>
+              {trace?.mode === "once" && trace.trace && (
+                <section aria-labelledby="trace-heading">
+                  <h2 id="trace-heading">Your trace</h2>
+                  <p role="status">
+                    {trace.trace.standing ? (
+                      <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
+                    ) : (
+                      <>
+                        Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
+                      </>
+                    )}
+                  </p>
+                </section>
+              )}
+              {trace?.mode === "settle" && trace.trace && (
+                <section aria-labelledby="trace-heading">
+                  <h2 id="trace-heading">Your trace</h2>
+                  {(() => {
+                    const parts = latestParts(trace.trace.latest);
+                    return (
+                      <p role="status">
+                        {parts.del ? (
+                          <>
+                            Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.kept} {parts.eligibility}
+                          </>
+                        ) : (
+                          <>
+                            Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                          </>
+                        )}
+                      </p>
+                    );
+                  })()}
+                  {trace.trace.otherStanding.length > 0 && (
+                    <ul class="trace-standing">
+                      {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
+                    </ul>
+                  )}
+                  {trace.trace.otherReplaced.length > 0 && (
+                    <ul class="trace-replaced">
+                      {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
+                    </ul>
+                  )}
+                </section>
+              )}
+              {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+              <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
+              <p class="question">If every word and every part is replaced, is it still the same thing?</p>
+              <p class="about caps"><a href="/readme/">About Theseus</a></p>
+            </div>
+          </div>
+          <div class="half kept-half kept-plate" id="kept">
+            <div class="half-head">
+              <div class="head-row">
+                <p class="caps half-label kept-label">What was kept</p>
+                <a class="caps to-stands" href="#stands">Back to what stands ↑</a>
+              </div>
+            </div>
+            {/* the kept sentence is read as words, a gap as "blank" (src/lib/kept-sentence.ts redraws it the same way) */}
+            <p class="kept-sentence">
+              {kept.words.map((w, i) => {
+                const word = kept.gaps[i] ? <><span class="w gap"></span><span class="sr-only">blank</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
+                return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
+              })}
+            </p>
+            <div id="house-kept" aria-hidden="true"></div>
+            <div class="foot">
+              <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
+              {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
+              {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
+            </div>
+          </div>
         </div>
-        <div id="house" aria-hidden="true"></div>
-        <p class="plate-note">Ten words. Ten parts of one house.<br />Change a word, and its part is rebuilt.</p>
         <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
-          import { attach, parseChange, parseSnapshot } from "../lib/live-client";
-          import { mountCurrent } from "../lib/house/page";
+          import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
+          import { classifyMoment } from "../lib/kept-moment";
+          import { renderKeptSentence } from "../lib/kept-sentence";
+          import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
+          import { BEAT_MS } from "../lib/house/kept-stage";
+          import { duration } from "../lib/house/motion";
+          import { mountCurrent, mountKept } from "../lib/house/page";
 
-          const house = mountCurrent(document);
-          const page = attach(document, { onLatest: (change) => house?.latest(change) });
+          // The moment of a replacement (docs/decisions/0003, Slice 5): a part that
+          // crosses from the standing house into the kept one; ship 1's completion,
+          // announced once, live; a later ship's quiet beat. Presentation only: what
+          // either house settles on is the kept ship the server derived.
+          const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+          const standsHost = document.getElementById("house"), keptHost = document.getElementById("house-kept");
+          const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null;
+          const keptLabel = document.querySelector(".kept-sentence");
+          const keptHouse = mountKept(document);
+          let keptNow: KeptShip | null = keptHouse?.initial ?? null; // the kept ship the page shows
+          let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
+          let beat = 0;
+
+          // your own replaced words in the kept ship shown (settle mode): as the server marked them, then from your trace
+          let mine = new Set<number>([...document.querySelectorAll(".kept-sentence .w")].flatMap((w, i) => (w.querySelector("mark") ? [i] : [])));
+          keptHouse?.mine([...mine][0] ?? null);
+          function renderKept(k: KeptShip): void {
+            if (keptLabel) renderKeptSentence(keptLabel, k, mine);
+          }
+
+          // Ship 1 complete: the one loud line, once, live, as the last part sets down.
+          // Never on a load, a reconnect or ?at=N. On a phone the pointer to the kept
+          // half also says that a part (or the whole first sentence) went below.
+          function acknowledge(moment: Moment): void {
+            const delay = reduced() ? 0 : 2400;
+            // ship 1's acknowledgement stays until the line has gone
+            if (moment.kind === "cross" || moment.kind === "first") acknowledgeBelow(document, moment.kind, reduced(), moment.kind === "first" ? delay + LINE_MS + 1000 : ACK_MS);
+            if (moment.kind === "first") setTimeout(() => showMomentLine(document, reduced()), delay);
+          }
+
+          // a kept ship and the moment a change brought to it
+          function moveKept(k: KeptShip, moment: Moment | null): void {
+            // a snapshot telling what the page already shows (every load's first one) changes nothing, mid-motion included
+            if (!moment && keptNow && JSON.stringify(k) === JSON.stringify(keptNow)) return;
+            clearTimeout(beat);
+            if (!moment || !keptHouse) {
+              keptHouse?.update(k);
+              renderKept(k);
+            } else {
+              const before = keptNow;
+              keptHouse.apply(k, moment, box(standsHost));
+              if (moment.kind === "later" && before) {
+                // the completed ship stands whole for its beat, in words as in its house
+                renderKept({ words: before.words, gaps: before.gaps.map(() => false) });
+                beat = window.setTimeout(() => renderKept(k), (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
+              } else renderKept(k);
+              acknowledge(moment);
+            }
+            keptNow = k;
+          }
+
+          // This visitor's own change, just made (Post/Redirect/Get): the kept ship
+          // the page showed when they submitted, read back once, if their word stands.
+          let own: Moment | null = null, ownBefore: KeptShip | null = null;
+          try {
+            const saved = sessionStorage.getItem("theseus:kept-before");
+            sessionStorage.removeItem("theseus:kept-before");
+            if (saved && keptNow) {
+              const { position, kept } = JSON.parse(saved) as { position: number; kept: KeptShip };
+              if (document.querySelector(`label[for="word-${position}"] mark`)) {
+                own = classifyMoment(kept, keptNow, position);
+                ownBefore = kept;
+              }
+            }
+          } catch { /* no storage: no moment */ }
+          for (const form of document.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"]')) {
+            form.addEventListener("submit", () => {
+              const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
+              try { if (keptNow) sessionStorage.setItem("theseus:kept-before", JSON.stringify({ position, kept: keptNow })); } catch { /* optional */ }
+            });
+          }
+
+          const house = mountCurrent(document, (position) => {
+            if (!own || own.position !== position || !ownBefore) return null;
+            const now = keptNow!;
+            keptHouse?.update(ownBefore);
+            keptNow = ownBefore;
+            moveKept(now, own);
+            return { toward: box(keptHost) };
+          });
+          const page = attach(document, {
+            onLatest: (change) => {
+              const c = crossing && crossing.position === change.position ? { toward: box(keptHost) } : null;
+              crossing = null;
+              house?.latest(change, c);
+            },
+            onMine: (positions) => {
+              mine = new Set(positions);
+              keptHouse?.mine(positions[0] ?? null);
+              if (keptNow) renderKept(keptNow);
+            },
+            onKept: (k, moment) => {
+              crossing = moment;
+              moveKept(k, moment);
+            },
+          });
           const events = new EventSource("/events");
           events.addEventListener("snapshot", (e) => {
             const snapshot = parseSnapshot(e.data);
@@ -129,6 +331,5 @@ const yours = trace?.standing ? trace.position : null;
       </>
     )
   }
-  {!earlier && <p class="question">If every word and every part is replaced, is it still the same thing?</p>}
-  <p class="about caps"><a href="/readme/">About Theseus</a></p>
+  {earlier && <p class="about caps"><a href="/readme/">About Theseus</a></p>}
 </Page>

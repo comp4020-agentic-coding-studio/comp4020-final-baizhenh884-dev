@@ -22,7 +22,7 @@ const { title } = Astro.props;
     <title>{title}</title>
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
-      :root { --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
+      :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
       * { box-sizing: border-box; }
       body {
         margin: 0; background: var(--field); color: var(--ink);
@@ -47,6 +47,9 @@ const { title } = Astro.props;
       /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
       .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
       .sentence.past { font-style: italic; color: #3b3630; }
+      /* the last word and the full stop: no line break between them, while the word itself wraps as any other */
+      .sentence .end { white-space: nowrap; }
+      .sentence .end > .pos { white-space: normal; }
       .sentence .pos { position: relative; display: inline-flex; flex-direction: column; vertical-align: top; max-width: 100%; padding-bottom: 0.18em; }
       /* Each word's label and input share one grid cell, so editing happens in
          the word's own place. The input contributes no width (width: 0) and
@@ -69,6 +72,13 @@ const { title } = Astro.props;
       @media (hover: hover) {
         .sentence .pos:hover label:not(:has(mark)), .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.35); }
       }
+      /* your holding word: a thin line fills under it until the hold ends (settle mode, your page only); never red */
+      .sentence .settling {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; pointer-events: none;
+        background: var(--soft); transform-origin: left; transform: scaleX(var(--from, 0));
+        animation: settling var(--ms, 0ms) linear forwards;
+      }
+      @keyframes settling { to { transform: scaleX(1); } }
       /* your word, while it stands: a hairline of dots, no badge */
       mark { background: none; color: inherit; text-decoration: underline dotted 1.5px var(--soft); text-underline-offset: 0.14em; }
       /* Where supported, grow with what's typed rather than scroll within the word,
@@ -86,16 +96,6 @@ const { title } = Astro.props;
       @supports not (field-sizing: content) {
         .sentence form:focus-within input[name="word"] { position: absolute; left: 0; top: 0; height: 100%; width: max(100%, 3.2em); max-width: 80vw; background: var(--field); z-index: 1; }
       }
-      /* The words a position held before sit beneath it but take no part in
-         its width (width: 0, then min-width: 100% of the word), so the
-         sentence spaces and wraps by its current words alone; a long one is
-         cut short rather than pushing its neighbours apart. */
-      .sentence .past {
-        font: 400 0.8rem/1.3 "Instrument Sans", sans-serif; color: var(--soft); opacity: 0.75; display: flex; flex-direction: column;
-        width: 0; min-width: 100%; margin-top: 0.35rem; letter-spacing: 0;
-      }
-      .sentence .past > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
-      .sentence .past > span + span { opacity: 0.7; }
       /* the word leaving as its body is rebuilt (decorative; the label is the word) */
       .sentence .leaving { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none; }
       /* Someone else changed this word while you were typing a draft for it.
@@ -115,9 +115,68 @@ const { title } = Astro.props;
       /* its line is always kept, so choosing a word never moves the centred column */
       #part { margin: 0 0 1rem; color: var(--soft); min-height: 1.45em; }
       #part[hidden] { display: block; visibility: hidden; }
-      #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
-      #house canvas { display: block; width: 100%; height: 100%; }
+      /* An earlier form: one house, beside its sentence. */
+      main > #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
+      #house canvas, #house-kept canvas { display: block; width: 100%; height: 100%; }
 
+      /* Two ships (docs/decisions/0003-settle-and-kept-ships.md), two equal halves:
+         what stands on the study field, what was kept on dark umber. Each half's
+         rows (heading, sentence, house, foot) are shared, so the two houses stand
+         level across the gutter. */
+      main:has(> .two) { padding: 0; }
+      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(30vh, 1fr) auto; min-height: 100vh; }
+      .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
+      .stands-half { background: var(--field); }
+      .kept-half { --kept-ink: #efe6d8; --kept-soft: #b9ab97; background: var(--kept-ground); color: var(--kept-ink); }
+      .half-head { display: flex; flex-direction: column; justify-content: end; }
+      .half-label { margin: 0 0 1.6vh; color: var(--soft); }
+      .kept-half .half-label { color: var(--kept-soft); }
+      /* a half's label row; on a phone it also names and links to the other half (hidden side by side) */
+      .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+      .to-kept, .to-stands { display: none; white-space: nowrap; color: var(--soft); text-decoration-color: var(--hair); }
+      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(185 171 151 / 0.4); }
+      html { scroll-behavior: smooth; }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      .stands-half .mast, .stands-half .text { max-width: none; }
+      .stands-half .mast { margin-bottom: 2.4vh; }
+      /* the live sentence, set to its half: still the largest thing on the page */
+      .two .sentence { font-size: clamp(36px, 3.8vw, 72px); }
+      .stands-half .text { margin: 0; padding: 0; }
+      /* the part notation lies over the house's own empty top band, which no house at rest reaches
+         (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
+      .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
+      .stands-half .invite { color: var(--soft); white-space: nowrap; }
+      .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
+      /* the row decides a house's size, never its canvas: the canvas lies over its host */
+      #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
+      .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
+      /* the kept sentence: a sentence in its own right, a step below the live one, which stays primary */
+      .kept-sentence { font: italic 400 clamp(28px, 2.85vw, 54px)/1.16 "Instrument Serif", serif; letter-spacing: -0.01em; margin: 0 0 1.2rem; color: var(--kept-ink); }
+      .kept-sentence .end { white-space: nowrap; }
+      /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
+      .kept-sentence mark { text-decoration-color: var(--kept-soft); }
+      /* a gap: a blank in the sentence, waiting for the word that stands there now */
+      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
+      .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
+      .kept-half .plate-note { color: var(--kept-ink); }
+      .kept-half .earlier { color: var(--kept-soft); }
+      .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
+      /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
+      .foot #how { margin: 0; }
+      .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
+      .foot .earlier { margin: 0; }
+      /* only when the halves stack: the kept half is far below, so say so */
+      .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
+
+      /* an earlier house (/?kept=k): the kept ship alone on its own ground, read-only */
+      main:has(> .lone-house) { background: var(--kept-ground); color: #efe6d8; }
+      .lone-house { --kept-ink: #efe6d8; --kept-soft: #b9ab97; display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
+      .lone-house .mast { border-bottom-color: rgb(239 230 216 / 0.16); max-width: none; }
+      .lone-house .mast .sub, .lone-house .half-label, .lone-house .history, .lone-house .about { color: var(--kept-soft); }
+      .lone-house .kept-sentence { max-width: 30ch; }
+      .lone-house #house-kept { position: relative; flex: 1; min-height: 48vh; }
+      .lone-house #house-kept canvas { position: absolute; inset: 0; }
+      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(185 171 151 / 0.4); }
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
@@ -127,6 +186,9 @@ const { title } = Astro.props;
       #trace-heading { margin: 0 0 0.3rem; font-size: 0.66rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
       section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; font-size: 0.9rem; color: var(--soft); }
       section[aria-labelledby="trace-heading"] del { font: italic 400 1.1rem/1 "Instrument Serif", serif; color: var(--ink); text-decoration-thickness: 1px; }
+      section[aria-labelledby="trace-heading"] ul { list-style: none; margin: 0.6rem 0 0; padding: 0; font-size: 0.85rem; color: var(--soft); }
+      section[aria-labelledby="trace-heading"] ul + ul { margin-top: 0.3rem; }
+      section[aria-labelledby="trace-heading"] li { margin: 0.25rem 0; }
       [role="alert"] { font: 400 1.6rem/1.25 "Instrument Serif", serif; max-width: 30ch; }
 
       /* ---- word and territory as one selection ---- */
@@ -144,13 +206,30 @@ const { title } = Astro.props;
       .thread.red circle { fill: #c3331c; fill-opacity: 0.9; }
 
       /* the plate's caption, under the house; and the question, at the foot beside About */
-      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; position: fixed; left: 57vw; top: 77vh; z-index: 1; }
-      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: auto 0 0; padding-top: 1.6rem; max-width: 34ch; }
+      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; }
+      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
+      .foot .about { margin: 0; }
+
+      /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once, across both
+         halves. Not red (red is only a part being rebuilt): pale, in difference, so it reads
+         as ink on the study field and as light on the kept ground. src/lib/moment-line.ts
+         sets its top in the clear band of the screen; both halves are veiled behind it. */
+      .moment {
+        position: fixed; left: 0; right: 0; top: 38%; z-index: 4; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
+        font: italic 400 clamp(34px, 5.4vw, 104px)/1.02 "Instrument Serif", serif; letter-spacing: -0.015em; text-wrap: balance;
+        color: #fff; mix-blend-mode: difference; opacity: 0; transition: opacity 0.7s;
+      }
+      .moment.on { opacity: 1; }
+      /* the veil: each half recedes into its own ground behind the line, and comes back when it goes */
+      .half { position: relative; }
+      .half::after { content: ""; position: absolute; inset: 0; z-index: 3; background: inherit; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
+      body.moment-on .half::after { opacity: 0.86; }
+      /* the phone pointer, acknowledging a part just kept below: ink rather than grey, never red */
+      .kept-pointer.ack { color: var(--ink); position: relative; z-index: 4; /* above the veil, so it reads while the line is up */ }
 
       @media (max-width: 900px) {
         /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
         .thread { display: none; }
-        .plate-note { position: static; margin: 0.4rem 0 0; }
         main { padding: 1.1rem 1rem 1.4rem; }
         .mast, .text { max-width: none; }
         .text { margin: 0; padding: 0; }
@@ -162,12 +241,22 @@ const { title } = Astro.props;
         .sentence label { position: relative; }
         .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: calc(100% + 0.16em); transform: translateX(-50%); }
         .sentence form { min-height: 44px; }
-        /* the house takes its own band under the sentence; the page scrolls through it as a page */
-        #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
+        /* the two halves stack: what stands, then what was kept, each a band of its own ground */
+        .two { display: block; min-height: 0; }
+        .kept-pointer { display: block; }
+        .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
+        .half-label { margin-bottom: 0.8rem; }
+        .to-kept, .to-stands { display: inline; }
+        main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
+        #house { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
+        #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
+        .two .sentence { font-size: 34px; }
+        .kept-sentence { font-size: 26px; line-height: 1.3; }
       }
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }
         .thread { transition: none; }
+        .moment, .half::after { transition: none; }
       }
     </style>
   </head>
