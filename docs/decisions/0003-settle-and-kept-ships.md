@@ -1,6 +1,6 @@
 # 0003 — Settling replaces one-change-ever; kept ships as the second Theseus
 
-**Status:** Proposed
+**Status:** Accepted (2026-10-21)
 **Decision for:** Final Project redesign (branch `final/theseus-redesign`)
 **Supersedes:** [0002](0002-pseudonymous-visitor-and-logging.md)'s "What each
 person may change" section
@@ -144,8 +144,7 @@ reassembled first ship that goes static forever (M1) answers the identity
 question sharply but goes inert the moment it completes — it doesn't say what
 happens next, which this redesign needs an answer for. A one-step "shadow" of
 only the latest removed word per position (M2) never stands as a real
-sentence and forgets immediately, which the existing fading-trail-beneath-each-
-word treatment already does better. Every removed word kept in time order
+sentence and forgets immediately. Every removed word kept in time order
 (M3) is explicitly a feed — unbounded, ordered by recency — which directly
 conflicts with README's "without becoming a feed." Kept ships (M4) are the
 only option that is a valid sentence at every stage, never stops (ship 2, 3,
