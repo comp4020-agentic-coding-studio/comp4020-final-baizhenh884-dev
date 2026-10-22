@@ -232,6 +232,18 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; }
       .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
       .foot .about { margin: 0; }
+      /* Side by side, the live half's notes fold into two columns, each its own stack: the rule, your trace
+         and the links on the left, the captions on the right. The foot gets shorter, so the house's row,
+         which takes what's left, gets taller (spec/two-ships-layout.test.ts). Stacked (a phone), the two
+         columns dissolve and the notes read in one column, the links last. */
+      .foot-main, .foot-aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+      @media (min-width: 901px) {
+        .stands-half .foot { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 3vw; align-items: start; }
+      }
+      @media (max-width: 900px) {
+        .foot-main, .foot-aside { display: contents; }
+        .foot .about { order: 1; }
+      }
 
       /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once, across both
          halves. Not red (red is only a part being rebuilt): pale, in difference, so it reads

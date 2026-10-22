@@ -136,6 +136,7 @@ const how =
             </div>
             <div id="house" aria-hidden="true"></div>
             <div class="foot">
+              <div class="foot-main">
               {/* the kept half is far below on a phone: one quiet line says it's there */}
               <p class="kept-pointer">What was replaced is kept below.</p>
               <p id="how">Choose a word, type its replacement and press Enter. <span class="esc">Press Escape to cancel. </span>{how}</p>
@@ -185,9 +186,12 @@ const how =
                 </section>
               )}
               {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
+              </div>
+              <div class="foot-aside">
               <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
               <p class="question">If every word and every part is replaced, is it still the same thing?</p>
-              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
+              </div>
             </div>
           </div>
           <div class="half kept-half kept-plate" id="kept">
