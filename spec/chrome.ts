@@ -96,11 +96,11 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
   }
 }
 
-// GET / as served, its stylesheet (and web fonts) inlined, its scripts left
-// out so only the markup and CSS are under test. Reads only; never changes
-// the shared sentence.
-export async function servedPage(baseUrl: string): Promise<Document> {
-  const res = await fetch(new URL("/", baseUrl));
+// A page as served (GET / unless another path is named), its stylesheet (and
+// web fonts) inlined, its scripts left out so only the markup and CSS are
+// under test. Reads only; never changes the shared sentence.
+export async function servedPage(baseUrl: string, path = "/"): Promise<Document> {
+  const res = await fetch(new URL(path, baseUrl));
   const home = await res.text();
   // A layout check builds a page from this markup: if GET / didn't actually
   // serve one (a non-200, or not HTML — an unreproduced CI failure once found
@@ -109,7 +109,7 @@ export async function servedPage(baseUrl: string): Promise<Document> {
   // three steps later.
   const contentType = res.headers.get("content-type") ?? "";
   if (!res.ok || !contentType.includes("text/html")) {
-    throw new Error(`GET / is not a 200 HTML page: status=${res.status} content-type=${contentType || "(none)"} body(300)=${home.slice(0, 300)}`);
+    throw new Error(`GET ${path} is not a 200 HTML page: status=${res.status} content-type=${contentType || "(none)"} body(300)=${home.slice(0, 300)}`);
   }
   const doc = new JSDOM(home).window.document;
   let css = "";
