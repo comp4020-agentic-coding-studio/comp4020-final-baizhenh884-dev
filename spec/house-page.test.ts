@@ -86,12 +86,28 @@ describe("GET /house/", () => {
       const page = async (path: string) => (await measureIn(await servedPage(baseUrl, path), `(async () => {
         await document.fonts.ready;
         const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom }; };
-        return { mast: r('.mast'), name: getComputedStyle(document.querySelector('.mast .name')).fontFamily,
-          parts: r('[data-table="parts"]'), letters: r('[data-table="letters"]'), scroll: document.documentElement.scrollWidth, vw: innerWidth };
+        return { mast: r('.mast'), nav: r('.mast nav'), name: getComputedStyle(document.querySelector('.mast .name')).fontFamily,
+          parts: r('[data-table="parts"]'), letters: r('[data-table="letters"]'), scroll: document.documentElement.scrollWidth, vw: innerWidth,
+          // a part's name may wrap at a space or after a hyphen, never inside a word: every place a new line
+          // starts (measured letter by letter) must follow one of those
+          brokenWords: [...document.querySelectorAll('[data-label]')].flatMap((e) => {
+            const node = e.firstChild, t = node.textContent, cuts = [];
+            let top = null;
+            for (let i = 0; i < t.length; i++) {
+              if (t[i] === ' ') continue;
+              const range = document.createRange(); range.setStart(node, i); range.setEnd(node, i + 1);
+              const y = Math.round(range.getBoundingClientRect().top);
+              if (top !== null && y > top + 2 && !/[\\s-]/.test(t[i - 1])) cuts.push(t.slice(0, i) + ' / ' + t.slice(i));
+              top = y;
+            }
+            return cuts;
+          }) };
       })()`, [size[0], size[1]])) as any;
       const house = await page("/house/"), readme = await page("/readme/");
       expect(house.mast.left, "the masthead isn't where /readme/ has it").toBeCloseTo(readme.mast.left, 0);
       expect(house.name, "the masthead isn't set as /readme/ sets it").toBe(readme.name);
+      // its way back to the sentence sits at the masthead's right end, as /readme/'s does
+      expect(house.nav.right, "the masthead's nav isn't at its right end, as on /readme/").toBeCloseTo(readme.nav.right, 0);
       expect(house.scroll, "the page scrolls sideways").toBeLessThanOrEqual(house.vw);
       if (size[0] > 900) {
         expect(house.letters.left, "the two tables aren't side by side").toBeGreaterThanOrEqual(house.parts.right);
@@ -100,6 +116,7 @@ describe("GET /house/", () => {
       } else {
         expect(house.letters.top, "the tables aren't stacked").toBeGreaterThanOrEqual(house.parts.bottom);
       }
+      expect(house.brokenWords, "a part's name breaks inside a word").toEqual([]);
     }, 90_000);
   }
 });
