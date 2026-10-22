@@ -79,7 +79,8 @@ export const TESTS: Record<AdjectiveKey, Test> = {
   flat: { holds: (f) => f.tall === 0, yes: "no tall letters", no: "has a tall letter", means: "no tall letter" },
   round: { holds: (f) => f.roundShare >= 0.5, yes: "mostly round", no: "not mostly round", means: "half the letters or more are round" },
   hangs: { holds: (f) => f.hanging > 0, yes: "a hanging letter", no: "no hanging letter", means: "at least one hanging letter" },
-  repeats: { holds: (f) => f.repeats >= 2, yes: "repeated letters", no: "no repeats", means: "letters used again, 2 or more times in all" },
+  // a repeat is any use of a letter after its first, across the whole word
+  repeats: { holds: (f) => f.repeats >= 2, yes: "2 or more repeats", no: "fewer than 2 repeats", means: "a repeat is any use of a letter after its first; 2 or more pass: letter has 2 (t, e), hammock has 1 (m)" },
   open: { holds: (f) => f.vowelShare >= 0.4, yes: "open", no: "not open", means: "40% or more of the letters are vowels" },
   veryTall: { holds: (f) => f.tall >= 3, yes: "very tall", no: "not very tall", means: "3 or more tall letters" },
 };

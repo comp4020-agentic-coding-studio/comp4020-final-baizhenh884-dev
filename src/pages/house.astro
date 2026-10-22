@@ -12,15 +12,19 @@ import { describeTerritory, FAMILY_ORDER, TERRITORIES } from "../lib/house/terri
 
 const n = (p: number) => String(p + 1).padStart(2, "0");
 const set = (s: Set<string>) => [...s].join(" ");
-// the tests the families use, in the order a reader meets them, with the letters each counts
-const FEATURE_ROWS: { feature: string; letters?: keyof typeof LETTERS; tests: AdjectiveKey[] }[] = [
+// the tests a family is decided by (FAMILY_ORDER), grouped by the feature each reads, with the letters it counts;
+// a test no family uses (tall, long) decides nothing and isn't listed
+const USED = new Set(Object.values(FAMILY_ORDER).flat().map((s) => s.test).filter((t): t is AdjectiveKey => t !== null));
+const FEATURE_ROWS = ([
   { feature: "Length", tests: ["short", "long"] },
   { feature: "Vowels", letters: "vowels", tests: ["open"] },
   { feature: "Tall letters", letters: "tall", tests: ["tall", "veryTall", "flat"] },
   { feature: "Round letters", letters: "round", tests: ["round"] },
   { feature: "Hanging letters", letters: "hanging", tests: ["hangs"] },
   { feature: "Repeated letters", tests: ["repeats"] },
-];
+] as { feature: string; letters?: keyof typeof LETTERS; tests: AdjectiveKey[] }[])
+  .map((row) => ({ ...row, tests: row.tests.filter((k) => USED.has(k)) }))
+  .filter((row) => row.tests.length > 0);
 // pairs checked to change their part's family (spec/house-page.test.ts)
 const EXAMPLES: [number, string, string][] = [
   [4, "people", "cut"],
@@ -44,8 +48,7 @@ const EXAMPLES: [number, string, string][] = [
         the word passes is the one it gets.
       </p>
       <p>
-        So the same word can make an arch at the entry and a plinth at the ground. A longer word also reaches further,
-        whatever its family.
+        So the same word can make an arch at the entry and a plinth at the ground.
       </p>
     </article>
 
@@ -97,6 +100,11 @@ const EXAMPLES: [number, string, string][] = [
           </tbody>
         </table>
 
+        <p class="shapes" data-shapes>
+          The letters also shape a part within its family: tall letters raise it, repeats multiply its windows, columns and bays,
+          clusters of consonants thicken its walls. And a longer word reaches further, whatever its family.
+        </p>
+
         <h2>Worked through</h2>
         <ul class="examples">
           {EXAMPLES.map(([p, was, word]) => (
@@ -128,7 +136,7 @@ const EXAMPLES: [number, string, string][] = [
 
   .house-doc .tables { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(32px, 4.5vw, 88px); margin-top: clamp(48px, 9vh, 96px); padding-top: 1.1rem; border-top: 1px solid var(--hair); }
   .house-doc h2 { font: 400 0.7rem/1.5 "Instrument Sans", system-ui, sans-serif; letter-spacing: 0.17em; text-transform: uppercase; color: var(--soft); margin: 0 0 0.9rem; }
-  .house-doc section h2 + table + h2, .house-doc table + h2 { margin-top: 2.6rem; }
+  .house-doc section h2:not(:first-child) { margin-top: 2.6rem; }
   .house-doc table { width: 100%; border-collapse: collapse; font: 400 0.92rem/1.5 "Instrument Sans", system-ui, sans-serif; color: var(--soft); }
   .house-doc thead th { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 400; text-align: left; padding: 0 0.8rem 0.5rem 0; }
   .house-doc tbody th, .house-doc tbody td { text-align: left; vertical-align: top; padding: 0.6rem 0.8rem 0.6rem 0; border-top: 1px solid var(--hair); font-weight: 400; }
@@ -139,8 +147,9 @@ const EXAMPLES: [number, string, string][] = [
   .house-doc .order { display: flex; flex-wrap: wrap; gap: 0.15rem 1.1rem; }
   .house-doc .fam { color: var(--ink); }
   .house-doc .test { margin-left: 0.3em; font-size: 0.86em; }
-  .house-doc .letters { display: block; margin-top: 0.2rem; color: var(--soft); letter-spacing: 0.12em; font-size: 0.86em; white-space: normal; }
+  .house-doc .letters { display: block; margin-top: 0.2rem; color: var(--soft); letter-spacing: 0.12em; font-size: 0.86em; white-space: nowrap; }
   .house-doc .defs li + li { margin-top: 0.25rem; }
+  .house-doc .shapes { margin: 1.4rem 0 0; font: 400 0.92rem/1.55 "Instrument Sans", system-ui, sans-serif; color: var(--soft); max-width: 46ch; }
   .house-doc .examples li { display: grid; gap: 0.15rem; padding: 0.7rem 0; border-top: 1px solid var(--hair); font: 400 0.92rem/1.5 "Instrument Sans", system-ui, sans-serif; color: var(--soft); }
   .house-doc .examples .pair { color: var(--ink); font: italic 400 1.2rem/1.3 "Instrument Serif", serif; }
   .house-doc .examples .pair i { font-style: italic; }
