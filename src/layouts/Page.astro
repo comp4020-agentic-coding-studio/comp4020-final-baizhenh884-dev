@@ -75,11 +75,12 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .sentence input[name="word"] {
         width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0;
         /* the label's own face, so the field is exactly the word's width and focusing it moves nothing */
-        font: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
+        font: inherit; letter-spacing: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
       }
       .sentence input[name="word"]::placeholder { color: var(--faint); opacity: 1; }
       .sentence form:focus-within label { visibility: hidden; }
-      .sentence form:focus-within input[name="word"] { opacity: 1; outline: none; }
+      /* shown while in hand, with the page's keyboard focus outline (a:focus-visible, input:focus-visible) */
+      .sentence form:focus-within input[name="word"] { opacity: 1; }
       /* the label carries the field's 1px rule, unseen, so the word and its field are the same size */
       .sentence label { border-bottom: 1px solid transparent; cursor: text; text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 0.11em; transition: color 0.25s; }
       /* choosing a word: the others recede, the chosen one is drawn in ink */
@@ -162,6 +163,10 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
       .stands-half .invite { color: var(--soft); white-space: nowrap; }
       .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
+      /* while a replacement is typed: one line, the replaced word struck, and only it shortened when long; the keys are never cut */
+      #part:has(> del) { display: flex; white-space: pre; }
+      #part > span { flex: none; }
+      #part > del { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-decoration-thickness: 1px; }
       /* the row decides a house's size, never its canvas: the canvas lies over its host */
       #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
       .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
@@ -252,6 +257,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        /* the words sit ~5px apart here: the focus outline hugs its word so it never touches the one beside or below */
+        .sentence input[name="word"]:focus-visible { outline-offset: 1px; }
         /* a word's target is as tall as its form (44px) and a little wider than the word, into the
            space beside it and no further: two short words side by side ("if it") used to have 46px
            targets that overlapped, and a tap on the first went to the second */

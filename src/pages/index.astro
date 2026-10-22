@@ -62,8 +62,8 @@ const keptMine = new Set<number>(
 );
 const how =
   trace?.mode === "settle"
-    ? `Choose a word, type its replacement and press Enter. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
-    : "Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
+    ? `Choose a word, type its replacement and press Enter. Press Escape to cancel. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
+    : "Choose a word, type its replacement and press Enter. Press Escape to cancel. You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
 ---
 
 <Page title="Theseus">
