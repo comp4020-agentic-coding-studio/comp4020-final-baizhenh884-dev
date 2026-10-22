@@ -206,6 +206,7 @@ const how =
             <div id="house-kept" aria-hidden="true"></div>
             <div class="foot">
               <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
+              <p class="kept-key">The words above have been replaced in the sentence; the gaps are words that still stand there.</p>
               {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
               {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
             </div>
