@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
 import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
+import { notation as notation_ } from "../src/lib/house/notation";
 import { TERRITORIES } from "../src/lib/house/territories";
 import { measureIn, QUERY_JS, servedPage } from "./chrome";
 import { EXTREMES, SENTENCES } from "./house-sentences";
@@ -99,12 +101,29 @@ type Notation = {
   shown: { text: string; sentence: number; house: number; kept: number }[];
 };
 
-// The live half with the part notation hidden, then showing each of the ten
-// parts' notations in turn, as choosing a word shows it (served copy only).
+// The longest notation each part can show at this width, over every pair of
+// pool words (src/lib/house/notation.ts): the whole reason on a desktop, the
+// family change only on a phone. Measured, never a sample, so the layout is
+// checked against the worst the page can actually say.
+const POOL = [...new Set((JSON.parse(readFileSync(new URL("./fixtures/house-descriptors.json", import.meta.url), "utf8")).rows as [number, string][]).map((r) => r[1]))];
+function longestNotations(width: number): string[] {
+  const form = width <= 900 ? "phone" : "desktop";
+  return TERRITORIES.map((_, position) => {
+    let best = "";
+    for (const was of POOL) for (const word of POOL) {
+      const s = notation_({ position, word, was }, form);
+      if (s.length > best.length) best = s;
+    }
+    return best;
+  });
+}
+
+// The live half with the part notation hidden, then showing each part's
+// longest notation in turn, as an accepted change shows it (served copy only).
 async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
   const doc = await servedPage(baseUrl);
   if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
-  const labels = TERRITORIES.map((t, i) => `${String(i + 1).padStart(2, "0")} — ${t.label}`);
+  const labels = longestNotations(size[0]);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
     const q = ${QUERY_JS};
@@ -219,10 +238,12 @@ describe("two ships on GET /", () => {
         else expect(n.houseBottom, "the desktop house no longer reaches its notes").toBeGreaterThanOrEqual(n.footTop - 1);
         // level: side by side, the two houses start together
         if (size[0] > 900) expect(Math.abs(n.hidden.kept - n.hidden.house), "the two houses aren't level").toBeLessThanOrEqual(1);
-        // never over a house at rest: every body's topmost point is at least 8px below the notation
+        // never over a house at rest: every body's topmost point is clear of the notation, by 8px on a
+        // desktop and by a comfortable 16px on a phone, where the notation is the family change only
+        // (measured at 25px; a fraction of a pixel of slack once broke on font metrics alone)
         const cam = new THREE.PerspectiveCamera();
         place(cam, n.houseWidth / n.houseHeight);
-        const clear = n.partBottom - n.hidden.house + 8; // px from the canvas top
+        const clear = n.partBottom - n.hidden.house + (size[0] <= 900 ? 16 : 8); // px from the canvas top
         const v = new THREE.Vector3();
         for (const words of [...SENTENCES, ...EXTREMES, Array(10).fill("wordmvadgycfe")]) {
           const body = buildBody(words);

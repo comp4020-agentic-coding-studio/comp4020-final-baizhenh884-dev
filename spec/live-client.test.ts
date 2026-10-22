@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it, vi } from "vitest";
+import { said } from "../src/lib/house/notation";
 import { attach, deriveTotal, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
@@ -757,6 +758,19 @@ describe("live page reconciliation", () => {
       expect(said, "the announcement doesn't name the position").toContain(String(position + 1));
       expect(region(doc).querySelector("x-theseus"), "a visitor word became markup").toBeNull();
       expect(said, "the announcement names a time").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute/i);
+    });
+
+    // the same family change the part notation shows, from the same code (src/lib/house/notation.ts)
+    localOnly("says one change's family change, as the part notation does", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version, word: was } = positionsOf(doc)[4];
+      const word = fresh();
+      page.applyChange({ position, word, version: version + 1 });
+      vi.advanceTimersByTime(2500);
+      expect(region(doc).textContent?.trim()).toBe(said({ position, word, was }));
     });
 
     localOnly("coalesces a burst into one announcement naming every changed position", async () => {
