@@ -344,12 +344,12 @@ describe("Your trace", () => {
     expect(section.querySelectorAll("ul").length, "once mode's trace grew a list").toBe(0);
   });
 
-  onceOnly("explains the rule under once mode with the exact, unchanged text", async () => {
+  onceOnly("explains the rule under once mode with the exact text, Escape included", async () => {
     const v = await arrive();
     const { doc } = await v.page("/");
     const how = doc.querySelector("#how");
     expect(how?.textContent?.trim()).toBe(
-      "Choose a word, type its replacement and press Enter. You get one change, and it can't be undone. Anyone after you can change any word, including yours.",
+      "Choose a word, type its replacement and press Enter. Press Escape to cancel. You get one change, and it can't be undone. Anyone after you can change any word, including yours.",
     );
   });
 
@@ -361,5 +361,7 @@ describe("Your trace", () => {
     expect(text, "#how still claims one change that can't be undone").not.toMatch(/one change/i);
     expect(text, "#how still claims the change can't be undone").not.toMatch(/can't be undone/i);
     expect(text, "#how doesn't explain settling or moving on").toMatch(/settl|hold|stand/i);
+    // every word field is described by #how: it says how to back out, as well as how to replace
+    expect(text, "#how doesn't say how to cancel").toContain("press Enter. Press Escape to cancel.");
   });
 });

@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
 import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
-import { notation as notation_ } from "../src/lib/house/notation";
+import { drafting, notation as notation_, showDrafting } from "../src/lib/house/notation";
 import { TERRITORIES } from "../src/lib/house/territories";
 import { measureIn, QUERY_JS, servedPage } from "./chrome";
 import { EXTREMES, SENTENCES } from "./house-sentences";
@@ -333,6 +333,97 @@ describe("two ships on GET /", () => {
       expect(m.line.top, "the settling line isn't under its word").toBeGreaterThanOrEqual(m.word.bottom - 2);
       expect(m.red, `the settling line is red (${m.color})`).toBe(false);
     }, 90_000);
+  }
+
+  // A word in hand, being typed over (src/lib/house/notation.ts drafting): the
+  // line in the notation's slot names the word being replaced, struck, and
+  // the keys, on one line, so it moves nothing and stays as clear of the
+  // house as the notation (checked above, for one line). A long word is
+  // shortened, alone, with an ellipsis; the keys are never cut. Set in the
+  // measured copy by the page's own showDrafting(), so the markup and the CSS
+  // under test are the page's.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`keeps the drafting line to one line in the notation's slot, shortening only a long word (${name})`, async () => {
+      const form = size[0] <= 900 ? "phone" : "desktop";
+      // the longest lead the page can show: the longest part label with its longest family
+      const longest = (word: string) => TERRITORIES.map((_, position) => drafting({ position, word }, form)).reduce((a, b) => (b.lead.length > a.lead.length ? b : a));
+      const cases = ["people", "incomprehensibilities", "w".repeat(24)].map(longest);
+      const out: any[] = [];
+      for (const d of cases) {
+        const doc = await servedPage(baseUrl);
+        showDrafting(doc.getElementById("part")!, d);
+        out.push(await measureIn(doc, `(async () => {
+          await document.fonts.ready;
+          const q = (s) => document.querySelector(s);
+          const part = q('#part'), was = part.querySelector('del'), tail = was.nextElementSibling, cs = getComputedStyle(part);
+          const r = part.getBoundingClientRect(), t = tail.getBoundingClientRect(), half = q('.stands-half').getBoundingClientRect(), inv = q('.stands-half .invite').getBoundingClientRect();
+          return { height: r.height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45, right: r.right, halfRight: half.right, top: r.top, invTop: inv.top,
+            tailRight: t.right, tailCut: tail.scrollWidth > tail.clientWidth + 1, wasCut: was.scrollWidth > was.clientWidth + 1,
+            ellipsis: getComputedStyle(was).textOverflow, struck: getComputedStyle(was).textDecorationLine,
+            house: q('.stands-half #house').getBoundingClientRect().top, sentence: q('.stands-half .sentence').getBoundingClientRect().bottom };
+        })()`, [size[0], size[1]]));
+      }
+      for (const [i, m] of out.entries()) {
+        const what = `"${cases[i].lead}${cases[i].was}${cases[i].tail}"`;
+        expect(m.height, `${what} wraps`).toBeLessThan(m.line * 1.5);
+        expect(m.right, `${what} runs out of its half`).toBeLessThanOrEqual(m.halfRight + 1);
+        expect(m.tailRight, `${what} cuts the keys`).toBeLessThanOrEqual(m.right + 1);
+        expect(m.tailCut, `${what} cuts the keys`).toBe(false);
+        expect(m.struck, `${what} doesn't strike the replaced word`).toContain("line-through");
+        expect(Math.abs(m.top - m.invTop), `${what} isn't in the notation's slot`).toBeLessThanOrEqual(1);
+        expect(m.house - m.sentence, `${what} pushed the house away`).toBeLessThanOrEqual(20);
+      }
+      expect(out[0].wasCut, "a short word is shortened").toBe(false);
+      expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
+      expect(out[2].ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
+    }, 120_000);
+  }
+
+  // The focused word field shows a visible keyboard focus: a 2px outline in
+  // ink. It never touches a neighbouring word, on the same line or the lines
+  // above and below, with at least a pixel of air (on a phone the words sit
+  // ~5px apart, so the outline's offset is smaller there). Measured for every
+  // word, empty field, as focusing it shows it.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    for (const longWords of [false, true]) {
+      it(`outlines the focused word in ink, clear of every neighbouring word (${name}${longWords ? ", ten long words" : ""})`, async () => {
+        const doc = await servedPage(baseUrl);
+        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        const rows = (await measureIn(doc, `(async () => {
+          await document.fonts.ready;
+          const forms = [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')];
+          const ground = getComputedStyle(document.querySelector('.stands-half')).backgroundColor;
+          return forms.map((f, i) => {
+            const input = f.querySelector('input[name="word"]');
+            input.focus();
+            const cs = getComputedStyle(input), r = input.getBoundingClientRect();
+            const grow = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth);
+            const o = { left: r.left - grow, right: r.right + grow, top: r.top - grow, bottom: r.bottom + grow };
+            // the closest any other word comes to the outline (negative: overlapping)
+            let air = Infinity;
+            forms.forEach((g, j) => {
+              if (j === i) return;
+              const b = g.querySelector('label').getBoundingClientRect();
+              const dx = Math.max(b.left - o.right, o.left - b.right), dy = Math.max(b.top - o.bottom, o.top - b.bottom);
+              air = Math.min(air, Math.max(dx, dy));
+            });
+            const out = { word: f.querySelector('label').textContent, focused: document.activeElement === input, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor, ground, air };
+            input.blur();
+            return out;
+          });
+        })()`, [size[0], size[1]])) as { word: string; focused: boolean; style: string; width: number; color: string; ground: string; air: number }[];
+        const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const lum = (c: number[]) => c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        for (const w of rows) {
+          expect(w.focused, `"${w.word}" can't be focused`).toBe(true);
+          expect(w.style, `"${w.word}" shows no focus outline`).not.toBe("none");
+          expect(w.width, `"${w.word}"'s focus outline is too thin to see`).toBeGreaterThanOrEqual(2);
+          const [a, b] = [lum(rgb(w.color)), lum(rgb(w.ground))].sort((m, n) => n - m);
+          expect((a + 0.05) / (b + 0.05), `"${w.word}"'s focus outline doesn't stand out from the ground`).toBeGreaterThanOrEqual(3);
+          expect(w.air, `"${w.word}"'s focus outline touches a neighbouring word`).toBeGreaterThanOrEqual(1);
+        }
+      }, 90_000);
+    }
   }
 
   it("never invites on an earlier form (?at=N)", async () => {
