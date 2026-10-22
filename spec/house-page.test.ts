@@ -44,13 +44,20 @@ describe("GET /house/", () => {
     });
   });
 
-  it("names every letter test with its threshold, and the letter sets, as features.ts has them", async () => {
+  // Only the tests a family is actually decided by: listing one that decides nothing (as "tall: 2 or more
+  // tall letters" and "long: 7 letters or more" once were) reads as a rule the house doesn't have.
+  it("defines every letter test a family uses, with its threshold, and no test that decides nothing", async () => {
     const { doc } = await get("/house/");
-    for (const [key, t] of Object.entries(TESTS)) {
+    const used = new Set(Object.values(FAMILY_ORDER).flat().map((s) => s.test).filter((t): t is NonNullable<typeof t> => t !== null));
+    for (const key of used) {
       const row = doc.querySelector(`[data-test-def="${key}"]`);
       expect(row, `no definition of "${key}"`).not.toBeNull();
-      expect(text(row), `"${key}" isn't defined as features.ts has it`).toContain(t.means);
+      expect(text(row), `"${key}" isn't defined as features.ts has it`).toContain(TESTS[key].means);
     }
+    const listed = [...doc.querySelectorAll("[data-test-def]")].map((e) => e.getAttribute("data-test-def"));
+    expect(listed.filter((k) => !used.has(k as never)), "the page defines a test no family uses").toEqual([]);
+    // the letters also shape a part within its family, and length sets its reach: said once, not as a test
+    expect(text(doc.querySelector("[data-shapes]")), "the page doesn't say what else the letters do").toMatch(/reach/i);
     for (const [name, set] of Object.entries(LETTERS)) {
       expect(text(doc.querySelector(`[data-letters="${name}"]`)), `the ${name} letters`).toBe([...set].join(" "));
     }

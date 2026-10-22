@@ -52,8 +52,26 @@ describe("why a territory has its family", () => {
     expect(say(4, "entrance")).toBe("not mostly round, not short"); // nested, the last: no test of its own
     expect(say(0, "jump")).toBe("a hanging letter"); // ground: stilts first
     expect(say(8, "letterbox")).toBe("very tall"); // side: tower first (l t t b = 4 tall)
-    expect(say(2, "hammock")).toBe("no repeats, not open"); // hall: block, the last
-    expect(say(6, "miss")).toBe("no repeats, no tall letters"); // roof: flat
-    expect(say(6, "bottle")).toBe("no repeats, has a tall letter, mostly round"); // roof: barrel
+    expect(say(2, "hammock")).toBe("fewer than 2 repeats, not open"); // hall: block, the last (one extra m: 1 repeat)
+    expect(say(6, "miss")).toBe("fewer than 2 repeats, no tall letters"); // roof: flat (one extra s)
+    expect(say(6, "bottle")).toBe("fewer than 2 repeats, has a tall letter, mostly round"); // roof: barrel (one extra t)
+  });
+
+  // "repeats" counts every use of a letter after its first, across the whole word, and the test holds
+  // at 2 or more. Its wording must not let a doubled letter read as passing: "hammock" (one extra m)
+  // fails it, "letter" (an extra t and an extra e) passes it, at the same position.
+  it("words the repeats test so a single doubled letter can't be misread as passing", () => {
+    const at = (word: string) => describeTerritory(2, word);
+    expect(features("hammock").repeats, "hammock's repeats").toBe(1);
+    expect(features("letter").repeats, "letter's repeats").toBe(2);
+    expect(at("hammock").family).toBe("block");
+    expect(at("letter").family).toBe("stepped");
+    expect(at("hammock").reason[0]).toEqual({ test: "repeats", holds: false });
+    expect(at("letter").reason[0]).toEqual({ test: "repeats", holds: true });
+    expect(TESTS.repeats.yes).toBe("2 or more repeats");
+    expect(TESTS.repeats.no).toBe("fewer than 2 repeats");
+    expect(TESTS.repeats.means, "the definition gives the threshold").toMatch(/2 or more/);
+    expect(TESTS.repeats.means, "the definition shows a passing example").toMatch(/letter/);
+    expect(TESTS.repeats.means, "the definition shows a failing example").toMatch(/hammock/);
   });
 });

@@ -50,7 +50,7 @@ describe("the part notation", () => {
     expect(notation({ position: 4, word: "cut", was: "people" }, "phone")).toBe("05 — entry · arch → cut");
     expect(notation({ position: 4, word: "door", was: "people" }, "desktop")).toBe("05 — entry · arch, unchanged · mostly round");
     expect(notation({ position: 4, word: "door", was: "people" }, "phone")).toBe("05 — entry · arch, unchanged");
-    expect(notation({ position: 2, word: "hammock", was: "website" }, "desktop")).toBe("03 — central hall · clerestory → block · no repeats, not open");
+    expect(notation({ position: 2, word: "hammock", was: "website" }, "desktop")).toBe("03 — central hall · clerestory → block · fewer than 2 repeats, not open");
     expect(notation({ position: 0, word: "jump" })).toBe("01 — ground · stilts");
   });
 
