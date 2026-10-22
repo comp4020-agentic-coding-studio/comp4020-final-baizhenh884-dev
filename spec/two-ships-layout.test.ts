@@ -512,6 +512,34 @@ describe("two ships on GET /", () => {
     }, 90_000);
   }
 
+  // A phone has no Escape key: the instructions' "Press Escape to cancel."
+  // takes no visible space there, while a screen reader still reads it in
+  // #how (every word field is described by it). A desktop shows it.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`shows "Press Escape to cancel" only where there's an Escape key, and always to a screen reader (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const how = doc.getElementById("how");
+      expect(how?.textContent, "#how doesn't say Press Escape to cancel").toContain("Press Escape to cancel.");
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const how = document.getElementById('how');
+        const walker = document.createTreeWalker(how, NodeFilter.SHOW_TEXT);
+        let node; while ((node = walker.nextNode()) && !node.textContent.includes('Escape'));
+        const el = node.parentElement, r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+        // still in the accessibility tree: not display:none, not visibility:hidden, not aria-hidden
+        const read = cs.display !== 'none' && cs.visibility !== 'hidden' && !el.closest('[aria-hidden="true"]');
+        return { width: r.width, height: r.height, read, own: el !== how };
+      })()`, [size[0], size[1]])) as { width: number; height: number; read: boolean; own: boolean };
+      expect(m.read, "a screen reader can't read it").toBe(true);
+      if (size[0] <= 900) {
+        expect(m.own, "the Escape sentence isn't its own element, so it can't be hidden alone").toBe(true);
+        expect(m.width * m.height, "a phone shows the Escape sentence").toBeLessThanOrEqual(1);
+      } else {
+        expect(m.width, "a desktop doesn't show the Escape sentence").toBeGreaterThan(20);
+      }
+    }, 60_000);
+  }
+
   it("stacks the halves on a phone (390×844)", async () => {
     const l = await layout([390, 844]);
     expect(l.kept.top, "the kept half isn't below the live one").toBeGreaterThanOrEqual(l.stands.bottom - 1);
