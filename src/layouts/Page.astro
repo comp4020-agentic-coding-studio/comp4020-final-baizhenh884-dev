@@ -37,7 +37,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
     <meta name="twitter:card" content="summary_large_image" />
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
-      :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
+      :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --caption: #5a544b; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
       * { box-sizing: border-box; }
       body {
         margin: 0; background: var(--field); color: var(--ink);
@@ -57,7 +57,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
       /* the current sentence is read first, with its rules beneath it */
       .text.current { display: flex; flex-direction: column; }
-      #how { margin: 1.3rem 0 0; font-size: 0.8rem; color: var(--soft); max-width: 46ch; }
+      /* the captions are read, not glanced at: 15px (14px on a phone), in --caption, 6.5:1 on the field */
+      #how { margin: 1.3rem 0 0; font-size: 15px; line-height: 1.5; color: var(--caption); max-width: 52ch; }
 
       /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
       .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
@@ -180,7 +181,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
       /* what the kept sentence's words and gaps are: a quiet key under the caption */
-      .kept-half .kept-key { margin: 0; font-size: 0.9rem; color: var(--kept-soft); max-width: 36ch; }
+      .kept-half .kept-key { margin: 0; font-size: 15px; line-height: 1.5; color: var(--kept-soft); max-width: 40ch; }
       .kept-half .earlier { color: var(--kept-soft); }
       .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
@@ -204,9 +205,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
       .form-state { color: var(--soft); margin: 0 0 1.2rem; }
       /* your trace: a quiet footnote to the shared sentence, not a panel */
-      section[aria-labelledby="trace-heading"] { margin-top: 2rem; padding-top: 0.8rem; border-top: 1px solid var(--hair); max-width: 36ch; }
+      section[aria-labelledby="trace-heading"] { margin-top: 2rem; padding-top: 0.8rem; border-top: 1px solid var(--hair); max-width: 42ch; }
       #trace-heading { margin: 0 0 0.3rem; font-size: 0.66rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
-      section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; font-size: 0.9rem; color: var(--soft); }
+      section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; font-size: 15px; line-height: 1.5; color: var(--caption); }
       section[aria-labelledby="trace-heading"] del { font: italic 400 1.1rem/1 "Instrument Serif", serif; color: var(--ink); text-decoration-thickness: 1px; }
       section[aria-labelledby="trace-heading"] ul { list-style: none; margin: 0.6rem 0 0; padding: 0; font-size: 0.85rem; color: var(--soft); }
       section[aria-labelledby="trace-heading"] ul + ul { margin-top: 0.3rem; }
@@ -257,6 +258,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-half .kept-key { font-size: 14px; }
         /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
         #how .esc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
         /* the words sit ~5px apart here: the focus outline hugs its word so it never touches the one beside or below */
