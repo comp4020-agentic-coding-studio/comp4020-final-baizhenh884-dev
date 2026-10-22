@@ -257,6 +257,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
+        #how .esc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
         /* the words sit ~5px apart here: the focus outline hugs its word so it never touches the one beside or below */
         .sentence input[name="word"]:focus-visible { outline-offset: 1px; }
         /* a word's target is as tall as its form (44px) and a little wider than the word, into the
