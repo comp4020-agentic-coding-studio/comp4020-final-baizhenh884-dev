@@ -512,6 +512,38 @@ describe("two ships on GET /", () => {
     }, 90_000);
   }
 
+  // The captions (the instructions, your trace, the kept key) are read, not
+  // glanced at: at least 15px on a desktop and 14px on a phone, at a contrast
+  // of at least 6:1 on their half's ground (measured over the ground, opacity
+  // included). A trace is staged in the measured copy the way GET / renders one.
+  for (const [name, size, px] of [["1920×1080", [1920, 1080], 15], ["phone 390×844", [390, 844], 14]] as const) {
+    it(`sets the captions large and dark enough to read (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      if (!doc.querySelector('section[aria-labelledby="trace-heading"]')) {
+        const section = doc.createElement("section");
+        section.setAttribute("aria-labelledby", "trace-heading");
+        section.innerHTML = '<h2 id="trace-heading">Your trace</h2><p role="status">Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands.</p>';
+        doc.getElementById("how")!.after(section);
+      }
+      const rows = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key']].map(([what, sel]) => {
+          const el = document.querySelector(sel), cs = getComputedStyle(el), ground = rgb(getComputedStyle(el.closest('.half')).backgroundColor);
+          const [r, g, b, a = 1] = rgb(cs.color), k = a * opacity(el), c = [r * k + ground[0] * (1 - k), g * k + ground[1] * (1 - k), b * k + ground[2] * (1 - k)];
+          const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m);
+          return { what, size: parseFloat(cs.fontSize), contrast: (x + 0.05) / (y + 0.05) };
+        });
+      })()`, [size[0], size[1]])) as { what: string; size: number; contrast: number }[];
+      for (const r of rows) {
+        expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
+        expect(r.contrast, `the ${r.what} are too faint on their ground`).toBeGreaterThanOrEqual(6);
+      }
+    }, 60_000);
+  }
+
   // A phone has no Escape key: the instructions' "Press Escape to cancel."
   // takes no visible space there, while a screen reader still reads it in
   // #how (every word field is described by it). A desktop shows it.
