@@ -1,4 +1,5 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
+import { said as saidOne } from "./house/notation";
 import { latestParts, replacedText, standingText } from "./trace-text";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
@@ -498,21 +499,26 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   // reconnect stays silent.
   const news = doc.getElementById("news");
   const heard = new Map<number, string>();
+  // the word each heard position held before this burst, so one change can say its part's family change
+  const before = new Map<number, string>();
   let speakTimer: ReturnType<typeof setTimeout> | null = null;
-  function announce(change: Position): void {
+  function announce(change: Position, was: string): void {
     if (!news) return;
+    if (!before.has(change.position)) before.set(change.position, was);
     heard.delete(change.position);
     heard.set(change.position, change.word);
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = setTimeout(() => {
       speakTimer = null;
       const said = [...heard].sort((a, b) => a[0] - b[0]);
+      const was = new Map(before);
       heard.clear();
+      before.clear();
       const words = [...slots.values()].sort((a, b) => a.latest.position - b.latest.position).map((s) => s.latest.word);
       const n = (p: number) => String(p + 1);
       news.textContent =
         said.length === 1
-          ? `Changed: word ${n(said[0][0])} is now “${said[0][1]}”.`
+          ? saidOne({ position: said[0][0], word: said[0][1], was: was.get(said[0][0]) })
           : said.length <= 3
             ? `Changed: words ${said.slice(0, -1).map(([p]) => n(p)).join(", ")} and ${n(said.at(-1)![0])}. The sentence now reads: ${words.join(" ")}.`
             : `Several words changed. The sentence now reads: ${words.join(" ")}.`;
@@ -541,9 +547,10 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       // the moment is told first, so the house knows how this change moves before onLatest exchanges it
       const slot = slots.get(change.position);
       const newer = !!slot && change.version > slot.latest.version;
+      const was = slot?.latest.word ?? change.word;
       if (change.keptShip) tellKept(change.keptShip, newer ? classifyMoment(keptSent, change.keptShip, change.position) : null);
       offer(change);
-      if (newer) announce(change);
+      if (newer) announce(change, was);
       render();
     },
   };
