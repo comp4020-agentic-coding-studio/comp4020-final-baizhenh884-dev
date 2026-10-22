@@ -15,13 +15,13 @@ export function anchorOf(body: { readonly groups: readonly THREE.Object3D[] }, p
   return { x: canvas.left + ((c.x + 1) / 2) * canvas.width, y: canvas.top + ((1 - c.y) / 2) * canvas.height };
 }
 
-// what the line is laid out against: the chosen word, the sentence's first word, the sentence, its column,
-// and the part notation's text (the slot under the sentence)
-export type ThreadRects = { word: Rect; first: Rect; sentence: Rect; column: Rect; notation: Rect };
+// what the line is laid out against: the part notation's text (the slot under the sentence)
+export type ThreadRects = { notation: Rect };
 
-// out of the word, round the text (above the first line, below the last), then straight to the territory
-export function threadPath(a: { x: number; y: number }, { word, first, sentence, column }: ThreadRects): string {
-  const cx = word.left + word.width / 2, above = word.top - first.top < word.height * 0.6;
-  const sy = above ? word.top : word.bottom, gy = above ? first.top - 12 : sentence.bottom + 6, gx = Math.max(cx, Math.min(column.right + 8, a.x - 24));
-  return `M${cx} ${sy}L${cx} ${gy}L${gx} ${gy}L${a.x} ${a.y}`;
+// Out of the end of the part notation, which names the word and sits under the sentence: a short stub
+// beside its text, down clear of it, then straight to the territory. It never leaves the word itself, so it
+// crosses no other word on the way down (spec/thread.test.ts); the chosen word is marked by its own outline.
+export function threadPath(a: { x: number; y: number }, { notation }: ThreadRects): string {
+  const sx = notation.right + 10, sy = notation.top + notation.height / 2, kx = sx + 14, ky = notation.bottom + 8;
+  return `M${sx} ${sy}L${kx} ${sy}L${kx} ${ky}L${a.x} ${a.y}`;
 }

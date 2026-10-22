@@ -58,7 +58,7 @@ describe("the leader line", () => {
           const cam = new THREE.PerspectiveCamera();
           place(cam, at.canvas.width / at.canvas.height);
           const a = anchorOf(body, position, cam, at.canvas)!;
-          const rects: ThreadRects = { word: at.words[position], first: at.words[0], sentence: at.sentence, column: at.column, notation: at.notation };
+          const rects: ThreadRects = { notation: at.notation };
           const d = threadPath(a, rects);
           const pts = points(d);
           const end = pts.at(-1)!;

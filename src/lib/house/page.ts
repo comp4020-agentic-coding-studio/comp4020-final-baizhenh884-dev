@@ -126,12 +126,11 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     drawn = 0;
     const p = target();
     if (!thread || !line || !dot || p === null || getComputedStyle(thread).display === "none") { thread?.classList.remove("on", "red"); return; }
-    const a = view.anchor(p), l = slots[p].label.getBoundingClientRect(), first = slots[0].label.getBoundingClientRect();
-    const sentence = doc.querySelector(".sentence")!.getBoundingClientRect(), column = doc.querySelector(".text")!.getBoundingClientRect();
-    if (!a) return;
-    const words = part && !part.hidden ? doc.createRange() : null;
-    words?.selectNodeContents(part!);
-    line.setAttribute("d", threadPath(a, { word: l, first, sentence, column, notation: (words ?? slots[p].label).getBoundingClientRect() }));
+    const a = view.anchor(p);
+    if (!a || !part || part.hidden) return; // the line leaves the notation: whenever it's drawn, the notation is shown
+    const text = doc.createRange();
+    text.selectNodeContents(part);
+    line.setAttribute("d", threadPath(a, { notation: text.getBoundingClientRect() }));
     dot.setAttribute("cx", String(a.x)); dot.setAttribute("cy", String(a.y));
     thread.classList.add("on");
     thread.classList.toggle("red", p === rebuilding);
