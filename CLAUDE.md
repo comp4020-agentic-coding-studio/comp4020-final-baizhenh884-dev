@@ -407,6 +407,18 @@ What the code must hold to. The README says why; don't restate it here.
   from `src/lib/house/` so it can't drift. Read-only, never live, never a
   place to try a word; reached from `/` and `/readme/`
   (`spec/house-page.test.ts`).
+- Escape on a word in hand cancels it: it empties the draft as the visitor
+  would (so a change it held back applies then), lets go of the field, and
+  never submits. While a replacement is typed, the notation's slot names the
+  word being replaced, struck, and the keys, on one line; a long word alone
+  is shortened, the keys never cut (`spec/live-client.test.ts`,
+  `spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
+- The focused word field shows a visible keyboard focus (2px, ink) that
+  never touches a neighbouring word, on a phone included
+  (`spec/two-ships-layout.test.ts`).
+- Every page has one visible h1 (the masthead's "Theseus"), a header, one
+  main, a meta description, Open Graph tags with an image that loads, and a
+  favicon (`spec/page-shell.test.ts`).
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
@@ -463,7 +475,8 @@ hold.
   everything returns to neutral. A phone has no line. Under the standing
   house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
   Under the kept house: "Replaced words are kept here, and built back into
-  a house." At
+  a house." and under it: "The words above have been replaced in the
+  sentence; the gaps are words that still stand there." At
   the foot beside About: "If every word and every part is replaced, is it
   still the same thing?" With reduced motion nothing moves and the cue stands
   still for a moment, then clears.
