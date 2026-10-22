@@ -73,7 +73,7 @@ const how =
     ) : earlier ? (
       <>
         <header class="mast">
-          <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+          <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
         </header>
         <div class="text">
           <p class="form-state caps">An earlier form (read-only)</p>
@@ -105,7 +105,7 @@ const how =
           <div class="half stands-half" id="stands">
             <div class="half-head">
               <header class="mast">
-                <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+                <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
               </header>
               {/* on a phone the halves stack: the header row names the other half, as desktop does side by side, and goes there */}
               <div class="head-row">
@@ -186,7 +186,7 @@ const how =
               {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
               <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
               <p class="question">If every word and every part is replaced, is it still the same thing?</p>
-              <p class="about caps"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></p>
+              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
             </div>
           </div>
           <div class="half kept-half kept-plate" id="kept">
@@ -331,5 +331,5 @@ const how =
       </>
     )
   }
-  {earlier && <p class="about caps"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></p>}
+  {earlier && <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>}
 </Page>

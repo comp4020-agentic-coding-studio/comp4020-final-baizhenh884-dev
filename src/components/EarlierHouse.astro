@@ -13,7 +13,7 @@ const { words, prev, next } = Astro.props;
 
 <div class="lone-house">
   <header class="mast">
-    <span class="name">Theseus</span><span class="sub caps">One sentence, two houses</span>
+    <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
   </header>
   <p class="caps half-label kept-label">A house that was kept (read-only)</p>
   <p class="kept-sentence">
@@ -25,7 +25,7 @@ const { words, prev, next } = Astro.props;
     {next !== null && <a rel="next" href={`?kept=${next}`}>Later house</a>}
     <a href="/">Back to now</a>
   </nav>
-  <p class="about caps"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></p>
+  <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
 </div>
 <script>
   // drawn once from these words, as timber, whole; never goes live

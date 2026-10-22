@@ -8,13 +8,16 @@ import Page from "../layouts/Page.astro";
 
 const title = readme.getHeadings().find((h) => h.depth === 1)?.text ?? "README";
 // ENFORCED / JUDGED are set as quiet tags; the words themselves are unchanged
-const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\/code>/g, '<span class="tag">$1</span>');
+// README's own h1 is the masthead's name (one h1 per page): kept as text, for /readme/'s heading check, not as a heading
+const html = (await readme.compiledContent())
+  .replace(/<code>(ENFORCED|JUDGED)<\/code>/g, '<span class="tag">$1</span>')
+  .replace(/<h1([^>]*)>(.*?)<\/h1>/, '<p class="readme-title"$1>$2</p>');
 ---
 
-<Page title={`About ${title}`}>
+<Page title={`About ${title}`} description="About Theseus: a shared sentence and the house built from it, what good means here, and how it works.">
   <div class="readme">
     <header class="mast">
-      <span class="name">{title}</span><span class="sub caps">About</span>
+      <h1 class="name">{title}</h1><span class="sub caps">About</span>
       <nav aria-label="site"><a class="caps" href="/house/">How the house reads a word</a><a class="caps" href="/">The sentence</a></nav>
     </header>
     <article set:html={html} />
@@ -28,11 +31,11 @@ const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\
   .readme .mast nav { margin-left: auto; color: var(--soft); }
   .readme .mast nav a { text-decoration-color: var(--hair); }
   .readme .mast nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem 1.2rem; }
-  .readme article > h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .readme article > .readme-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   /* the note: serif, the first line larger, the question set apart at its foot */
   .readme article > p { font: 400 clamp(20px, 1.55vw, 24px)/1.4 "Instrument Serif", serif; color: var(--ink); margin: 0 0 1.15em; letter-spacing: -0.003em; }
-  .readme article > h1 + p { font-size: clamp(27px, 2.5vw, 38px); line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1em; }
+  .readme article > .readme-title + p { font-size: clamp(27px, 2.5vw, 38px); line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1em; }
   .readme article > p:has(+ h2:first-of-type) { font-style: italic; font-size: clamp(24px, 2vw, 30px); line-height: 1.25; margin-top: 1.9em; }
   .readme article em { font-style: italic; }
 
@@ -52,7 +55,7 @@ const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\
 
   @media (max-width: 900px) {
     .readme .mast { margin-bottom: 2.4rem; }
-    .readme article > h1 + p { font-size: 28px; }
+    .readme article > .readme-title + p { font-size: 28px; }
     .readme article > p { font-size: 21px; }
     .readme article > p:has(+ h2:first-of-type) { font-size: 24px; }
     .readme article > h2:first-of-type { margin-top: 3.4rem; }

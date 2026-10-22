@@ -10,8 +10,13 @@ import "@fontsource/instrument-sans/500.css";
 
 interface Props {
   title: string;
+  description?: string;
 }
-const { title } = Astro.props;
+const DEFAULT_DESCRIPTION = "One shared sentence of ten words, and a house built from it. Anyone can replace a word, and its part of the house is rebuilt.";
+const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
+// absolute, from the request itself, so a shared link is right wherever the app runs
+const url = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin).href;
+const image = new URL("/og.png", Astro.url.origin).href;
 ---
 
 <!doctype html>
@@ -20,6 +25,16 @@ const { title } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
       :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
@@ -36,7 +51,7 @@ const { title } = Astro.props;
       a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
       .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--hair); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
-      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; }
+      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
       .mast .sub { color: var(--soft); }
       /* the sentence sits in the middle of the page's height, level with the house */
       .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
