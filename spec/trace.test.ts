@@ -91,21 +91,9 @@ const at = (all: { position: number; version: number; word: string }[], position
   return slot!;
 };
 
-// the territory labels (TERRITORIES in src/lib/house/territories.ts), by
-// position — hardcoded here, not imported, so this asserts the contract
-// rather than the module that happens to implement it today
-const TERRITORY_LABELS = [
-  "ground",
-  "front-left mass",
-  "central hall",
-  "front-right mass",
-  "entry",
-  "upper-left volume",
-  "roof",
-  "upper-right volume",
-  "side mass",
-  "threshold",
-];
+// the place a trace names, as the sentence's own notation numbers it ("01"):
+// a number, never the part of the house (spec/trace-text.test.ts pins the wording)
+const PLACE = (position: number) => `place ${String(position + 1).padStart(2, "0")}`;
 
 const traceSection = (doc: Document) => doc.querySelector('section[aria-labelledby="trace-heading"]');
 const traceStatus = (doc: Document) => doc.querySelector('section [role="status"], aside [role="status"]');
@@ -183,7 +171,7 @@ describe("Your trace", () => {
     expect(held.status, "the trace shows eligibility but the server still refuses the held position").toBe(403);
   });
 
-  settleOnly("free-but-blocked by replacement: names the blocking territory and still shows what replaced the word", async () => {
+  settleOnly("free-but-blocked by replacement: names the blocked place, where the word stood, and still shows what replaced the word", async () => {
     const ann = await arrive();
     const before = await ann.sentence();
     const slot = before[0];
@@ -199,7 +187,7 @@ describe("Your trace", () => {
     const status = traceStatus(doc)!;
     expect(status.querySelector("del")?.textContent?.trim(), "the replaced word isn't marked removed").toBe(anns);
     expect(status.textContent).toContain(beas);
-    expect(status.textContent, "the eligibility clause doesn't name the blocked territory").toContain(TERRITORY_LABELS[slot.position]);
+    expect(status.textContent, "the eligibility clause doesn't name the blocked place, in the past").toContain(`anywhere but ${PLACE(slot.position)}, where it stood.`);
   });
 
   settleByAgeOnly(
@@ -217,7 +205,7 @@ describe("Your trace", () => {
       const status = traceStatus(doc)!;
       expect(status.querySelector("del"), "a settled word is shown as removed").toBeNull();
       expect(status.textContent).toContain(word);
-      expect(status.textContent, "the eligibility clause still names the now-settled territory").toContain(TERRITORY_LABELS[slot.position]);
+      expect(status.textContent, "the eligibility clause doesn't name the now-settled place, in the present").toContain(`anywhere but ${PLACE(slot.position)}, where it stands.`);
 
       const now = await v.sentence();
       const settledAgain = await v.replace(at(now, (slot.position + 1) % now.length), unused(now));
