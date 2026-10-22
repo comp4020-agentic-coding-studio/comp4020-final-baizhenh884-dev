@@ -113,6 +113,12 @@ outside this repo: it holds their result and its specs, not the search.
   blocker found by a check or by hand, with the evidence; not for taste. Do not
   reopen a deliberately rejected design or grammar direction without new
   evidence that changes the reason it was rejected.
+- The one exception: restructuring the grammar's code (e.g. into data tables,
+  so the reason for a family can be read from the rule itself) when its output
+  doesn't change. `spec/house-grammar.test.ts` and its fixture are the proof
+  and pass unmodified: neither is edited in the same change, and a
+  restructure that needs either edited is a grammar change, not a
+  restructure.
 - One word primarily changes its own territory. A neighbour may move only
   through a structural rule that already exists (the threshold clearing the
   entry), never because a word was given reach into it.
