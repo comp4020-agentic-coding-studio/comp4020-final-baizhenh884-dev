@@ -474,6 +474,19 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     keepAllInside(); // typing can move words, and the notices under them
   });
 
+  // Escape is the way out of a word in hand: the visitor's own clearing of the draft (so a change it held
+  // back applies, by the input listener above), then letting go of the field. It never submits.
+  doc.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const slot of slots.values()) {
+      if (event.target !== slot.input) continue;
+      event.preventDefault();
+      slot.input.value = "";
+      slot.input.dispatchEvent(new (doc.defaultView ?? window).Event("input", { bubbles: true }));
+      slot.input.blur();
+    }
+  });
+
   // The positions one trace shape refers to: one, under once mode; up to
   // several, under settle mode.
   function tracePositions(t: Trace | SettleTrace): number[] {

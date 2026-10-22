@@ -10,8 +10,13 @@ import "@fontsource/instrument-sans/500.css";
 
 interface Props {
   title: string;
+  description?: string;
 }
-const { title } = Astro.props;
+const DEFAULT_DESCRIPTION = "One shared sentence of ten words, and a house built from it. Anyone can replace a word, and its part of the house is rebuilt.";
+const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
+// absolute, from the request itself, so a shared link is right wherever the app runs
+const url = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin).href;
+const image = new URL("/og.png", Astro.url.origin).href;
 ---
 
 <!doctype html>
@@ -20,6 +25,16 @@ const { title } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
       :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
@@ -36,7 +51,7 @@ const { title } = Astro.props;
       a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
       .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--hair); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
-      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; }
+      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
       .mast .sub { color: var(--soft); }
       /* the sentence sits in the middle of the page's height, level with the house */
       .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
@@ -60,11 +75,12 @@ const { title } = Astro.props;
       .sentence input[name="word"] {
         width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0;
         /* the label's own face, so the field is exactly the word's width and focusing it moves nothing */
-        font: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
+        font: inherit; letter-spacing: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
       }
       .sentence input[name="word"]::placeholder { color: var(--faint); opacity: 1; }
       .sentence form:focus-within label { visibility: hidden; }
-      .sentence form:focus-within input[name="word"] { opacity: 1; outline: none; }
+      /* shown while in hand, with the page's keyboard focus outline (a:focus-visible, input:focus-visible) */
+      .sentence form:focus-within input[name="word"] { opacity: 1; }
       /* the label carries the field's 1px rule, unseen, so the word and its field are the same size */
       .sentence label { border-bottom: 1px solid transparent; cursor: text; text-decoration-line: underline; text-decoration-thickness: 1px; text-decoration-color: transparent; text-underline-offset: 0.11em; transition: color 0.25s; }
       /* choosing a word: the others recede, the chosen one is drawn in ink */
@@ -147,6 +163,10 @@ const { title } = Astro.props;
       .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
       .stands-half .invite { color: var(--soft); white-space: nowrap; }
       .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
+      /* while a replacement is typed: one line, the replaced word struck, and only it shortened when long; the keys are never cut */
+      #part:has(> del) { display: flex; white-space: pre; }
+      #part > span { flex: none; }
+      #part > del { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-decoration-thickness: 1px; }
       /* the row decides a house's size, never its canvas: the canvas lies over its host */
       #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
       .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
@@ -159,6 +179,8 @@ const { title } = Astro.props;
       .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
+      /* what the kept sentence's words and gaps are: a quiet key under the caption */
+      .kept-half .kept-key { margin: 0; font-size: 0.9rem; color: var(--kept-soft); max-width: 36ch; }
       .kept-half .earlier { color: var(--kept-soft); }
       .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
@@ -235,6 +257,8 @@ const { title } = Astro.props;
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        /* the words sit ~5px apart here: the focus outline hugs its word so it never touches the one beside or below */
+        .sentence input[name="word"]:focus-visible { outline-offset: 1px; }
         /* a word's target is as tall as its form (44px) and a little wider than the word, into the
            space beside it and no further: two short words side by side ("if it") used to have 46px
            targets that overlapped, and a tap on the first went to the second */

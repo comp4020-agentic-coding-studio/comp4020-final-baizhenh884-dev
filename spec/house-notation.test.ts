@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { notation, said } from "../src/lib/house/notation";
+import { JSDOM } from "jsdom";
+import { drafting, notation, said, showDrafting } from "../src/lib/house/notation";
 import { describeTerritory, TERRITORIES, TESTS } from "../src/lib/house/territories";
 
 // The part notation's words (#part, and what a screen reader hears of the same
@@ -52,6 +53,37 @@ describe("the part notation", () => {
     expect(notation({ position: 4, word: "door", was: "people" }, "phone")).toBe("05 — entry · arch, unchanged");
     expect(notation({ position: 2, word: "hammock", was: "website" }, "desktop")).toBe("03 — central hall · clerestory → block · fewer than 2 repeats, not open");
     expect(notation({ position: 0, word: "jump" })).toBe("01 — ground · stilts");
+  });
+
+  // While a replacement is being typed: the word being replaced, struck, and
+  // the keys, in the notation's slot. A desktop keeps the part and its family
+  // (of the word that stands: typing never previews the house); a phone says
+  // only what's being replaced and how to send it. Three pieces, so the page
+  // can strike the word and shorten it alone when it's long
+  // (spec/two-ships-layout.test.ts): the keys are never cut.
+  it("while typing, names the word being replaced and the keys", () => {
+    expect(drafting({ position: 4, word: "people" }, "desktop")).toEqual({ lead: "05 — entry · arch · replacing ", was: "people", tail: " · Enter to replace · Esc to cancel" });
+    expect(drafting({ position: 4, word: "people" }, "phone")).toEqual({ lead: "Replacing ", was: "people", tail: " · Enter to replace" });
+    for (let p = 0; p < 10; p++) for (const w of WORDS) {
+      const d = drafting({ position: p, word: w }, "desktop");
+      expect(d.lead).toBe(`${notation({ position: p, word: w })} · replacing `);
+      expect(d.was).toBe(w);
+      expect(drafting({ position: p, word: w }, "phone").was).toBe(w);
+    }
+  });
+
+  // the slot gets the three pieces as text, the replaced word struck (a <del>), never as markup
+  it("sets the drafting line as text, the replaced word struck", () => {
+    const doc = new JSDOM('<p id="part" hidden></p>').window.document;
+    const part = doc.getElementById("part")!;
+    showDrafting(part, drafting({ position: 4, word: "<b>x</b>" }, "phone"));
+    expect(part.hidden).toBe(false);
+    expect(part.textContent).toBe("Replacing <b>x</b> · Enter to replace");
+    expect(part.querySelector("b"), "a word became markup").toBeNull();
+    expect(part.querySelector("del")?.textContent).toBe("<b>x</b>");
+    // and the plain notation afterwards leaves no struck word behind
+    part.textContent = notation({ position: 4, word: "door" });
+    expect(part.querySelector("del")).toBeNull();
   });
 
   // what the polite live region says of the same change: positions, words and families, never who or when

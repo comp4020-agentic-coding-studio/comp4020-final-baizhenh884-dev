@@ -287,6 +287,55 @@ describe("live page reconciliation", () => {
     expect(notice(doc, position, second), "the notice outlived the draft").toBeNull();
   });
 
+  // Escape is the way out of a word in hand: it empties the draft and lets go
+  // of the field, exactly as if the visitor had cleared it themselves, so a
+  // change the draft was holding back applies then (never by itself before).
+  // Escape never submits.
+  const escape = (doc: Document, position: number) => {
+    const { input } = slot(doc, position);
+    input.dispatchEvent(new doc.defaultView!.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  };
+
+  localOnly("Escape empties a draft and lets go of the field, applying a change it held back", async () => {
+    const doc = await (await arrive()).page("/");
+    const page = attach(doc);
+    page.applySnapshot(snapshotOf(doc));
+    const { position, version } = positionsOf(doc)[0];
+    slot(doc, position).input.focus();
+    type(doc, position, "mydraft");
+    const newer = fresh();
+    page.applyChange({ position, word: newer, version: version + 1 });
+    expect(slot(doc, position).version.value, "the change applied under the draft").toBe(String(version));
+
+    escape(doc, position);
+
+    const s = slot(doc, position);
+    expect(s.input.value, "Escape left the draft").toBe("");
+    expect(doc.activeElement, "Escape kept the field focused").not.toBe(s.input);
+    expect(s.label.textContent!.trim(), "Escape didn't apply the change the draft held back").toBe(newer);
+    expect(s.version.value).toBe(String(version + 1));
+    expect(notice(doc, position, newer), "the notice outlived the draft").toBeNull();
+  });
+
+  localOnly("Escape with nothing held back only empties and lets go: the word and its version stay", async () => {
+    const doc = await (await arrive()).page("/");
+    attach(doc);
+    const { position, version, word } = positionsOf(doc)[1];
+    slot(doc, position).input.focus();
+    type(doc, position, "mydraft");
+    let submitted = false;
+    slot(doc, position).form.addEventListener("submit", (e) => { submitted = true; e.preventDefault(); });
+
+    escape(doc, position);
+
+    const s = slot(doc, position);
+    expect(s.input.value).toBe("");
+    expect(doc.activeElement).not.toBe(s.input);
+    expect(s.label.textContent!.trim()).toBe(word);
+    expect(s.version.value).toBe(String(version));
+    expect(submitted, "Escape submitted the form").toBe(false);
+  });
+
   describe("the visitor's own trace", () => {
     localOnly("leaves a standing word alone, then says when it's replaced, and by what", async () => {
       const ann = await arrive();

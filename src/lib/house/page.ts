@@ -4,7 +4,7 @@
 // words, couples selection, and animates a change after the server has
 // accepted it. Nothing here runs while a visitor types (no preview).
 
-import { notation } from "./notation";
+import { drafting, notation, showDrafting } from "./notation";
 import type { KeptShip, Moment } from "../kept-moment";
 import type { Look } from "./theme";
 import { HouseView } from "./view";
@@ -103,10 +103,17 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
   let held = false; // the territory is singled out by an accepted change, not by someone at work on the word
   // the part and its family while a word is in hand; after an accepted change, the family change and,
   // where there's room (not a phone, where it would reach the house), the letters that decided it
+  const form = () => (matchMedia("(max-width: 900px)").matches ? "phone" : "desktop");
   const annotate = (position: number | null, was?: string) => {
     if (!part) return;
     part.hidden = position === null;
-    part.textContent = position === null ? "" : notation({ position, word: words[position], was }, matchMedia("(max-width: 900px)").matches ? "phone" : "desktop");
+    part.textContent = position === null ? "" : notation({ position, word: words[position], was }, form());
+  };
+  // while a replacement is typed: the word it replaces, struck, and the keys; an emptied field goes back to the part
+  const drafted = (s: Slot) => {
+    if (!part || selected !== s.position || held) return;
+    if (s.input.value === "") annotate(s.position);
+    else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position] }, form())); // the word on screen, which a draft may hold back
   };
   // the one hairline between the chosen word and its territory (desktop; red only while that territory is rebuilt)
   const thread = doc.getElementById("thread") as SVGSVGElement | null;
@@ -168,12 +175,12 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
   });
   doc.addEventListener("pointerout", (e) => { if ((e.target as Element).closest?.('section[aria-labelledby="trace-heading"]') && !(e.relatedTarget as Element | null)?.closest?.('section[aria-labelledby="trace-heading"]')) setHover(null); });
   for (const s of slots) {
-    s.input.addEventListener("focus", () => select(s.position));
+    s.input.addEventListener("focus", () => { select(s.position); drafted(s); });
     s.input.addEventListener("blur", () => {
       // a draft keeps its word chosen; an empty field lets go
       setTimeout(() => { if (selected === s.position && doc.activeElement !== s.input && s.input.value === "") select(null); }, 0);
     });
-    s.input.addEventListener("input", () => { if (s.input.value === "" && doc.activeElement !== s.input) select(null); });
+    s.input.addEventListener("input", () => { if (s.input.value === "" && doc.activeElement !== s.input) select(null); else drafted(s); });
     s.pos.addEventListener("pointerenter", () => { if (fine()) setHover(s.position); });
     s.pos.addEventListener("pointerleave", () => { if (fine()) setHover(null); });
   }

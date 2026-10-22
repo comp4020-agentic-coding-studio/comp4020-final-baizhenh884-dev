@@ -95,6 +95,10 @@ describe("an earlier house, /?kept=k", () => {
     // one at a time: a way back to now, and no earlier house before ship 1
     expect(doc.querySelector('a[href="/"]'), "no way back to now").not.toBeNull();
     expect(doc.querySelector('a[rel="prev"]'), "ship 1 offers an earlier house").toBeNull();
+    // the same shell as every other page (spec/page-shell.test.ts): one h1, a main, a description
+    expect([...doc.querySelectorAll("h1")].map((h) => h.textContent?.trim()), "an earlier house's h1").toEqual(["Theseus"]);
+    expect(doc.querySelectorAll("main"), "an earlier house has no single main").toHaveLength(1);
+    expect(doc.querySelector('meta[name="description"]')?.getAttribute("content")?.trim(), "an earlier house has no description").toBeTruthy();
   }, 120_000);
 
   localOnly("is 404 for the ship still being built and any ship after it", async () => {
