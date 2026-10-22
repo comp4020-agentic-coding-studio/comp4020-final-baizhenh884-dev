@@ -3,11 +3,11 @@
 // not HTML strings — so src/pages/index.astro (server JSX) and
 // src/lib/live-client.ts (client DOM) build identical markup from one
 // source, including after the client's local settle timer flips a trace's
-// display (see live-client.ts). No numbers or times ever appear here: the
+// display (see live-client.ts). No counts or times ever appear here: the
 // settle timer's own value (settlesInMs) only ever drives a local setTimeout,
-// never rendered text.
+// never rendered text. The one number is a place's, which names a position,
+// as the part notation's "05" does.
 
-import { TERRITORIES } from "./house/territories";
 import type { ReplacedItem, SettleTrace, StandingItem } from "./db";
 import type { KeptWhere } from "./kept-ship";
 
@@ -28,7 +28,8 @@ const KEPT: Record<KeptWhere, string> = {
 };
 export const keptPhrase = (where: KeptWhere): string => KEPT[where];
 
-const territoryLabel = (position: number): string => TERRITORIES[position]?.label ?? `position ${position + 1}`;
+// a place by the sentence's own number ("place 01"), never the part of the house it builds
+const place = (position: number): string => `place ${String(position + 1).padStart(2, "0")}`;
 
 export function latestParts(latest: SettleTrace["latest"]): LatestParts {
   if (!latest.standing) {
@@ -37,7 +38,7 @@ export function latestParts(latest: SettleTrace["latest"]): LatestParts {
       del: latest.word,
       now: latest.now,
       kept: `It's ${keptPhrase(latest.kept)}.`,
-      eligibility: `You can act again, anywhere but the ${territoryLabel(latest.position)}.`,
+      eligibility: `You can act again, anywhere but ${place(latest.position)}, where it stood.`,
     };
   }
   if (!latest.settled) {
@@ -48,7 +49,7 @@ export function latestParts(latest: SettleTrace["latest"]): LatestParts {
   }
   return {
     word: latest.word,
-    eligibility: `You can act again, anywhere but the ${territoryLabel(latest.position)}.`,
+    eligibility: `You can act again, anywhere but ${place(latest.position)}, where it stands.`,
   };
 }
 
