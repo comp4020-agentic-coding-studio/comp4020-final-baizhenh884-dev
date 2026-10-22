@@ -260,6 +260,20 @@ describe("Kept ship markup on GET /", () => {
     expect(readable(sentence), "the kept sentence doesn't read as its words and blanks").toContain(`${words.join(" ")}.`);
   });
 
+  // what the kept sentence is, said once under its house: a first visitor
+  // reads the words above as replaced and the gaps as still standing. GET /
+  // only: an earlier form has no kept half (houses stay level with it,
+  // spec/two-ships-layout.test.ts)
+  const KEPT_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
+  it("says under its house what its words and gaps are, on GET / only", async () => {
+    const doc = await new Visitor().page();
+    const lines = [...doc.querySelectorAll(".kept-half .foot p")].map((p) => p.textContent?.trim());
+    expect(lines, "the kept half's foot doesn't say what its words and gaps are").toContain(KEPT_LINE);
+    expect(doc.querySelector(".kept-half .foot")?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    const earlier = new JSDOM(await (await fetch(new URL("/?at=0", baseUrl))).text()).window.document;
+    expect(earlier.body.textContent, "an earlier form says what a kept half shows").not.toContain(KEPT_LINE);
+  });
+
   // The shared sentence accumulates every other spec file's replacements, so
   // this never assumes which ship is currently shown or which position is a
   // gap: it reads the kept ship's own rendered gaps, picks one, replaces
