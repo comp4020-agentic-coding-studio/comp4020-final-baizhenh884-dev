@@ -393,6 +393,20 @@ What the code must hold to. The README says why; don't restate it here.
   load, snapshot or reconnect), a burst coalesced into one announcement, as
   plain text naming positions and words, never who or when
   (`spec/live-client.test.ts`).
+- The part notation names its part's family and, after an accepted change
+  (own or another visitor's), the family before and after ("arch → cut", or
+  "arch, unchanged") and, on a desktop, every letter test that decided it,
+  all from `describeTerritory()` (`src/lib/house/notation.ts`), never a
+  second copy of the rule. A phone shows the family change only: the reason
+  would reach the house there. Same slot, moves nothing, and clear of every
+  house at rest by 8px on a desktop and 16px on a phone. Decorative to
+  assistive technology, which hears the same family change in the polite
+  live region (`spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
+- `GET /house/` explains how the house reads a word: the places and parts,
+  each part's family order, the letter tests and worked examples, generated
+  from `src/lib/house/` so it can't drift. Read-only, never live, never a
+  place to try a word; reached from `/` and `/readme/`
+  (`spec/house-page.test.ts`).
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
