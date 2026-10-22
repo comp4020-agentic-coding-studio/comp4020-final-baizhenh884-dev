@@ -66,22 +66,29 @@ export function level(key: LevelKey, f: Features): Level {
 }
 export const LEVEL_KEYS = Object.keys(CUTS) as LevelKey[];
 
-// The same features read as plain adjectives; a territory's character is the
-// first one that applies to it.
-export type Adjectives = Record<"short" | "long" | "tall" | "flat" | "round" | "hangs" | "repeats" | "open" | "veryTall", boolean>;
+// The same features read as plain adjectives, each a test with its own words
+// for when it holds and when it doesn't; a territory's character is the first
+// one that applies to it (territories.ts). One table, so the rule and the
+// explanation of it (the part notation, /house/) are the same data.
+export type AdjectiveKey = "short" | "long" | "tall" | "flat" | "round" | "hangs" | "repeats" | "open" | "veryTall";
+export type Test = { holds: (f: Features) => boolean; yes: string; no: string; means: string };
+export const TESTS: Record<AdjectiveKey, Test> = {
+  short: { holds: (f) => f.length <= 4, yes: "short", no: "not short", means: "4 letters or fewer" },
+  long: { holds: (f) => f.length >= 7, yes: "long", no: "not long", means: "7 letters or more" },
+  tall: { holds: (f) => f.tall >= 2, yes: "tall", no: "not tall", means: "2 or more tall letters" },
+  flat: { holds: (f) => f.tall === 0, yes: "no tall letters", no: "has a tall letter", means: "no tall letter" },
+  round: { holds: (f) => f.roundShare >= 0.5, yes: "mostly round", no: "not mostly round", means: "half the letters or more are round" },
+  hangs: { holds: (f) => f.hanging > 0, yes: "a hanging letter", no: "no hanging letter", means: "at least one hanging letter" },
+  // a repeat is any use of a letter after its first, across the whole word
+  repeats: { holds: (f) => f.repeats >= 2, yes: "2 or more repeats", no: "fewer than 2 repeats", means: "a repeat is any use of a letter after its first; 2 or more pass: letter has 2 (t, e), hammock has 1 (m)" },
+  open: { holds: (f) => f.vowelShare >= 0.4, yes: "open", no: "not open", means: "40% or more of the letters are vowels" },
+  veryTall: { holds: (f) => f.tall >= 3, yes: "very tall", no: "not very tall", means: "3 or more tall letters" },
+};
+export type Adjectives = Record<AdjectiveKey, boolean>;
 export function adjectives(f: Features): Adjectives {
-  return {
-    short: f.length <= 4,
-    long: f.length >= 7,
-    tall: f.tall >= 2,
-    flat: f.tall === 0,
-    round: f.roundShare >= 0.5,
-    hangs: f.hanging > 0,
-    repeats: f.repeats >= 2,
-    open: f.vowelShare >= 0.4,
-    veryTall: f.tall >= 3,
-  };
+  return Object.fromEntries(Object.entries(TESTS).map(([k, t]) => [k, t.holds(f)])) as Adjectives;
 }
+export const LETTERS = { vowels: VOWELS, tall: TALL, round: ROUND, hanging: HANGING };
 
 // Longer words reach further, graded continuously so long words keep reaching:
 // 3 letters 0.11, 5 0.40, 7 0.60, 9 0.74, 11 0.86, and the whole reach from 14

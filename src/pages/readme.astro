@@ -15,7 +15,7 @@ const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\
   <div class="readme">
     <header class="mast">
       <span class="name">{title}</span><span class="sub caps">About</span>
-      <nav aria-label="site"><a class="caps" href="/">The sentence</a></nav>
+      <nav aria-label="site"><a class="caps" href="/house/">How the house reads a word</a><a class="caps" href="/">The sentence</a></nav>
     </header>
     <article set:html={html} />
   </div>
@@ -27,6 +27,7 @@ const html = (await readme.compiledContent()).replace(/<code>(ENFORCED|JUDGED)<\
   .readme .mast { max-width: none; margin-bottom: clamp(36px, 9vh, 88px); }
   .readme .mast nav { margin-left: auto; color: var(--soft); }
   .readme .mast nav a { text-decoration-color: var(--hair); }
+  .readme .mast nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem 1.2rem; }
   .readme article > h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   /* the note: serif, the first line larger, the question set apart at its foot */

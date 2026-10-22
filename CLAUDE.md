@@ -113,6 +113,12 @@ outside this repo: it holds their result and its specs, not the search.
   blocker found by a check or by hand, with the evidence; not for taste. Do not
   reopen a deliberately rejected design or grammar direction without new
   evidence that changes the reason it was rejected.
+- The one exception: restructuring the grammar's code (e.g. into data tables,
+  so the reason for a family can be read from the rule itself) when its output
+  doesn't change. `spec/house-grammar.test.ts` and its fixture are the proof
+  and pass unmodified: neither is edited in the same change, and a
+  restructure that needs either edited is a grammar change, not a
+  restructure.
 - One word primarily changes its own territory. A neighbour may move only
   through a structural rule that already exists (the threshold clearing the
   entry), never because a word was given reach into it.
@@ -387,6 +393,20 @@ What the code must hold to. The README says why; don't restate it here.
   load, snapshot or reconnect), a burst coalesced into one announcement, as
   plain text naming positions and words, never who or when
   (`spec/live-client.test.ts`).
+- The part notation names its part's family and, after an accepted change
+  (own or another visitor's), the family before and after ("arch → cut", or
+  "arch, unchanged") and, on a desktop, every letter test that decided it,
+  all from `describeTerritory()` (`src/lib/house/notation.ts`), never a
+  second copy of the rule. A phone shows the family change only: the reason
+  would reach the house there. Same slot, moves nothing, and clear of every
+  house at rest by 8px on a desktop and 16px on a phone. Decorative to
+  assistive technology, which hears the same family change in the polite
+  live region (`spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
+- `GET /house/` explains how the house reads a word: the places and parts,
+  each part's family order, the letter tests and worked examples, generated
+  from `src/lib/house/` so it can't drift. Read-only, never live, never a
+  place to try a word; reached from `/` and `/readme/`
+  (`spec/house-page.test.ts`).
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule

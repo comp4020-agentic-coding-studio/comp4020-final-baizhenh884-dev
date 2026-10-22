@@ -4,7 +4,7 @@
 // words, couples selection, and animates a change after the server has
 // accepted it. Nothing here runs while a visitor types (no preview).
 
-import { TERRITORIES } from "./territories";
+import { notation } from "./notation";
 import type { KeptShip, Moment } from "../kept-moment";
 import type { Look } from "./theme";
 import { HouseView } from "./view";
@@ -12,7 +12,6 @@ import { TIMING, type Kind } from "./motion";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
-export const partLabel = (position: number) => `${String(position + 1).padStart(2, "0")} — ${TERRITORIES[position].label}`;
 
 // a browser that can't draw WebGL keeps the sentence and loses only the house
 function viewIn(host: HTMLElement | null, look: Look): HouseView | null {
@@ -80,7 +79,7 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     const dur = TIMING[kind].exchange;
     // the word and its territory are singled out together: the line stands while the part is exchanged, the emphasis until it has settled
     const T = reduced() ? TIMING.reduced : TIMING[kind];
-    hold(s.position, T.exchange || T.hold, T.exchange + T.hold);
+    hold(s.position, T.exchange || T.hold, T.exchange + T.hold, old);
     if (reduced()) return;
     const ghost = doc.createElement("span");
     ghost.className = "leaving";
@@ -102,10 +101,12 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
   let hovered: number | null = null; // pointed at: a word, a territory, or the visitor's own trace
   let rebuilding: number | null = null; // the territory being exchanged right now
   let held = false; // the territory is singled out by an accepted change, not by someone at work on the word
-  const annotate = (position: number | null) => {
+  // the part and its family while a word is in hand; after an accepted change, the family change and,
+  // where there's room (not a phone, where it would reach the house), the letters that decided it
+  const annotate = (position: number | null, was?: string) => {
     if (!part) return;
     part.hidden = position === null;
-    part.textContent = position === null ? "" : partLabel(position);
+    part.textContent = position === null ? "" : notation({ position, word: words[position], was }, matchMedia("(max-width: 900px)").matches ? "phone" : "desktop");
   };
   // the one hairline between the chosen word and its territory (desktop; red only while that territory is rebuilt)
   const thread = doc.getElementById("thread") as SVGSVGElement | null;
@@ -139,21 +140,21 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     for (const s of slots) s.pos.classList.toggle("pointed", s.position === p); // the word is marked whoever is pointing: the word, the house or the trace
     sync();
   };
-  const select = (position: number | null, byChange = false) => {
+  const select = (position: number | null, byChange = false, was?: string) => {
     selected = position;
     held = byChange && position !== null;
     view.select(position);
-    annotate(position);
+    annotate(position, was);
     doc.body.classList.toggle("selecting", position !== null);
     for (const s of slots) s.pos.classList.toggle("selected", s.position === position);
     sync();
   };
   // A word has just been exchanged: its territory is the one thing singled out, and the line (red) stands for
   // `lineMs` while it is rebuilt; the emphasis lasts until `ms`, when the body has settled and everything lets go.
-  const hold = (position: number, lineMs: number, ms: number) => {
+  const hold = (position: number, lineMs: number, ms: number, was: string) => {
     if (selected !== null) return; // someone is already at work on a word; a change elsewhere doesn't take it over
     rebuilding = position;
-    select(position, true);
+    select(position, true, was);
     setTimeout(() => { if (rebuilding === position) { rebuilding = null; sync(); } }, lineMs);
     setTimeout(() => { if (selected === position && held && doc.activeElement !== slots[position].input) select(null); }, ms);
   };
