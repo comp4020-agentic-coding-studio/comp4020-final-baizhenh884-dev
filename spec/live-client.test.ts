@@ -374,7 +374,10 @@ describe("live page reconciliation", () => {
       input.focus(); // a word in hand, nothing typed yet
       lengthen(page, doc);
       if (sizeStep(LONG) !== Number(before)) expect(step(doc), "the step changed under a focused word").toBe(before);
-      input.blur();
+      // moving straight to another word is still a word in hand
+      slot(doc, 1).input.focus();
+      if (sizeStep(LONG) !== Number(before)) expect(step(doc), "the step changed while moving between words").toBe(before);
+      slot(doc, 1).input.blur();
       expect(step(doc), "letting go didn't apply the new step").toBe(String(sizeStep(LONG)));
     });
 
