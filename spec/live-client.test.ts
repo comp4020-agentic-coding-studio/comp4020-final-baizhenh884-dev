@@ -1,6 +1,7 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it, vi } from "vitest";
 import { said } from "../src/lib/house/notation";
+import { sizeStep } from "../src/lib/sentence-step";
 import { attach, deriveTotal, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
@@ -334,6 +335,65 @@ describe("live page reconciliation", () => {
     expect(s.label.textContent!.trim()).toBe(word);
     expect(s.version.value).toBe(String(version));
     expect(submitted, "Escape submitted the form").toBe(false);
+  });
+
+  // The live sentence's size step (src/lib/sentence-step.ts) never changes
+  // under someone: when another visitor's change needs a different step, it
+  // waits while this visitor has a word in hand (a field focused, or holding a
+  // draft) and applies once they let go, as a held-back change does. With no
+  // word in hand it applies with the change. The page shows the step it would
+  // render for the words now standing (GET / renders the same).
+  describe("the sentence's size step", () => {
+    const step = (doc: Document) => doc.querySelector(".stands-half .sentence")?.getAttribute("data-step");
+    const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
+    // a change to each position in turn, newer than shown, building the long sentence
+    const lengthen = (page: ReturnType<typeof attach>, doc: Document) => {
+      for (const p of positionsOf(doc)) page.applyChange({ position: p.position, word: LONG[p.position], version: p.version + 1 });
+    };
+
+    localOnly("GET / renders the step for the words it shows", async () => {
+      const doc = await (await arrive()).page("/");
+      expect(step(doc), "GET / renders no size step").toMatch(/^\d$/);
+      expect(Number(step(doc))).toBe(sizeStep(positionsOf(doc).map((p) => p.word)));
+    });
+
+    localOnly("applies a new step with the change when no word is in hand", async () => {
+      const doc = await (await arrive()).page("/");
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      lengthen(page, doc);
+      expect(step(doc), "the step didn't follow the new words").toBe(String(sizeStep(LONG)));
+    });
+
+    localOnly("waits while a word is in hand, and applies once the visitor lets go", async () => {
+      const doc = await (await arrive()).page("/");
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const before = step(doc);
+      const { input } = slot(doc, 0);
+      input.focus(); // a word in hand, nothing typed yet
+      lengthen(page, doc);
+      if (sizeStep(LONG) !== Number(before)) expect(step(doc), "the step changed under a focused word").toBe(before);
+      input.blur();
+      expect(step(doc), "letting go didn't apply the new step").toBe(String(sizeStep(LONG)));
+    });
+
+    localOnly("waits under a draft until the visitor clears it, as a held-back change does", async () => {
+      const doc = await (await arrive()).page("/");
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const before = step(doc);
+      const { input } = slot(doc, 3);
+      input.focus();
+      type(doc, 3, "mydraft");
+      lengthen(page, doc);
+      input.blur(); // focus leaves, the draft stays: still a word in hand
+      if (sizeStep(LONG) !== Number(before)) expect(step(doc), "the step changed under a draft").toBe(before);
+      input.focus();
+      type(doc, 3, "");
+      input.blur();
+      expect(step(doc), "clearing the draft didn't apply the new step").toBe(String(sizeStep(LONG)));
+    });
   });
 
   describe("the visitor's own trace", () => {
