@@ -9,6 +9,7 @@ import type { KeptShip, Moment } from "../kept-moment";
 import type { Look } from "./theme";
 import { HouseView } from "./view";
 import { TIMING, type Kind } from "./motion";
+import { threadPath } from "./thread";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -125,13 +126,11 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     drawn = 0;
     const p = target();
     if (!thread || !line || !dot || p === null || getComputedStyle(thread).display === "none") { thread?.classList.remove("on", "red"); return; }
-    const a = view.anchor(p), l = slots[p].label.getBoundingClientRect(), first = slots[0].label.getBoundingClientRect();
-    const sentence = doc.querySelector(".sentence")!.getBoundingClientRect(), column = doc.querySelector(".text")!.getBoundingClientRect();
-    if (!a) return;
-    const cx = l.left + l.width / 2, above = l.top - first.top < l.height * 0.6;
-    // out of the word, round the text (above the first line, below the last), then straight to the territory
-    const sy = above ? l.top : l.bottom, gy = above ? first.top - 12 : sentence.bottom + 6, gx = Math.max(cx, Math.min(column.right + 8, a.x - 24));
-    line.setAttribute("d", `M${cx} ${sy}L${cx} ${gy}L${gx} ${gy}L${a.x} ${a.y}`);
+    const a = view.anchor(p);
+    if (!a || !part || part.hidden) return; // the line leaves the notation: whenever it's drawn, the notation is shown
+    const text = doc.createRange();
+    text.selectNodeContents(part);
+    line.setAttribute("d", threadPath(a, { notation: text.getBoundingClientRect() }));
     dot.setAttribute("cx", String(a.x)); dot.setAttribute("cy", String(a.y));
     thread.classList.add("on");
     thread.classList.toggle("red", p === rebuilding);

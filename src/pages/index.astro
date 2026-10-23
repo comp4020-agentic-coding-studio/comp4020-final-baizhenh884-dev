@@ -60,10 +60,11 @@ const keptMine = new Set<number>(
       ]
     : [],
 );
+// the rule after the keys; "Press Escape to cancel." sits between them, in its own span (a phone has no Escape key)
 const how =
   trace?.mode === "settle"
-    ? `Choose a word, type its replacement and press Enter. Press Escape to cancel. Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
-    : "Choose a word, type its replacement and press Enter. Press Escape to cancel. You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
+    ? `Your word then holds your place: until someone replaces it, or it has stood ${settleSecondsPhrase(SETTLE_SECONDS)}, you can't make another. Your next word has to go somewhere else.`
+    : "You get one change, and it can't be undone. Anyone after you can change any word, including yours.";
 ---
 
 <Page title="Theseus">
@@ -135,9 +136,10 @@ const how =
             </div>
             <div id="house" aria-hidden="true"></div>
             <div class="foot">
+              <div class="foot-main">
               {/* the kept half is far below on a phone: one quiet line says it's there */}
               <p class="kept-pointer">What was replaced is kept below.</p>
-              <p id="how">{how}</p>
+              <p id="how">Choose a word, type its replacement and press Enter. <span class="esc">Press Escape to cancel. </span>{how}</p>
               {trace?.mode === "once" && trace.trace && (
                 <section aria-labelledby="trace-heading">
                   <h2 id="trace-heading">Your trace</h2>
@@ -184,9 +186,12 @@ const how =
                 </section>
               )}
               {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
+              </div>
+              <div class="foot-aside">
               <p class="plate-note">Ten words. Ten parts.<br />Change a word, and its part is rebuilt.</p>
               <p class="question">If every word and every part is replaced, is it still the same thing?</p>
-              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
+              </div>
             </div>
           </div>
           <div class="half kept-half kept-plate" id="kept">

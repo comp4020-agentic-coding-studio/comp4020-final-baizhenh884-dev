@@ -11,6 +11,7 @@ import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
 import type { Kind } from "./motion";
 import { EDGE, FIELD, INK, lights, type Look, partTone, RED } from "./theme";
+import { anchorOf } from "./thread";
 
 export class HouseView {
   readonly canvas: HTMLCanvasElement;
@@ -93,12 +94,7 @@ export class HouseView {
 
   // where a territory sits on the page (client pixels): the centre of what is standing there now
   anchor(position: number): { x: number; y: number } | null {
-    const g = this.body.groups[position];
-    if (!g) return null;
-    g.updateMatrixWorld(true);
-    const c = new THREE.Box3().setFromObject(g, true).getCenter(new THREE.Vector3()).project(this.camera);
-    const r = this.canvas.getBoundingClientRect();
-    return { x: r.left + ((c.x + 1) / 2) * r.width, y: r.top + ((1 - c.y) / 2) * r.height };
+    return anchorOf(this.body, position, this.camera, this.canvas.getBoundingClientRect());
   }
 
   // the territory under a point of the canvas, if any

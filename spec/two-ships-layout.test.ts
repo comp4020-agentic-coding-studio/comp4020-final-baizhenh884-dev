@@ -199,6 +199,35 @@ describe("two ships on GET /", () => {
     }, 90_000);
   }
 
+  // The houses are the body of the sentence, not a thumbnail under it: on a
+  // desktop the live half's notes fold into two columns (the rule, your trace
+  // and the links; the captions), so each house's row takes a larger share of
+  // the screen, both rows level, and the page still fits the screen. Measured
+  // with the maker's sentence and an empty kept ship, in the measured copy
+  // only, so the shared sentence's state doesn't decide it. Before the fold,
+  // the rows were 39%, 36% and 32% of these screens (425, 322 and 259px).
+  for (const [name, size, share] of [["1920×1080", [1920, 1080], 0.48], ["1440×900", [1440, 900], 0.42], ["1280×800", [1280, 800], 0.36]] as const) {
+    it(`gives each house a larger share of the screen (${name}: at least ${Math.round(share * 100)}%)`, async () => {
+      const doc = await servedPage(baseUrl);
+      const maker = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
+      doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label').forEach((l, i) => (l.textContent = maker[i]));
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const q = ${QUERY_JS};
+        for (const w of q('.kept-sentence').querySelectorAll('.w')) { w.classList.add('gap'); w.textContent = ''; }
+        const b = (s) => q(s).getBoundingClientRect();
+        return { stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top,
+          page: document.documentElement.scrollHeight, footBottom: Math.max(b('.stands-half .foot').bottom, b('.kept-half .foot').bottom) };
+      })()`, [size[0], size[1]])) as { stands: number; kept: number; standsTop: number; keptTop: number; page: number; footBottom: number };
+      const at = ` (house rows ${m.stands.toFixed(0)}/${m.kept.toFixed(0)}px of ${size[1]})`;
+      expect(m.stands, "the live house's row is too small a share of the screen" + at).toBeGreaterThanOrEqual(size[1] * share);
+      expect(m.kept, "the kept house's row is too small a share of the screen" + at).toBeGreaterThanOrEqual(size[1] * share);
+      expect(Math.abs(m.standsTop - m.keptTop), "the houses aren't level" + at).toBeLessThanOrEqual(1);
+      // and the page still fits the screen: the notes aren't pushed below it
+      expect(m.page, "the page no longer fits the screen" + at).toBeLessThanOrEqual(size[1] + 1);
+    }, 90_000);
+  }
+
   // GET / shows only what stands now (the maker's decision): no earlier words
   // under the live words, so a long sentence never pushes the houses off the
   // first screen. The words are a staged long sentence in the measured copy;
@@ -510,6 +539,66 @@ describe("two ships on GET /", () => {
       })()`, [size[0], size[1]])) as number;
       expect(shown, "a phone link shows beside the halves").toBe(0);
     }, 90_000);
+  }
+
+  // The captions (the instructions, your trace, the kept key) are read, not
+  // glanced at: at least 15px on a desktop and 14px on a phone, at a contrast
+  // of at least 6:1 on their half's ground (measured over the ground, opacity
+  // included). A trace is staged in the measured copy the way GET / renders one.
+  for (const [name, size, px] of [["1920×1080", [1920, 1080], 15], ["phone 390×844", [390, 844], 14]] as const) {
+    it(`sets the captions large and dark enough to read (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      if (!doc.querySelector('section[aria-labelledby="trace-heading"]')) {
+        const section = doc.createElement("section");
+        section.setAttribute("aria-labelledby", "trace-heading");
+        section.innerHTML = '<h2 id="trace-heading">Your trace</h2><p role="status">Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands.</p>';
+        doc.getElementById("how")!.after(section);
+      }
+      const rows = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key']].map(([what, sel]) => {
+          const el = document.querySelector(sel), cs = getComputedStyle(el), ground = rgb(getComputedStyle(el.closest('.half')).backgroundColor);
+          const [r, g, b, a = 1] = rgb(cs.color), k = a * opacity(el), c = [r * k + ground[0] * (1 - k), g * k + ground[1] * (1 - k), b * k + ground[2] * (1 - k)];
+          const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m);
+          return { what, size: parseFloat(cs.fontSize), contrast: (x + 0.05) / (y + 0.05) };
+        });
+      })()`, [size[0], size[1]])) as { what: string; size: number; contrast: number }[];
+      for (const r of rows) {
+        expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
+        expect(r.contrast, `the ${r.what} are too faint on their ground`).toBeGreaterThanOrEqual(6);
+      }
+    }, 60_000);
+  }
+
+  // A phone has no Escape key: the instructions' "Press Escape to cancel."
+  // takes no visible space there, while a screen reader still reads it in
+  // #how (every word field is described by it). A desktop shows it.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`shows "Press Escape to cancel" only where there's an Escape key, and always to a screen reader (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const how = doc.getElementById("how");
+      expect(how?.textContent, "#how doesn't say Press Escape to cancel").toContain("Press Escape to cancel.");
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const how = document.getElementById('how');
+        const walker = document.createTreeWalker(how, NodeFilter.SHOW_TEXT);
+        let node; while ((node = walker.nextNode()) && !node.textContent.includes('Escape'));
+        const el = node.parentElement, r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+        // still in the accessibility tree: not display:none, not visibility:hidden, not aria-hidden
+        const read = cs.display !== 'none' && cs.visibility !== 'hidden' && !el.closest('[aria-hidden="true"]');
+        return { width: r.width, height: r.height, read, own: el !== how };
+      })()`, [size[0], size[1]])) as { width: number; height: number; read: boolean; own: boolean };
+      expect(m.read, "a screen reader can't read it").toBe(true);
+      if (size[0] <= 900) {
+        expect(m.own, "the Escape sentence isn't its own element, so it can't be hidden alone").toBe(true);
+        expect(m.width * m.height, "a phone shows the Escape sentence").toBeLessThanOrEqual(1);
+      } else {
+        expect(m.width, "a desktop doesn't show the Escape sentence").toBeGreaterThan(20);
+      }
+    }, 60_000);
   }
 
   it("stacks the halves on a phone (390×844)", async () => {
