@@ -678,6 +678,55 @@ describe("two ships on GET /", () => {
     }, 60_000);
   }
 
+  // The foot is set, not just wrapped. No caption ends on one word alone on its
+  // last line ("rebuilt.", "else.", "house."): the measured copy stages a trace
+  // the way GET / renders one, so the trace is held to it too. The site's two
+  // links read as two units: neither breaks inside itself anywhere, and side
+  // by side they share one line, clear of the notes and captions, still last
+  // in reading order (placed by the stylesheet, never moved in the markup).
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`ends no caption on a lone word, and keeps the site's links whole (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      if (!doc.querySelector('section[aria-labelledby="trace-heading"]')) {
+        const section = doc.createElement("section");
+        section.setAttribute("aria-labelledby", "trace-heading");
+        section.innerHTML = '<h2 id="trace-heading">Your trace</h2><p role="status">Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands.</p>';
+        doc.getElementById("how")!.after(section);
+      }
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        // the last two words of an element's text: on different lines, the last stands alone
+        const lone = (el) => {
+          const words = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          for (let n; (n = walker.nextNode()); ) {
+            if (n.parentElement.closest('.sr-only, .esc') && getComputedStyle(n.parentElement).clipPath !== 'none') continue;
+            for (const w of n.textContent.matchAll(/\\S+/g)) words.push([n, w.index, w.index + w[0].length]);
+          }
+          if (words.length < 2) return false;
+          const top = ([n, a, b]) => { const r = document.createRange(); r.setStart(n, a); r.setEnd(n, b); return r.getClientRects()[0].top; };
+          return Math.abs(top(words.at(-1)) - top(words.at(-2))) > 2;
+        };
+        const captions = [['the plate note', '.stands-half .plate-note'], ['the kept plate note', '.kept-half .plate-note'], ['the instructions', '#how'],
+          ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept key', '.kept-half .kept-key'], ['the question', '.stands-half .question']]
+          .map(([what, sel]) => ({ what, lone: lone(document.querySelector(sel)) }));
+        const nav = document.querySelector('.stands-half .foot .about');
+        const links = [...nav.querySelectorAll('a')].map((a) => ({ text: a.textContent, lines: a.getClientRects().length, top: a.getBoundingClientRect().top }));
+        const nb = nav.getBoundingClientRect();
+        const overlaps = [...document.querySelectorAll('.stands-half .foot :is(#how, section, .earlier, .plate-note, .question)')]
+          .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.bottom > nb.top + 0.5 && r.top < nb.bottom - 0.5 && r.right > nb.left && r.left < nb.right; })
+          .map((el) => el.id || el.className || el.tagName);
+        const after = (sel) => { const el = document.querySelector(sel); return !el || !!(el.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING); };
+        return { captions, links, overlaps, last: after('#how') && after('.stands-half .earlier') && after('section[aria-labelledby="trace-heading"]') };
+      })()`, [size[0], size[1]])) as { captions: { what: string; lone: boolean }[]; links: { text: string; lines: number; top: number }[]; overlaps: string[]; last: boolean };
+      for (const c of m.captions) expect(c.lone, `${c.what} ends on a lone word`).toBe(false);
+      for (const l of m.links) expect(l.lines, `"${l.text}" breaks across lines`).toBe(1);
+      if (size[0] > 900) expect(Math.abs(m.links[0].top - m.links[1].top), "the site's links don't share one line").toBeLessThanOrEqual(1);
+      expect(m.overlaps, "the site's links overlap the notes").toEqual([]);
+      expect(m.last, "the site's links aren't last in reading order").toBe(true);
+    }, 90_000);
+  }
+
   // A phone has no Escape key: the instructions' "Press Escape to cancel."
   // takes no visible space there, while a screen reader still reads it in
   // #how (every word field is described by it). A desktop shows it.
