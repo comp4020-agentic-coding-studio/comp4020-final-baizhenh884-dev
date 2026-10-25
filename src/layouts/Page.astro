@@ -1,8 +1,11 @@
 ---
 // The one page shell: language, viewport, title and the styles every view
-// shares, in Monograph: a light architectural-study field, the sentence set
-// large in Instrument Serif, the house as its body beside it. Visitor words
-// are only ever interpolated as text.
+// shares, as a drawing sheet: the live half on drafting paper, the kept half a
+// blueprint, each ruled with a faint grid; the sentence set large in
+// Instrument Serif, every label lettered in IBM Plex Mono, the house as its
+// body beside it. Visitor words are only ever interpolated as text.
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource/instrument-sans/400.css";
@@ -37,20 +40,31 @@ const image = new URL("/og.png", Astro.url.origin).href;
     <meta name="twitter:card" content="summary_large_image" />
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
-      :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --caption: #5a544b; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
+      :root {
+        /* drafting paper and blueprint; labels and captions are legible on a grid line, not just the flat ground (spec/two-ships-layout.test.ts) */
+        --field: #ece8df; --ink: #191714; --soft: #5a544b; --caption: #3f3a33; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16);
+        --kept-ground: #1d3350; --kept-ink: #eef3f8; --kept-soft: #9fb1c7; --kept-caption: #b9c7d8; --kept-gap: #dce6f2;
+        --grid: rgb(25 23 20 / 0.045); --kept-grid: rgb(255 255 255 / 0.055); --frame: rgb(25 23 20 / 0.22); --kept-frame: rgb(255 255 255 / 0.22);
+        --rule: rgb(25 23 20 / 0.3); --kept-rule: rgb(255 255 255 / 0.28);
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      /* a sheet: a faint grid, ruled both ways, on its own ground */
+      .sheet { background-color: var(--field); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+      .blueprint { background-color: var(--kept-ground); background-image: linear-gradient(var(--kept-grid) 1px, transparent 1px), linear-gradient(90deg, var(--kept-grid) 1px, transparent 1px); background-size: 24px 24px; }
       * { box-sizing: border-box; }
       body {
-        margin: 0; background: var(--field); color: var(--ink);
+        margin: 0; color: var(--ink);
+        background-color: var(--field); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px;
         font: 400 15px/1.45 "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
       }
       main { min-height: 100vh; padding: 4.2vh 5.2vw 4.6vh; overflow-wrap: anywhere; display: flex; flex-direction: column; }
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-      .caps { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; }
+      .caps { font: 500 0.69rem/1.35 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
       a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
       a:hover { text-decoration-thickness: 2px; }
       a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
-      .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--hair); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
+      .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
       .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
       .mast .sub { color: var(--soft); }
       /* the sentence sits in the middle of the page's height, level with the house */
@@ -149,15 +163,18 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* the house row takes at least half the screen; the notes under it may fall below the first screen */
       .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) auto; min-height: 100vh; }
       .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
-      .stands-half { background: var(--field); }
-      .kept-half { --kept-ink: #efe6d8; --kept-soft: #b9ab97; background: var(--kept-ground); color: var(--kept-ink); }
+      .stands-half, .kept-half { position: relative; }
+      .kept-half { color: var(--kept-ink); }
+      /* each sheet's inset hairline frame (decorative) */
+      .half::before { content: ""; position: absolute; inset: 18px; border: 1px solid var(--frame); pointer-events: none; z-index: 0; }
+      .kept-half::before { border-color: var(--kept-frame); }
       .half-head { display: flex; flex-direction: column; justify-content: end; }
       .half-label { margin: 0 0 1.6vh; color: var(--soft); }
       .kept-half .half-label { color: var(--kept-soft); }
       /* a half's label row; on a phone it also names and links to the other half (hidden side by side) */
       .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
       .to-kept, .to-stands { display: none; white-space: nowrap; color: var(--soft); text-decoration-color: var(--hair); }
-      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(185 171 151 / 0.4); }
+      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(159 177 199 / 0.45); }
       html { scroll-behavior: smooth; }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       .stands-half .mast, .stands-half .text { max-width: none; }
@@ -187,13 +204,13 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
       .kept-sentence mark { text-decoration-color: var(--kept-soft); }
       /* a gap: a blank in the sentence, waiting for the word that stands there now */
-      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
+      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-gap); }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
       /* what the kept sentence's words and gaps are: a quiet key under the caption */
-      .kept-half .kept-key { margin: 0; font-size: 15px; line-height: 1.5; color: var(--kept-soft); max-width: 40ch; }
+      .kept-half .kept-key { margin: 0; font-size: 15px; line-height: 1.5; color: var(--kept-caption); max-width: 40ch; }
       .kept-half .earlier { color: var(--kept-soft); }
-      .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
+      .kept-half .earlier a { text-decoration-color: rgb(159 177 199 / 0.45); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
       .foot #how { margin: 0; }
       .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
@@ -202,14 +219,14 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
 
       /* an earlier house (/?kept=k): the kept ship alone on its own ground, read-only */
-      main:has(> .lone-house) { background: var(--kept-ground); color: #efe6d8; }
-      .lone-house { --kept-ink: #efe6d8; --kept-soft: #b9ab97; display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
-      .lone-house .mast { border-bottom-color: rgb(239 230 216 / 0.16); max-width: none; }
+      main:has(> .lone-house) { background-color: var(--kept-ground); background-image: linear-gradient(var(--kept-grid) 1px, transparent 1px), linear-gradient(90deg, var(--kept-grid) 1px, transparent 1px); background-size: 24px 24px; color: var(--kept-ink); }
+      .lone-house { display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
+      .lone-house .mast { border-bottom-color: var(--kept-rule); max-width: none; }
       .lone-house .mast .sub, .lone-house .half-label, .lone-house .history, .lone-house .about { color: var(--kept-soft); }
       .lone-house .kept-sentence { max-width: 30ch; }
       .lone-house #house-kept { position: relative; flex: 1; min-height: 48vh; }
       .lone-house #house-kept canvas { position: absolute; inset: 0; }
-      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(185 171 151 / 0.4); }
+      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(159 177 199 / 0.45); }
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
@@ -264,6 +281,15 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .stands-half .foot .earlier { grid-row: 3; margin-top: 0.9rem; }
         .stands-half .foot-aside { grid-column: 2; grid-row: 1 / 5; }
         .stands-half .foot .about { grid-column: 1 / -1; grid-row: 5; margin-top: 1.1rem; }
+        /* a drawing's title block: the foot ruled off from the sheet, its columns divided by a hairline,
+           the question under a rule of its own (decorative: the rules are borders, the reading order is the markup's) */
+        .half > .foot { margin: 0 -1.6vw; padding: 1rem 1.6vw 0.4rem; border-top: 1px solid var(--rule); }
+        .kept-half > .foot { border-top-color: var(--kept-rule); }
+        .stands-half .foot { column-gap: 0; }
+        .stands-half .foot-main > * { padding-right: 1.6vw; }
+        .stands-half .foot-aside { border-left: 1px solid var(--rule); padding-left: 1.6vw; }
+        .stands-half .foot .question { border-top: 1px solid var(--rule); padding-top: 0.8rem; }
+        .stands-half .foot .about { padding-top: 0.8rem; border-top: 1px solid var(--rule); margin-top: 1rem; }
       }
       @media (max-width: 900px) {
         .foot-main, .foot-aside { display: contents; }
@@ -310,6 +336,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .two { display: block; min-height: 0; }
         .kept-pointer { display: block; }
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
+        /* the frame sits in the gutter, outside the text, never through it */
+        .half::before { inset: 6px; }
         .half-label { margin-bottom: 0.8rem; }
         .to-kept, .to-stands { display: inline; }
         main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
