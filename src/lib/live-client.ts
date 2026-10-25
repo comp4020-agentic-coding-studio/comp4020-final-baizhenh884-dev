@@ -1,6 +1,7 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
 import { said as saidOne } from "./house/notation";
 import { latestParts, replacedText, standingText } from "./trace-text";
+import { sizeStep } from "./sentence-step";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
 // the `snapshot` and `change` events from GET /events to the page's own
@@ -456,7 +457,25 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     options.onMine?.(mine);
   }
 
+  // The sentence's size step follows the words on screen, but never changes under someone: while a
+  // field is focused or holds a draft it waits, and applies once the visitor lets go (blur, Escape, or
+  // clearing a draft), as a held-back change does.
+  const sentenceEl = slots.values().next().value?.form.closest<HTMLElement>(".sentence") ?? null;
+  const inHand = () => [...slots.values()].some((s) => hasDraft(s) || doc.activeElement === s.input);
+  function renderStep(): void {
+    if (!sentenceEl || !sentenceEl.hasAttribute("data-step") || inHand()) return;
+    const step = String(sizeStep([...slots.values()].sort((a, b) => a.latest.position - b.latest.position).map((s) => s.label.textContent?.trim() ?? "")));
+    if (sentenceEl.getAttribute("data-step") !== step) sentenceEl.setAttribute("data-step", step);
+  }
+  // letting go: focus leaving a field for anything but another word field (moving between words is
+  // still a word in hand: the step mustn't shift the word being chosen), or a draft emptied
+  const isField = (el: EventTarget | null) => [...slots.values()].some((s) => s.input === el);
+  doc.addEventListener("focusout", (event) => {
+    if (isField(event.target) && !isField((event as FocusEvent).relatedTarget)) renderStep();
+  });
+
   function render(): void {
+    renderStep();
     renderMine();
     renderTrace();
     renderSettling();
@@ -471,6 +490,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       if (event.target !== slot.input || hasDraft(slot) || !slot.notice) continue;
       if (slot.latest.version > shownVersion(slot)) show(slot);
     }
+    renderStep(); // an emptied draft may let go of the sentence's last word in hand
     keepAllInside(); // typing can move words, and the notices under them
   });
 

@@ -141,7 +141,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
          rows (heading, sentence, house, foot) are shared, so the two houses stand
          level across the gutter. */
       main:has(> .two) { padding: 0; }
-      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(30vh, 1fr) auto; min-height: 100vh; }
+      /* the house row takes at least half the screen; the notes under it may fall below the first screen */
+      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) auto; min-height: 100vh; }
       .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
       .stands-half { background: var(--field); }
       .kept-half { --kept-ink: #efe6d8; --kept-soft: #b9ab97; background: var(--kept-ground); color: var(--kept-ink); }
@@ -157,7 +158,11 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .stands-half .mast, .stands-half .text { max-width: none; }
       .stands-half .mast { margin-bottom: 2.4vh; }
       /* the live sentence, set to its half: still the largest thing on the page */
-      .two .sentence { font-size: clamp(36px, 3.8vw, 72px); }
+      /* side by side, a long sentence steps down through fixed sizes to stay on two lines (src/lib/sentence-step.ts) */
+      .two .sentence { --step: 1; font-size: calc(clamp(36px, 3.8vw, 72px) * var(--step)); }
+      .two .sentence[data-step="1"] { --step: 0.92; }
+      .two .sentence[data-step="2"] { --step: 0.85; }
+      .two .sentence[data-step="3"] { --step: 0.8; }
       .stands-half .text { margin: 0; padding: 0; }
       /* the part notation lies over the house's own empty top band, which no house at rest reaches
          (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
