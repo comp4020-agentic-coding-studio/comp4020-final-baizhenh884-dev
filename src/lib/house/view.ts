@@ -10,7 +10,7 @@ import type { KeptShip, Moment } from "../kept-moment";
 import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
 import type { Kind } from "./motion";
-import { EDGE, FIELD, INK, lights, type Look, partTone, RED } from "./theme";
+import { EDGE, FIELD, INK, lights, type Look, partTone, RECEDE_TO, RED } from "./theme";
 import { anchorOf } from "./thread";
 
 export class HouseView {
@@ -232,7 +232,7 @@ export class HouseView {
 
   // selection is ink, never red: the chosen territory drawn firmly, the rest receding toward the field (theme.ts partTone)
   private paint(): void {
-    const field = new THREE.Color(FIELD), focus = this.selected ?? this.hovered;
+    const field = new THREE.Color(RECEDE_TO[this.look]), focus = this.selected ?? this.hovered;
     this.body.groups.forEach((g, i) => {
       const t = partTone(this.look, { selected: i === this.selected, hovered: i === this.hovered && i !== this.selected, traced: i === this.traced, other: focus !== null && i !== focus });
       const lift = new THREE.Color(t.edgeColour);
