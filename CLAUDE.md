@@ -428,7 +428,12 @@ What the code must hold to. The README says why; don't restate it here.
   holding a draft, including moving between words) and applies once they
   let go. Ten 24-letter words may wrap past two lines at the floor
   (`spec/sentence-step.test.ts`, `spec/live-client.test.ts`,
-  `spec/two-ships-layout.test.ts`).
+  `spec/two-ships-layout.test.ts`). The step is a prediction from glyph
+  widths, not a measurement in the visitor's browser: two lines is checked
+  only in Chrome on macOS and Linux (the 500-sentence set). Elsewhere
+  (Windows, Safari, Firefox) a rare third line is possible. A third line
+  never shrinks the house: the house row keeps its half-screen floor, so
+  the house moves down by a line at the same size.
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
