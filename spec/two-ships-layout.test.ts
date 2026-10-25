@@ -648,6 +648,8 @@ describe("two ships on GET /", () => {
   // glanced at: at least 15px on a desktop and 14px on a phone, at a contrast
   // of at least 6:1 on their half's ground (measured over the ground, opacity
   // included). A trace is staged in the measured copy the way GET / renders one.
+  // The invitation is the first line a stranger reads, so it is held to the
+  // same contrast; it keeps its own small caps size (the notation's slot).
   for (const [name, size, px] of [["1920×1080", [1920, 1080], 15], ["phone 390×844", [390, 844], 14]] as const) {
     it(`sets the captions large and dark enough to read (${name})`, async () => {
       const doc = await servedPage(baseUrl);
@@ -662,7 +664,7 @@ describe("two ships on GET /", () => {
         const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
         const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
         const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
-        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key']].map(([what, sel]) => {
+        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key'], ['invitation line', '.stands-half .invite']].map(([what, sel]) => {
           const el = document.querySelector(sel), cs = getComputedStyle(el), ground = rgb(getComputedStyle(el.closest('.half')).backgroundColor);
           const [r, g, b, a = 1] = rgb(cs.color), k = a * opacity(el), c = [r * k + ground[0] * (1 - k), g * k + ground[1] * (1 - k), b * k + ground[2] * (1 - k)];
           const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m);
@@ -670,7 +672,7 @@ describe("two ships on GET /", () => {
         });
       })()`, [size[0], size[1]])) as { what: string; size: number; contrast: number }[];
       for (const r of rows) {
-        expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
+        if (r.what !== "invitation line") expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
         expect(r.contrast, `the ${r.what} are too faint on their ground`).toBeGreaterThanOrEqual(6);
       }
     }, 60_000);
