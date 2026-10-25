@@ -253,14 +253,27 @@ describe("two ships on GET /", () => {
       const doc = await servedPage(baseUrl);
       const set = [MAKER_SENTENCE, LONG_SENTENCE, ...SENTENCES];
       const steps = set.map((w) => sizeStep(w));
+      // For each sentence: its lines at its step, and how much room this browser leaves on its last
+      // line (the column's right edge minus the line's end, as a share of the column). sizeStep()
+      // can't see this platform's glyph widths, so every run reports its tightest sentences: a
+      // failure, and a pass, both say how much margin the step function actually needs here.
       const out = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         const sent = document.querySelector('.stands-half .sentence'), labels = [...sent.querySelectorAll('label')];
+        const col = sent.getBoundingClientRect();
         const lines = () => new Set(labels.map((l) => Math.round(l.getBoundingClientRect().top))).size;
-        return ${JSON.stringify(set)}.map((ws, i) => { ws.forEach((w, j) => (labels[j].textContent = w)); sent.setAttribute('data-step', ${JSON.stringify(steps)}[i]); return lines(); });
-      })()`, [size[0], size[1]])) as number[];
-      const over = out.flatMap((n, i) => (n > 2 ? [`"${set[i].join(" ")}" (${n} lines at step ${steps[i]})`] : []));
-      expect(over.slice(0, 3), `${over.length} sentences wrap past two lines`).toEqual([]);
+        return ${JSON.stringify(set)}.map((ws, i) => {
+          ws.forEach((w, j) => (labels[j].textContent = w)); sent.setAttribute('data-step', ${JSON.stringify(steps)}[i]);
+          const end = sent.querySelector('.end').getBoundingClientRect().right;
+          return { lines: lines(), room: (col.right - end) / col.width, font: parseFloat(getComputedStyle(sent).fontSize) };
+        });
+      })()`, [size[0], size[1]])) as { lines: number; room: number; font: number }[];
+      const say = (i: number) => `"${set[i].join(" ")}" (${out[i].lines} lines at step ${steps[i]}, ${out[i].font}px, last line ${(100 * out[i].room).toFixed(2)}% short of the column)`;
+      const tightest = out.map((_, i) => i).filter((i) => out[i].lines <= 2).sort((a, b) => out[a].room - out[b].room).slice(0, 3).map(say);
+      // always visible: CI shows it as an annotation on the run, so a pass also reports the margin
+      process.stdout.write(`\n::notice title=sentence-step ${name}::tightest two-line sentences: ${tightest.join(" | ")}\n`);
+      const over = out.flatMap((o, i) => (o.lines > 2 ? [say(i)] : []));
+      expect(over.slice(0, 3), `${over.length} sentences wrap past two lines; the tightest that fit: ${tightest.join(" | ")}`).toEqual([]);
     }, 120_000);
 
     it(`at its smallest step the live sentence still outranks the kept one, and the longest words keep the house on screen (${name})`, async () => {
