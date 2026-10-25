@@ -242,6 +242,32 @@ describe("two ships on GET /", () => {
     }
   }
 
+  // A third line never shrinks the house (CLAUDE.md "Enforced"): wherever the
+  // step's prediction misses (an untested platform), the sentence takes a
+  // line more and the house row keeps its half-screen floor, both houses
+  // level. Forced here with long words at the smallest step, where they set
+  // a third line in any browser (the step is pinned, not predicted).
+  for (const [name, size] of [["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
+    it(`keeps each house's half-screen row when the sentence takes a third line (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      stageWords(doc, Array(10).fill("wordmvadgycfe"));
+      doc.querySelector(".stands-half .sentence")!.setAttribute("data-step", String(SIZE_STEPS.length - 1));
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const q = ${QUERY_JS};
+        const labels = [...document.querySelectorAll('.stands-half .sentence label')];
+        const b = (s) => q(s).getBoundingClientRect();
+        return { lines: new Set(labels.map((l) => Math.round(l.getBoundingClientRect().top))).size, step: q('.stands-half .sentence').getAttribute('data-step'),
+          stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top };
+      })()`, [size[0], size[1]])) as { lines: number; step: string; stands: number; kept: number; standsTop: number; keptTop: number };
+      const at = ` (${m.lines} lines at step ${m.step}; rows ${m.stands.toFixed(0)}/${m.kept.toFixed(0)}px, tops ${m.standsTop.toFixed(0)}/${m.keptTop.toFixed(0)}, screen ${size[1]})`;
+      expect(m.lines, "the staged sentence didn't take a third line, so this proves nothing" + at).toBeGreaterThan(2);
+      expect(m.stands, "a third line shrank the live house's row" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+      expect(m.kept, "a third line shrank the kept house's row" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+      expect(Math.abs(m.standsTop - m.keptTop), "a third line left the houses unlevel" + at).toBeLessThanOrEqual(1);
+    }, 90_000);
+  }
+
   // The live sentence stays on two lines on a desktop: it steps down through a
   // few fixed sizes (src/lib/sentence-step.ts), the step GET / renders. At its
   // smallest step it still outranks the kept sentence. Ten 24-letter words may
