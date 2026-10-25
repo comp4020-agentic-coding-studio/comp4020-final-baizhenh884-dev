@@ -336,8 +336,9 @@ What the code must hold to. The README says why; don't restate it here.
 - Public views never show who made a change or when anyone else acted, and no
   counts appear on the page: no totals, no "3 of 12", no popularity or scores.
   The ordinal in a `?at=N` URL is navigation, not a count shown on the page,
-  and so is the part notation ("05 — entry"): it names a position. (Enforced
-  in code and checked by review; no automated check yet.)
+  and so are the part notation ("05 — entry"), the 01–10 index above each
+  word and kept gap, and the house's numbered tag: each names a position.
+  (Enforced in code and checked by review; no automated check yet.)
 - A visitor who has contributed and comes back can recognise their
   contribution in context: their word if it still stands, or that it has been
   replaced. Its markup is fixed in the HTTP contract at the top of
@@ -488,15 +489,31 @@ hold.
   live house starts on the first screen, ten 13-letter words included
   (`spec/two-ships-layout.test.ts`).
 - The visual treatment (fading, layout) is judged, not specified. Its
-  direction is Monograph, an architectural-study field: the sentence is the
-  protagonist and the house its body; a standing house stays restrained; red
-  is only a part being rebuilt now.
+  direction is a drawing sheet: the standing half on drafting paper
+  (#ECE8DF, a faint grid, an inset hairline frame, a title-block foot), the
+  kept half a blueprint (#1D3350, a faint white grid) with its house in
+  ivory outlined in white; labels in IBM Plex Mono caps, self-hosted, the
+  sentences in Instrument Serif. The sentence is the protagonist and the
+  house its body; a standing house stays restrained; red is only a part
+  being rebuilt now.
+- The question first: above both halves of `GET /`, a band with the
+  question, one sentence on Theseus's ship and three numbered steps on how
+  to play, in full until this visitor has made a change (from their trace,
+  on the server, never live), then the question alone. Its copy claims
+  nothing the rules don't do (`spec/question-band.test.ts`).
+- Every live word and every kept word or gap carries its position, 01–10,
+  small above it, always, a phone included; drawn, never read
+  (`spec/numbering.test.ts`).
 - Word and house as one selection (settled; change only with a recorded
   reason). Pointing at a word, or at a territory on a fine pointer, marks both
-  by paired emphasis, with no line. A focused or selected word gets a thin
-  line to its territory and the part notation ("05 — entry"). An accepted
-  change draws that line red while exactly that part is exchanged, then
-  everything returns to neutral. A phone has no line. Under the standing
+  by paired emphasis and a numbered tag on that territory, with no line. A
+  focused or selected word gets a thin line to its territory, ending in that
+  tag, and the part notation ("05 — entry"). No tag at rest. An accepted
+  change draws that line and tag red while exactly that part is exchanged,
+  then everything returns to neutral. A phone has no line and no tag.
+  (Reason for the tag, replacing the line's plain end: the drawing-sheet
+  redesign, the maker's decision of 2026-10-25, so the house names the
+  same position as the index above the word.) Under the standing
   house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
   Under the kept house: "Replaced words are kept here, and built back into
   a house." and under it: "The words above have been replaced in the
