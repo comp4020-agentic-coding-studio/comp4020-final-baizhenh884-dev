@@ -160,6 +160,24 @@ const image = new URL("/og.png", Astro.url.origin).href;
          rows (heading, sentence, house, foot) are shared, so the two houses stand
          level across the gutter. */
       main:has(> .two) { padding: 0; }
+      /* The question first (spec/question-band.test.ts): a paper strip across both halves, the masthead, the
+         question and Theseus's ship on the left, how to play on the right; folded, the masthead and the question
+         on one line. Read, not decorative: the question is the page's h2. */
+      #question { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 4vw; align-items: end;
+        padding: 3vh 3.6vw 2.6vh; border-bottom: 1px solid var(--rule); }
+      #question .mast { max-width: none; margin: 0; border-bottom: 0; padding-bottom: 0; }
+      #question .question-line { margin: 1.6vh 0 0; font: italic 400 clamp(26px, 2.4vw, 40px)/1.12 "Instrument Serif", serif; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
+      #question .ship { margin: 0.8rem 0 0; font-size: 14px; line-height: 1.5; color: var(--caption); max-width: 62ch; text-wrap: pretty; }
+      #question .how h3 { margin: 0 0 0.6rem; color: var(--soft); }
+      #question .how-to-play { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.55rem; }
+      #question .how-to-play li { counter-increment: step; display: flex; gap: 0.75rem; align-items: baseline; font-size: 14px; line-height: 1.4; color: var(--ink); }
+      #question .how-to-play li::before { content: counter(step); flex: none; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid rgb(25 23 20 / 0.55); border-radius: 50%;
+        font: 500 10.5px/20px var(--mono); text-align: center; color: var(--ink); transform: translateY(-1px); }
+      #question .stacked { display: none; }
+      /* folded: the masthead and the question on one line */
+      #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.4vh; padding-top: 2.2vh; }
+      #question.folded .question-main { display: flex; align-items: baseline; gap: 2vw; min-width: 0; }
+      #question.folded .question-line { margin: 0; font-size: clamp(18px, 1.5vw, 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       /* the house row takes at least half the screen; the notes under it may fall below the first screen */
       .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) auto; min-height: 100vh; }
       .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
@@ -177,8 +195,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .to-stands { color: var(--kept-soft); text-decoration-color: rgb(159 177 199 / 0.45); }
       html { scroll-behavior: smooth; }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-      .stands-half .mast, .stands-half .text { max-width: none; }
-      .stands-half .mast { margin-bottom: 2.4vh; }
+      .stands-half .text { max-width: none; }
       /* the live sentence, set to its half: still the largest thing on the page */
       /* side by side, a long sentence steps down through fixed sizes to stay on two lines (src/lib/sentence-step.ts) */
       .two .sentence { --step: 1; font-size: calc(clamp(36px, 3.8vw, 72px) * var(--step)); }
@@ -320,6 +337,20 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .mast, .text { max-width: none; }
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
+        /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play in a ruled box */
+        #question { display: block; padding: 0.9rem 1rem 1rem; }
+        #question .mast { margin: 0; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); }
+        #question .question-line { margin-top: 0.7rem; font-size: 24px; line-height: 1.1; }
+        #question .ship { margin-top: 0.45rem; font-size: 13px; line-height: 1.42; }
+        #question .how { margin-top: 0.7rem; }
+        #question .how h3 { margin-bottom: 0.4rem; }
+        #question .how-to-play { gap: 0.3rem; }
+        #question .how-to-play li { font-size: 13px; line-height: 1.38; gap: 0.6rem; }
+        #question .how-to-play li::before { width: 19px; height: 19px; font-size: 9.5px; line-height: 17px; }
+        #question .side-by-side { display: none; }
+        #question .stacked { display: inline; }
+        #question.folded, #question.folded .question-main { display: block; }
+        #question.folded .question-line { margin-top: 0.8rem; font-size: 20px; white-space: normal; }
         .sentence { font-size: 34px; line-height: 1.32; }
         #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-half .kept-key { font-size: 14px; }
         /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
