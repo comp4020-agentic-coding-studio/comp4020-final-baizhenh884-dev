@@ -14,7 +14,7 @@ import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 const baseUrl = inject("baseUrl");
 const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
 
-type Index = { content: string; font: string; contrast: number; top: number; bottom: number; left: number; ownTop: number; ownHeight: number; overlaps: string[] };
+type Index = { content: string; font: string; contrast: number; top: number; bottom: number; left: number; ownTop: number; overlaps: string[] };
 
 describe("the numbering", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
@@ -35,18 +35,32 @@ describe("the numbering", () => {
           const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, s) => s - p); return (x + 0.05) / (y + 0.05); };
           const over = ([r, g, b, a = 1], [R, G, B]) => [r * a + R * (1 - a), g * a + G * (1 - a), b * a + B * (1 - a)];
           const ground = (half) => { const s = getComputedStyle(q(half)), flat = rgb(s.backgroundColor), line = (s.backgroundImage.match(/rgba?\\([^)]*\\)/) || [null])[0]; return [flat, line ? over(rgb(line), flat) : flat]; };
+          // a word's ink: its letters' own top and bottom (ascenders and descenders included), from the font's
+          // metrics on its own line box, not the line box itself, whose leading would hide a clash
+          const ctx = document.createElement('canvas').getContext('2d');
+          const ink = (w) => {
+            const b = w.getBoundingClientRect(), text = w.textContent.trim();
+            if (!text) return { left: b.left, right: b.right, top: b.bottom - 2, bottom: b.bottom }; // a gap: its drawn line
+            const s = getComputedStyle(w);
+            ctx.font = s.fontStyle + ' ' + s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily;
+            const m = ctx.measureText(text), lh = parseFloat(s.lineHeight) || b.height;
+            // from the content box: a word may keep room above its letters (padding) for its index
+            const baseline = b.top + parseFloat(s.paddingTop) + parseFloat(s.borderTopWidth) + (lh - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+            return { left: b.left, right: b.right, top: baseline - m.actualBoundingBoxAscent, bottom: baseline + m.actualBoundingBoxDescent };
+          };
           // an index is its element's ::before, laid out against the element's own box
           const index = (el, half, words) => {
             const s = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
             const top = r.top + parseFloat(s.top), left = r.left + parseFloat(s.left), height = parseFloat(s.height);
             const [flat, line] = ground(half), fg = over(rgb(s.color), flat);
             const box = { top, bottom: top + height, left, right: left + parseFloat(s.width) };
-            // the words this index would sit on: any other word's ink box it crosses
-            const overlaps = words.filter((w) => w !== el && !el.contains(w)).map((w) => [w, w.getBoundingClientRect()])
-              .filter(([, b]) => b.width > 0 && box.left < b.right && box.right > b.left && box.top < b.bottom - 0.2 * b.height && box.bottom > b.top + 0.2 * b.height)
+            // the words this index would sit on, its own included: any word's letters it crosses, with 1px clear
+            const overlaps = words.map((w) => [w, ink(w)])
+              .filter(([, b]) => b.right > b.left && box.left < b.right && box.right > b.left && box.top < b.bottom && box.bottom > b.top - 1)
               .map(([w]) => w.textContent.trim() || 'gap');
-            const own = (el.querySelector('label') || el).getBoundingClientRect();
-            return { content: s.content, font: s.fontFamily, contrast: Math.min(ratio(fg, flat), ratio(fg, line)), top, bottom: box.bottom, left, ownTop: own.top, ownHeight: own.height, overlaps };
+            // its own word's letters (a gap: its drawn line)
+            const own = ink(el.querySelector('label') || el);
+            return { content: s.content, font: s.fontFamily, contrast: Math.min(ratio(fg, flat), ratio(fg, line)), top, bottom: box.bottom, left, ownTop: own.top, overlaps };
           };
           const live = [...document.querySelectorAll('.stands-half .sentence .pos')];
           const liveLabels = live.map((p) => p.querySelector('label'));
@@ -61,8 +75,8 @@ describe("the numbering", () => {
             expect(x.content, `${at} has no index`).toMatch(/^counter\(\w+, decimal-leading-zero\) \/ ""$/);
             expect(x.font, `${at}'s index isn't in Plex Mono`).toMatch(/IBM Plex Mono/);
             expect(x.contrast, `${at}'s index is too faint on its grid`).toBeGreaterThanOrEqual(4.5);
-            // in the leading over its word's letters: no lower than the top quarter of the word's own box
-            expect(x.bottom, `${at}'s index isn't above its word`).toBeLessThanOrEqual(x.ownTop + 0.25 * x.ownHeight);
+            // over its own word: wholly above its letters (or a gap's line)
+            expect(x.bottom, `${at}'s index isn't above its word`).toBeLessThanOrEqual(x.ownTop);
             expect(x.top, `${at}'s index runs off the top of the page`).toBeGreaterThanOrEqual(0);
             expect(x.overlaps, `${at}'s index sits on another word`).toEqual([]);
           }
