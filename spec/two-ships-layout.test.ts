@@ -731,6 +731,60 @@ describe("two ships on GET /", () => {
     }, 60_000);
   }
 
+  // A drawing sheet: the live half on drafting paper (#ECE8DF), the kept half a
+  // blueprint (#1D3350), each with a faint grid, and every label (the small
+  // caps: half labels, the invitation, the notation, links) lettered in IBM
+  // Plex Mono, served by the app itself. Every label is legible where it lies:
+  // at least 4.5:1, and every caption at least 6:1, measured against the
+  // darkest point of its ground, a grid line, never the flat colour alone.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`draws a sheet and a blueprint, lettered in Plex Mono, every label legible on its grid (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      // the served stylesheet carries the font itself; no third-party font host
+      const css = doc.querySelector("style")!.textContent!;
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const over = ([r, g, b, a = 1], [R, G, B]) => [r * a + R * (1 - a), g * a + G * (1 - a), b * a + B * (1 - a)];
+        // a half's ground, and its grid line laid over it: the darker (or, on the blueprint, the lighter) of the two is the worst case for text
+        const grounds = (half) => {
+          const cs = getComputedStyle(half), flat = rgb(cs.backgroundColor), line = (cs.backgroundImage.match(/rgba?\\([^)]*\\)/) || [null])[0];
+          return { flat, grid: line ? over(rgb(line), flat) : null, image: cs.backgroundImage, size: cs.backgroundSize };
+        };
+        const halves = { stands: grounds(document.querySelector('.stands-half')), kept: grounds(document.querySelector('.kept-half')) };
+        const worst = (el, fg) => { const g = halves[el.closest('.kept-half') ? 'kept' : 'stands']; return Math.min(ratio(fg, g.flat), g.grid ? ratio(fg, g.grid) : Infinity); };
+        const ink = (el) => { const cs = getComputedStyle(el); let k = 1; for (let e = el; e; e = e.parentElement) k *= Number(getComputedStyle(e).opacity);
+          const [r, g, b, a = 1] = rgb(cs.color), half = halves[el.closest('.kept-half') ? 'kept' : 'stands'].flat; return over([r, g, b, a * k], half); };
+        const shown = (el) => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const labels = [...document.querySelectorAll('.two .caps')].filter(shown).map((el) => ({ what: (el.className + ' ' + el.textContent.trim()).slice(0, 60),
+          family: getComputedStyle(el).fontFamily, contrast: worst(el, ink(el)) }));
+        const captions = ['#how', '.kept-half .kept-key', '.stands-half .invite'].map((s) => document.querySelector(s)).filter((el) => el && shown(el))
+          .map((el) => ({ what: el.id || el.className, contrast: worst(el, ink(el)) }));
+        const plex = [...document.fonts].filter((f) => /IBM Plex Mono/.test(f.family) && f.status === 'loaded').length;
+        return { halves, labels, captions, plex };
+      })()`, [size[0], size[1]])) as {
+        halves: Record<"stands" | "kept", { flat: number[]; grid: number[] | null; image: string; size: string }>;
+        labels: { what: string; family: string; contrast: number }[]; captions: { what: string; contrast: number }[]; plex: number;
+      };
+      expect(css, "the stylesheet loads a font from a third-party host").not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+      expect(m.halves.stands.flat.slice(0, 3), "the live half isn't on drafting paper").toEqual([236, 232, 223]);
+      expect(m.halves.kept.flat.slice(0, 3), "the kept half isn't a blueprint").toEqual([29, 51, 80]);
+      for (const k of ["stands", "kept"] as const) {
+        expect(m.halves[k].grid, `the ${k} half has no grid`).not.toBeNull();
+        expect(m.halves[k].image, `the ${k} half's grid isn't ruled both ways`).toMatch(/linear-gradient.*linear-gradient/);
+      }
+      expect(m.plex, "IBM Plex Mono isn't loaded").toBeGreaterThan(0);
+      expect(m.labels.length, "no labels measured").toBeGreaterThan(2);
+      for (const l of m.labels) {
+        expect(l.family, `"${l.what}" isn't lettered in IBM Plex Mono`).toMatch(/^"?IBM Plex Mono"?/);
+        expect(l.contrast, `"${l.what}" is too faint on its grid`).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const c of m.captions) expect(c.contrast, `the ${c.what} is too faint on its grid`).toBeGreaterThanOrEqual(6);
+    }, 90_000);
+  }
+
   // The foot is set, not just wrapped. No caption ends on one word alone on its
   // last line ("rebuilt.", "else.", "house."): the measured copy stages a trace
   // the way GET / renders one, so the trace is held to it too. The site's two
