@@ -89,8 +89,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       @media (hover: hover) {
         .sentence .pos:hover label:not(:has(mark)), .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.35); }
       }
-      /* no hover: every word at rest shows it can be changed, by a faint solid line (your own word keeps its dotted one) */
-      @media (hover: none) {
+      /* a touch screen: every word at rest shows it can be changed, by a faint solid line (your own word keeps its dotted one).
+         Coarse as well as no hover: a headless desktop with no pointer at all matches (hover: none) too */
+      @media (hover: none) and (pointer: coarse) {
         .sentence label:not(:has(mark)) { text-decoration-color: var(--hair); }
       }
       /* your holding word: a thin line fills under it until the hold ends (settle mode, your page only); never red */
