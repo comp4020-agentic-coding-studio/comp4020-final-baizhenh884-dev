@@ -13,12 +13,15 @@ import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 
 const baseUrl = inject("baseUrl");
 const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
+// descenders over every index below them: words that wrap line after line, each with a g, p or y low in it
+// (one such word left in the shared sentence by another spec once found the clash at 1280)
+const LOW = ["eligmvnuioene", "gypsy", "jumpy", "agapggypqyjgp", "pygmy", "yoga", "gappy", "puppy", "gyppy", "spy"];
 
 type Index = { content: string; font: string; contrast: number; top: number; bottom: number; left: number; ownTop: number; overlaps: string[] };
 
 describe("the numbering", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
-    for (const [which, words] of [["the page's sentence", null], ["a long sentence", LONG]] as const) {
+    for (const [which, words] of [["the page's sentence", null], ["a long sentence", LONG], ["descenders over the indices", LOW]] as const) {
       it(`sets 01 to 10 above every live word and every kept word or gap, decorative, legible on its grid (${name}, ${which})`, async () => {
         const doc = await servedPage(baseUrl);
         if (words) stageWords(doc, [...words]);
