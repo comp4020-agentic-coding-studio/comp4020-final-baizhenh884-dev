@@ -558,6 +558,56 @@ describe("two ships on GET /", () => {
     }
   }
 
+  // A phone has no hover, so nothing says a word can be changed until it's
+  // touched: there, every word at rest carries a faint solid line under it,
+  // the label's own underline (so the word's box and the sentence's wrap don't
+  // move). It must never be taken for the visitor's own word (a dotted line,
+  // darker) or a kept gap (a blank on the other ground, with no word on it):
+  // solid, never dotted, and fainter than the mark. A pointer that can hover
+  // keeps today's rest, with no line until a word is pointed at. Staged in the
+  // measured copy: one word marked as the visitor's, as GET / renders one.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`marks the words as changeable at rest only where there's no hover, never like your own word (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const label = doc.querySelector('.stands-half .sentence form[action="/replace"] label')!;
+      const mark = doc.createElement("mark");
+      mark.textContent = label.textContent;
+      label.replaceChildren(mark);
+      const plain = (await measureIn(await servedPage(baseUrl), `(async () => { await document.fonts.ready;
+        return [...document.querySelectorAll('.stands-half .sentence label')].map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }); })()`, [size[0], size[1]])) as number[][];
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ground = rgb(getComputedStyle(document.querySelector('.stands-half')).backgroundColor);
+        // a line's contrast on the field, its alpha laid over the ground
+        const contrast = (c) => { const [r, g, b, a = 1] = rgb(c), k = [r * a + ground[0] * (1 - a), g * a + ground[1] * (1 - a), b * a + ground[2] * (1 - a)];
+          const [x, y] = [lum(k), lum(ground)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const line = (el) => { const cs = getComputedStyle(el); const on = cs.textDecorationLine.includes('underline');
+          return { on, style: cs.textDecorationStyle, contrast: on ? contrast(cs.textDecorationColor) : 1 }; };
+        const labels = [...document.querySelectorAll('.stands-half .sentence label')];
+        const rest = labels.slice(1).map((l) => ({ word: l.textContent, ...line(l) }));
+        const mine = line(labels[0].querySelector('mark')), mineLabel = line(labels[0]);
+        const boxes = labels.map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+        return { rest, mine, mineLabel, boxes };
+      })()`, [size[0], size[1]])) as { rest: { word: string; on: boolean; style: string; contrast: number }[]; mine: { style: string; contrast: number }; mineLabel: { on: boolean; contrast: number }; boxes: number[][] };
+      if (size[0] <= 900) {
+        for (const w of m.rest) {
+          expect(w.on && w.contrast > 1.05, `"${w.word}" shows no line at rest on a phone`).toBe(true);
+          expect(w.style, `"${w.word}"'s line at rest is drawn like your own word's`).toBe("solid");
+          expect(w.contrast, `"${w.word}"'s line at rest is as strong as your own word's`).toBeLessThan(m.mine.contrast);
+        }
+        // your word: its dotted line alone, not doubled by the resting one
+        expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
+      } else {
+        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest where a pointer can hover`).toBe(false);
+      }
+      expect(m.mine.style, "your own word's line isn't dotted").toBe("dotted");
+      // the line moves nothing: every word's box is where it is without a mark staged
+      m.boxes.slice(1).forEach((b, i) => b.forEach((v, k) => expect(Math.abs(v - plain[i + 1][k]), `the resting line moved "${m.rest[i].word}"`).toBeLessThanOrEqual(0.5)));
+    }, 90_000);
+  }
+
   it("never invites on an earlier form (?at=N)", async () => {
     const res = await fetch(new URL("/?at=0", baseUrl));
     expect(res.status).toBe(200);
