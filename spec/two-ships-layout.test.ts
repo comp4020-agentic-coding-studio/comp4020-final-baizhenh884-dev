@@ -41,14 +41,24 @@ type Layout = {
   liveSize: number; keptSize: number; keptTextContrast: number;
   gaps: { width: number; ink: number }[];
   pointer: Box | null; pointerShown: boolean;
+  // the question band above both halves: its question, and its steps while it's in full
+  question: Box; steps: Box | null;
   // each live word, and the text shown under it in its slot (outside its form), if any
   slots: { word: string; under: string[] }[];
 };
 
-async function layout(size: [number, number], longNotes = false, longWords = false): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
-  // a staged long sentence, in the measured copy only: ten 13-letter words
-  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+  // a staged long sentence, in the measured copy only: ten 13-letter words, or the words given
+  if (longWords) stageWords(doc, longWords === true ? Array(10).fill("wordmvadgycfe") : longWords);
+  // the band as GET / folds it for a visitor who has made a change (spec/question-band.test.ts)
+  if (folded) {
+    const band = doc.querySelector("#question");
+    if (!band) throw new Error("GET / has no #question");
+    band.querySelector(".ship")?.remove();
+    band.querySelector(".how")?.remove();
+    band.classList.add("folded");
+  }
   if (longNotes) {
     const how = doc.querySelector("#how");
     if (!how) throw new Error("GET / has no #how");
@@ -87,6 +97,7 @@ async function layout(size: [number, number], longNotes = false, longWords = fal
       // the stacked layout's line pointing down to the kept half
       pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
       pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
+      question: box('#question .question-line'), steps: document.querySelector('ol.how-to-play') ? box('ol.how-to-play') : null,
       slots: [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')].map((f) => ({
         word: f.querySelector('label').textContent,
         under: [...f.closest('.pos').querySelectorAll('*')].filter((el) => !f.contains(el) && el.children.length === 0 && el.textContent.trim()
@@ -327,15 +338,34 @@ describe("two ships on GET /", () => {
   // GET / shows only what stands now (the maker's decision): no earlier words
   // under the live words, so a long sentence never pushes the houses off the
   // first screen. The words are a staged long sentence in the measured copy;
-  // whatever the server renders under them is what's under test.
+  // whatever the server renders under them is what's under test. On a phone
+  // this holds once the question band is folded (a visitor who has made a
+  // change); a new visitor's full band is checked below.
   for (const [name, size, limit] of [["1920×1080", [1920, 1080], 2 / 3], ["phone 390×844", [390, 844], 0.85]] as const) {
-    it(`shows nothing under a live word, and keeps the houses on the first screen with ten long words (${name})`, async () => {
-      const l = await layout([size[0], size[1]], false, true);
+    it(`shows nothing under a live word, and keeps the houses on the first screen with ten long words (${name}${size[0] > 900 ? "" : ", band folded"})`, async () => {
+      const l = await layout([size[0], size[1]], false, true, size[0] <= 900);
       expect(l.slots).toHaveLength(10);
       for (const s of l.slots) expect(s.under, `words shown under "${s.word}"`).toEqual([]);
       expect(l.standsHouse.top, "the live house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
       // side by side, the kept house starts level with it; stacked, it's below by design (the pointer says so)
       if (size[0] > 900) expect(l.keptHouse.top, "the kept house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
+    }, 90_000);
+  }
+
+  // A new visitor on a phone (the band in full): the first screen holds the
+  // band's question, its three steps and the whole live sentence; the house
+  // may start below the fold, one scroll away. Measured with the maker's
+  // sentence and a long one. Ten 13-letter words make the sentence alone
+  // ~520px tall, more than a first screen leaves under the band; that
+  // visitor's house is one scroll further, and once they've made a change the
+  // folded band brings it back to the first screen (above).
+  for (const [which, words] of [["the maker's sentence", ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"]], ["a long sentence", ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"]]] as const) {
+    it(`opens a new visitor's phone on the question, how to play and the whole sentence (phone 390×844, band in full, ${which})`, async () => {
+      const l = await layout([390, 844], false, [...words]);
+      expect(l.steps, "the band isn't in full for a new visitor").not.toBeNull();
+      expect(l.question.top, "the question isn't on the first screen").toBeGreaterThanOrEqual(0);
+      expect(l.steps!.bottom, "how to play runs past the first screen").toBeLessThanOrEqual(844);
+      expect(l.standsSentence.bottom, "the live sentence runs past the first screen under the band").toBeLessThanOrEqual(844);
     }, 90_000);
   }
 
