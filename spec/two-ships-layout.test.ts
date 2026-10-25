@@ -653,7 +653,12 @@ describe("two ships on GET /", () => {
       expect(how?.textContent, "#how doesn't say Press Escape to cancel").toContain("Press Escape to cancel.");
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
-        const how = document.getElementById('how');
+        // a miss says what the measured page held where the instructions belong (CI once found no #how
+        // here, in a page whose served copy had one), instead of failing inside createTreeWalker
+        const foot = document.querySelector('.stands-half .foot');
+        if (!document.getElementById('how')) throw new Error('the measured page has no #how | ids=' + JSON.stringify([...document.querySelectorAll('[id]')].map((e) => e.id)) +
+          ' foot(600)=' + JSON.stringify(foot ? foot.innerHTML.slice(0, 600) : null) + ' halves=' + document.querySelectorAll('.half').length);
+        const how = (${QUERY_JS})('#how');
         const walker = document.createTreeWalker(how, NodeFilter.SHOW_TEXT);
         let node; while ((node = walker.nextNode()) && !node.textContent.includes('Escape'));
         const el = node.parentElement, r = el.getBoundingClientRect(), cs = getComputedStyle(el);
