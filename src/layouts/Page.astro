@@ -236,6 +236,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       }
       .two .sentence .pos::before { content: counter(word, decimal-leading-zero) / ""; top: 1px; }
       .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; color: var(--kept-soft); }
+      /* a gap stands as tall as a word over the baseline (its 12px strip and the letters' ascent), so its number
+         is level with the words' numbers on its line; only its foot is drawn */
+      .kept-sentence .gap { box-sizing: content-box; height: calc(0.907em - 2px); }
       .kept-sentence .gap::before { left: 0; }
       /* a small laptop: a smaller index in a narrower strip, so the longest words still leave the house on the first screen */
       @media (min-width: 901px) and (max-width: 1365px) {
@@ -401,6 +404,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
         .two .sentence { font-size: 34px; }
         .kept-sentence { font-size: 26px; line-height: 1.3; }
+        /* the looser leading here sets a word's letters lower in its line: the gap stands as tall */
+        .kept-sentence .gap { height: calc(0.96em - 2px); }
       }
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }

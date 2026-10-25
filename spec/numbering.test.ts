@@ -88,6 +88,41 @@ describe("the numbering", () => {
     }
   }
 
+  // A gap's number and a word's number on the same line of the kept sentence stand level, one row of numbers
+  // over the line (seen live: a gap's number sat down beside the next word's letters). The kept sentence has
+  // gaps and words both, as GET / serves them: alternate positions as gaps, so every line mixes them.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`sets the kept sentence's numbers level along each line, gaps and words alike (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const kept = doc.querySelector(".kept-sentence")!;
+      kept.querySelectorAll(".w").forEach((w, i) => {
+        if (i % 2) { w.className = "w gap"; w.textContent = ""; } else { w.className = "w"; w.textContent = ["Make", "website", "people", "miss", "it"][i / 2]; }
+      });
+      const rows = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        // each number's top, and its word's or gap's box (a gap's box is shorter than a word's on the same line)
+        return [...document.querySelectorAll('.kept-half .kept-sentence .w')].map((w) => {
+          const r = w.getBoundingClientRect(), s = getComputedStyle(w, '::before');
+          const top = s.top === 'auto' ? r.bottom - parseFloat(s.bottom) - parseFloat(s.height) : r.top + parseFloat(s.top);
+          return { gap: w.classList.contains('gap'), top, boxTop: r.top, boxBottom: r.bottom };
+        });
+      })()`, [size[0], size[1]])) as { gap: boolean; top: number; boxTop: number; boxBottom: number }[];
+      expect(rows, "not ten kept words or gaps").toHaveLength(10);
+      // one line: boxes that overlap vertically (in reading order, a new line starts below the last one's box)
+      const lines: (typeof rows)[] = [];
+      for (const r of rows) {
+        const last = lines.at(-1);
+        if (last && r.boxTop < Math.max(...last.map((x) => x.boxBottom)) && r.boxBottom > Math.min(...last.map((x) => x.boxTop))) last.push(r);
+        else lines.push([r]);
+      }
+      expect(lines.some((l) => l.some((x) => x.gap) && l.some((x) => !x.gap)), "no kept line holds both a gap and a word: nothing compared").toBe(true);
+      for (const [n, items] of lines.entries()) {
+        const tops = items.map((i) => i.top);
+        expect(Math.max(...tops) - Math.min(...tops), `the numbers on kept line ${n + 1} aren't level: ${JSON.stringify(items.map((i) => [i.gap ? "gap" : "word", Math.round(i.top)]))}`).toBeLessThanOrEqual(1);
+      }
+    }, 90_000);
+  }
+
   it("counts the indices from the sentence's own start, so they read 01 to 10 on both halves", async () => {
     const doc = await servedPage(baseUrl);
     const m = (await measureIn(doc, `(() => {
