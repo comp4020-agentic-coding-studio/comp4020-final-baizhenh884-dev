@@ -6,7 +6,7 @@ import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
 import { drafting, notation as notation_, showDrafting } from "../src/lib/house/notation";
 import { TERRITORIES } from "../src/lib/house/territories";
-import { measureIn, QUERY_JS, servedPage } from "./chrome";
+import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 import { EXTREMES, SENTENCES } from "./house-sentences";
 import { SIZE_STEPS, sizeStep } from "../src/lib/sentence-step";
 
@@ -48,7 +48,7 @@ type Layout = {
 async function layout(size: [number, number], longNotes = false, longWords = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
   // a staged long sentence, in the measured copy only: ten 13-letter words
-  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
   if (longNotes) {
     const how = doc.querySelector("#how");
     if (!how) throw new Error("GET / has no #how");
@@ -123,7 +123,7 @@ function longestNotations(width: number): string[] {
 // longest notation in turn, as an accepted change shows it (served copy only).
 async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
   const doc = await servedPage(baseUrl);
-  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
   const labels = longestNotations(size[0]);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
@@ -210,15 +210,11 @@ describe("two ships on GET /", () => {
   // ship, in the measured copy only.
   const LONG_SENTENCE = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
   const MAKER_SENTENCE = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
-  const withWords = (doc: Document, words: string[]) => {
-    doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label').forEach((l, i) => (l.textContent = words[i]));
-    doc.querySelector(".stands-half .sentence")!.setAttribute("data-step", String(sizeStep(words)));
-  };
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
     for (const [which, words] of [["the maker's sentence", MAKER_SENTENCE], ["a long sentence", LONG_SENTENCE]] as const) {
       it(`gives each house at least half the screen, under the sentence and the invitation (${name}, ${which})`, async () => {
         const doc = await servedPage(baseUrl);
-        withWords(doc, [...words]);
+        stageWords(doc, [...words]);
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
@@ -269,7 +265,7 @@ describe("two ships on GET /", () => {
 
     it(`at its smallest step the live sentence still outranks the kept one, and the longest words keep the house on screen (${name})`, async () => {
       const doc = await servedPage(baseUrl);
-      withWords(doc, Array(10).fill("w".repeat(24)));
+      stageWords(doc, Array(10).fill("w".repeat(24)));
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         const q = (s) => document.querySelector(s);
@@ -354,7 +350,7 @@ describe("two ships on GET /", () => {
     for (const longWords of [false, true]) {
       it(`invites a stranger to change a word at rest, in the notation's slot, moving nothing (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
-        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = (s) => document.querySelector(s);
@@ -471,7 +467,7 @@ describe("two ships on GET /", () => {
     for (const longWords of [false, true]) {
       it(`outlines the focused word in ink, clear of every neighbouring word (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
-        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const rows = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const forms = [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')];
@@ -482,19 +478,26 @@ describe("two ships on GET /", () => {
             const cs = getComputedStyle(input), r = input.getBoundingClientRect();
             const grow = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth);
             const o = { left: r.left - grow, right: r.right + grow, top: r.top - grow, bottom: r.bottom + grow };
-            // the closest any other word comes to the outline (negative: overlapping)
-            let air = Infinity;
+            // the closest any other word comes to the outline (negative: overlapping), and which word that is
+            let air = Infinity, near = -1, nearBox = null;
             forms.forEach((g, j) => {
               if (j === i) return;
               const b = g.querySelector('label').getBoundingClientRect();
               const dx = Math.max(b.left - o.right, o.left - b.right), dy = Math.max(b.top - o.bottom, o.top - b.bottom);
-              air = Math.min(air, Math.max(dx, dy));
+              if (Math.max(dx, dy) < air) { air = Math.max(dx, dy); near = j; nearBox = b; }
             });
-            const out = { word: f.querySelector('label').textContent, focused: document.activeElement === input, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor, ground, air };
+            const fix = (b) => b && [b.left, b.top, b.right, b.bottom].map((v) => +v.toFixed(2));
+            const sentence = document.querySelector('.stands-half .sentence');
+            // everything needed to explain a failure without rerunning it
+            const why = { position: i + 1, neighbour: near + 1, neighbourWord: near >= 0 ? forms[near].querySelector('label').textContent : null,
+              step: sentence.getAttribute('data-step'), fontSize: getComputedStyle(sentence).fontSize, viewport: [innerWidth, innerHeight],
+              field: fix(r), outline: fix({ left: o.left, top: o.top, right: o.right, bottom: o.bottom }), neighbourBox: fix(nearBox),
+              outlineOffset: cs.outlineOffset, outlineWidth: cs.outlineWidth, fonts: document.fonts.status };
+            const out = { word: f.querySelector('label').textContent, focused: document.activeElement === input, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor, ground, air, why };
             input.blur();
             return out;
           });
-        })()`, [size[0], size[1]])) as { word: string; focused: boolean; style: string; width: number; color: string; ground: string; air: number }[];
+        })()`, [size[0], size[1]])) as { word: string; focused: boolean; style: string; width: number; color: string; ground: string; air: number; why: object }[];
         const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const lum = (c: number[]) => c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
         for (const w of rows) {
@@ -503,7 +506,7 @@ describe("two ships on GET /", () => {
           expect(w.width, `"${w.word}"'s focus outline is too thin to see`).toBeGreaterThanOrEqual(2);
           const [a, b] = [lum(rgb(w.color)), lum(rgb(w.ground))].sort((m, n) => n - m);
           expect((a + 0.05) / (b + 0.05), `"${w.word}"'s focus outline doesn't stand out from the ground`).toBeGreaterThanOrEqual(3);
-          expect(w.air, `"${w.word}"'s focus outline touches a neighbouring word`).toBeGreaterThanOrEqual(1);
+          expect(w.air, `"${w.word}"'s focus outline touches a neighbouring word: ${JSON.stringify({ air: +w.air.toFixed(2), ...w.why })}`).toBeGreaterThanOrEqual(1);
         }
       }, 90_000);
     }
@@ -530,7 +533,7 @@ describe("two ships on GET /", () => {
   for (const longWords of [false, true]) {
     it(`links to the kept half and back from the header rows on a phone, never scrolling by itself (390×844${longWords ? ", ten long words" : ""})`, async () => {
       const doc = await servedPage(baseUrl);
-      if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+      if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
       // where the sentence and house stood without the links: the header row mustn't grow
       const withoutLinks = doc.cloneNode(true) as Document;
       withoutLinks.querySelectorAll("a.to-kept, a.to-stands").forEach((a) => a.remove());

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JSDOM } from "jsdom";
+import { sizeStep } from "../src/lib/sentence-step";
 
 // Layout checks: jsdom has no layout, so these build a page from the app's own
 // served markup and stylesheet and measure it in headless Chrome.
@@ -141,4 +142,21 @@ export async function measureIn(doc: Document, expression: string, size: [number
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
+}
+
+// Stages words in a served copy of GET / exactly as GET / would render them:
+// each word's label and its field's placeholder (an empty focused field is
+// sized to its placeholder), and the sentence's size step. Staging only the
+// labels left the server's own words in the placeholders and the server's
+// step on the sentence, so a layout check measured a mix of two sentences
+// that depended on what earlier spec files had left in the shared one: the
+// focus-outline check once failed, intermittently, because a focused field
+// was drawn at the width of a leftover word (spec/two-ships-layout.test.ts).
+export function stageWords(doc: Document, words: string[]): void {
+  const forms = [...doc.querySelectorAll('.stands-half .sentence form[action="/replace"]')];
+  forms.forEach((f, i) => {
+    f.querySelector("label")!.textContent = words[i];
+    f.querySelector<HTMLInputElement>('input[name="word"]')!.setAttribute("placeholder", words[i]);
+  });
+  doc.querySelector(".stands-half .sentence")?.setAttribute("data-step", String(sizeStep(words)));
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, inject, it } from "vitest";
-import { measureIn, servedPage } from "./chrome";
+import { measureIn, servedPage, stageWords } from "./chrome";
 
 // Ship 1's one loud line (docs/decisions/0003, Slice 5) and the phone
 // pointer's acknowledgement, measured in headless Chrome on GET /'s served
@@ -22,7 +22,7 @@ const momentCode = ts.transpileModule(readFileSync(new URL("../src/lib/moment-li
 
 async function page(longWords: boolean): Promise<Document> {
   const doc = await servedPage(baseUrl);
-  if (longWords) for (const l of doc.querySelectorAll('.sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe"; // ten 13-letter words
+  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe")); // ten 13-letter words, as GET / would render them
   const script = doc.createElement("script");
   script.textContent = momentCode;
   doc.head.append(script);
