@@ -234,16 +234,31 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .thread.red circle { fill: #c3331c; fill-opacity: 0.9; }
 
       /* the plate's caption, under the house; and the question, at the foot beside About */
-      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; }
+      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
+      .plate-note .line { display: block; text-wrap: balance; }
       .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
+      /* the captions end on more than one word (spec/two-ships-layout.test.ts) */
+      #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-key, .question { text-wrap: pretty; }
       .foot .about { margin: 0; }
+      /* each link reads as one unit, never broken inside itself */
+      .about a { white-space: nowrap; }
       /* Side by side, the live half's notes fold into two columns, each its own stack: the rule, your trace
          and the links on the left, the captions on the right. The foot gets shorter, so the house's row,
          which takes what's left, gets taller (spec/two-ships-layout.test.ts). Stacked (a phone), the two
-         columns dissolve and the notes read in one column, the links last. */
+         columns dissolve and the notes read in one column, the links last.
+         Side by side, the links take a row of their own across both columns, so "How the house reads a
+         word" never breaks in the narrow left one; placed here, still last in the markup. */
       .foot-main, .foot-aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
       @media (min-width: 901px) {
-        .stands-half .foot { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 3vw; align-items: start; }
+        /* rows: the rule, your trace, Earlier, a spacer the captions grow into, the links */
+        .stands-half .foot { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto; column-gap: 3vw; row-gap: 0; align-items: start; }
+        .stands-half .foot-main { display: contents; }
+        .stands-half .foot-main > * { grid-column: 1; }
+        .stands-half .foot #how { grid-row: 1; }
+        .stands-half .foot section[aria-labelledby="trace-heading"] { grid-row: 2; margin-top: 1.3rem; }
+        .stands-half .foot .earlier { grid-row: 3; margin-top: 0.9rem; }
+        .stands-half .foot-aside { grid-column: 2; grid-row: 1 / 5; }
+        .stands-half .foot .about { grid-column: 1 / -1; grid-row: 5; margin-top: 1.1rem; }
       }
       @media (max-width: 900px) {
         .foot-main, .foot-aside { display: contents; }
