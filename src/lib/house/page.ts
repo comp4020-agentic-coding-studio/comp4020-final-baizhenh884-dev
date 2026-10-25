@@ -9,7 +9,7 @@ import type { KeptShip, Moment } from "../kept-moment";
 import type { Look } from "./theme";
 import { HouseView } from "./view";
 import { TIMING, type Kind } from "./motion";
-import { threadPath } from "./thread";
+import { tagged, tagLabel, threadPath } from "./thread";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -116,24 +116,32 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     if (s.input.value === "") annotate(s.position);
     else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position] }, form())); // the word on screen, which a draft may hold back
   };
-  // the one hairline between the chosen word and its territory (desktop; red only while that territory is rebuilt)
+  // the one hairline between the chosen word and its territory, ending in that territory's numbered tag
+  // (desktop; red only while that territory is rebuilt)
   const thread = doc.getElementById("thread") as SVGSVGElement | null;
-  const line = thread?.querySelector("path") ?? null, dot = thread?.querySelector("circle") ?? null;
+  const line = thread?.querySelector("path") ?? null, tag = thread?.querySelector<SVGGElement>(".tag") ?? null;
+  const tagText = tag?.querySelector("text") ?? null;
   let drawn = 0;
-  // the line means "this word is acting on this territory": a word at work, or a part being rebuilt. Pointing alone never draws it.
+  // the line means "this word is acting on this territory": a word at work, or a part being rebuilt. Pointing alone never draws it;
+  // it only tags the territory pointed at (spec/numbering.test.ts)
   const target = () => rebuilding ?? (selected !== null && !held ? selected : null);
   const drawThread = () => {
     drawn = 0;
-    const p = target();
-    if (!thread || !line || !dot || p === null || getComputedStyle(thread).display === "none") { thread?.classList.remove("on", "red"); return; }
-    const a = view.anchor(p);
-    if (!a || !part || part.hidden) return; // the line leaves the notation: whenever it's drawn, the notation is shown
-    const text = doc.createRange();
-    text.selectNodeContents(part);
-    line.setAttribute("d", threadPath(a, { notation: text.getBoundingClientRect() }));
-    dot.setAttribute("cx", String(a.x)); dot.setAttribute("cy", String(a.y));
+    const t = tagged({ selected, held, hovered, rebuilding }), p = target();
+    if (!thread || !line || !tag || !tagText || t === null || getComputedStyle(thread).display === "none") { thread?.classList.remove("on", "red"); return; }
+    const a = view.anchor(t);
+    if (!a) return;
+    // the line leaves the notation: whenever it's drawn, the notation is shown
+    const lined = p === t && !!part && !part.hidden;
+    if (lined) {
+      const text = doc.createRange();
+      text.selectNodeContents(part!);
+      line.setAttribute("d", threadPath(a, { notation: text.getBoundingClientRect() }));
+    } else line.setAttribute("d", "");
+    tag.setAttribute("transform", `translate(${a.x} ${a.y})`);
+    tagText.textContent = tagLabel(t);
     thread.classList.add("on");
-    thread.classList.toggle("red", p === rebuilding);
+    thread.classList.toggle("red", t === rebuilding);
     drawn = requestAnimationFrame(drawThread); // follows scroll, resize and a word growing as it is typed
   };
   const sync = () => {

@@ -222,6 +222,26 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .kept-sentence mark { text-decoration-color: var(--kept-soft); }
       /* a gap: a blank in the sentence, waiting for the word that stands there now */
       .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-gap); }
+      /* The drawing sheet's numbering (spec/numbering.test.ts): each word's and each gap's position, 01 to 10, small
+         above it, in the leading over its letters. It names a position, like "05 — entry", never a count, and it's
+         drawn, not read: its alternative text is empty, so the sentences are read as their words. */
+      .two .sentence { counter-reset: word; }
+      /* room above each word for its index; on its baseline, so the full stop still sits on the last word's line */
+      .two .sentence .pos { counter-increment: word; padding-top: 12px; margin-top: -6px; padding-bottom: 0.12em; vertical-align: baseline; }
+      .kept-sentence { counter-reset: kept; }
+      .kept-sentence .w { position: relative; display: inline-block; padding-top: 12px; counter-increment: kept; }
+      .two .sentence .pos::before, .kept-sentence .w::before {
+        position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em;
+        color: var(--soft); pointer-events: none; white-space: nowrap; text-decoration: none;
+      }
+      .two .sentence .pos::before { content: counter(word, decimal-leading-zero) / ""; top: 1px; }
+      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; color: var(--kept-soft); }
+      .kept-sentence .gap::before { left: 0; }
+      /* a small laptop: a smaller index in a narrower strip, so the longest words still leave the house on the first screen */
+      @media (min-width: 901px) and (max-width: 1365px) {
+        .two .sentence .pos { padding-top: 11px; }
+        .two .sentence .pos::before { font-size: 9px; top: 4px; }
+      }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
       /* what the kept sentence's words and gaps are: a quiet key under the caption */
@@ -268,9 +288,11 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .thread { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 0.18s; }
       .thread.on { opacity: 1; }
       .thread path { fill: none; stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 1; vector-effect: non-scaling-stroke; }
-      .thread circle { fill: var(--ink); fill-opacity: 0.7; }
+      /* the territory's numbered tag: the line's end, and alone where a word is only pointed at */
+      .thread .tag circle { fill: var(--field); stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; }
+      .thread .tag text { font: 500 10px var(--mono); letter-spacing: 0.04em; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
       .thread.red path { stroke: #c3331c; stroke-opacity: 0.85; }
-      .thread.red circle { fill: #c3331c; fill-opacity: 0.9; }
+      .thread.red .tag circle { stroke: #c3331c; stroke-opacity: 0.9; }
 
       /* the plate's caption, under the house; and the question, at the foot beside About */
       .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
@@ -352,6 +374,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
         #question.folded, #question.folded .question-main { display: block; }
         #question.folded .question-line { margin-top: 0.8rem; font-size: 20px; white-space: normal; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        /* the index takes the room the leading gave the words here */
+        .two .sentence { line-height: 1.1; }
+        .two .sentence .pos { margin-top: -8px; }
         #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-half .kept-key { font-size: 14px; }
         /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
         #how .esc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
