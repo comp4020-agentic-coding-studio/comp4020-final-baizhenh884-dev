@@ -167,7 +167,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* the part notation lies over the house's own empty top band, which no house at rest reaches
          (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
       .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
-      .stands-half .invite { color: var(--soft); white-space: nowrap; }
+      .stands-half .invite { color: var(--caption); white-space: nowrap; }
       .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
       /* while a replacement is typed: one line, the replaced word struck, and only it shortened when long; the keys are never cut */
       #part:has(> del) { display: flex; white-space: pre; }
