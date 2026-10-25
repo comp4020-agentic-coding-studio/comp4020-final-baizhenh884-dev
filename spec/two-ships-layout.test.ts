@@ -41,14 +41,24 @@ type Layout = {
   liveSize: number; keptSize: number; keptTextContrast: number;
   gaps: { width: number; ink: number }[];
   pointer: Box | null; pointerShown: boolean;
+  // the question band above both halves: its question, and its steps while it's in full
+  question: Box; steps: Box | null;
   // each live word, and the text shown under it in its slot (outside its form), if any
   slots: { word: string; under: string[] }[];
 };
 
-async function layout(size: [number, number], longNotes = false, longWords = false): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
-  // a staged long sentence, in the measured copy only: ten 13-letter words
-  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+  // a staged long sentence, in the measured copy only: ten 13-letter words, or the words given
+  if (longWords) stageWords(doc, longWords === true ? Array(10).fill("wordmvadgycfe") : longWords);
+  // the band as GET / folds it for a visitor who has made a change (spec/question-band.test.ts)
+  if (folded) {
+    const band = doc.querySelector("#question");
+    if (!band) throw new Error("GET / has no #question");
+    band.querySelector(".ship")?.remove();
+    band.querySelector(".how")?.remove();
+    band.classList.add("folded");
+  }
   if (longNotes) {
     const how = doc.querySelector("#how");
     if (!how) throw new Error("GET / has no #how");
@@ -87,6 +97,7 @@ async function layout(size: [number, number], longNotes = false, longWords = fal
       // the stacked layout's line pointing down to the kept half
       pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
       pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
+      question: box('#question .question-line'), steps: document.querySelector('ol.how-to-play') ? box('ol.how-to-play') : null,
       slots: [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')].map((f) => ({
         word: f.querySelector('label').textContent,
         under: [...f.closest('.pos').querySelectorAll('*')].filter((el) => !f.contains(el) && el.children.length === 0 && el.textContent.trim()
@@ -327,15 +338,34 @@ describe("two ships on GET /", () => {
   // GET / shows only what stands now (the maker's decision): no earlier words
   // under the live words, so a long sentence never pushes the houses off the
   // first screen. The words are a staged long sentence in the measured copy;
-  // whatever the server renders under them is what's under test.
+  // whatever the server renders under them is what's under test. On a phone
+  // this holds once the question band is folded (a visitor who has made a
+  // change); a new visitor's full band is checked below.
   for (const [name, size, limit] of [["1920×1080", [1920, 1080], 2 / 3], ["phone 390×844", [390, 844], 0.85]] as const) {
-    it(`shows nothing under a live word, and keeps the houses on the first screen with ten long words (${name})`, async () => {
-      const l = await layout([size[0], size[1]], false, true);
+    it(`shows nothing under a live word, and keeps the houses on the first screen with ten long words (${name}${size[0] > 900 ? "" : ", band folded"})`, async () => {
+      const l = await layout([size[0], size[1]], false, true, size[0] <= 900);
       expect(l.slots).toHaveLength(10);
       for (const s of l.slots) expect(s.under, `words shown under "${s.word}"`).toEqual([]);
       expect(l.standsHouse.top, "the live house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
       // side by side, the kept house starts level with it; stacked, it's below by design (the pointer says so)
       if (size[0] > 900) expect(l.keptHouse.top, "the kept house starts too far down the first screen").toBeLessThanOrEqual(size[1] * limit);
+    }, 90_000);
+  }
+
+  // A new visitor on a phone (the band in full): the first screen holds the
+  // band's question, its three steps and the whole live sentence; the house
+  // may start below the fold, one scroll away. Measured with the maker's
+  // sentence and a long one. Ten 13-letter words make the sentence alone
+  // ~520px tall, more than a first screen leaves under the band; that
+  // visitor's house is one scroll further, and once they've made a change the
+  // folded band brings it back to the first screen (above).
+  for (const [which, words] of [["the maker's sentence", ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"]], ["a long sentence", ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"]]] as const) {
+    it(`opens a new visitor's phone on the question, how to play and the whole sentence (phone 390×844, band in full, ${which})`, async () => {
+      const l = await layout([390, 844], false, [...words]);
+      expect(l.steps, "the band isn't in full for a new visitor").not.toBeNull();
+      expect(l.question.top, "the question isn't on the first screen").toBeGreaterThanOrEqual(0);
+      expect(l.steps!.bottom, "how to play runs past the first screen").toBeLessThanOrEqual(844);
+      expect(l.standsSentence.bottom, "the live sentence runs past the first screen under the band").toBeLessThanOrEqual(844);
     }, 90_000);
   }
 
@@ -463,8 +493,8 @@ describe("two ships on GET /", () => {
   // A word in hand, being typed over (src/lib/house/notation.ts drafting): the
   // line in the notation's slot names the word being replaced, struck, and
   // the keys, on one line, so it moves nothing and stays as clear of the
-  // house as the notation (checked above, for one line). A long word is
-  // shortened, alone, with an ellipsis; the keys are never cut. Set in the
+  // house as the notation (checked above, for one line). A word too long for
+  // the line is shortened, alone, with an ellipsis; the keys are never cut. Set in the
   // measured copy by the page's own showDrafting(), so the markup and the CSS
   // under test are the page's.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
@@ -499,8 +529,10 @@ describe("two ships on GET /", () => {
         expect(m.house - m.sentence, `${what} pushed the house away`).toBeLessThanOrEqual(20);
       }
       expect(out[0].wasCut, "a short word is shortened").toBe(false);
-      expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
-      expect(out[2].ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
+      // a word is shortened only when the line can't hold it whole: on a phone, the longest word always
+      // is; on a desktop, whether 24 letters fit depends on the label face (IBM Plex Mono holds them at 1920)
+      if (size[0] <= 900) expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
+      for (const m of out.filter((o) => o.wasCut)) expect(m.ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
     }, 120_000);
   }
 
@@ -729,6 +761,60 @@ describe("two ships on GET /", () => {
         expect(r.contrast, `the ${r.what} are too faint on their ground`).toBeGreaterThanOrEqual(6);
       }
     }, 60_000);
+  }
+
+  // A drawing sheet: the live half on drafting paper (#ECE8DF), the kept half a
+  // blueprint (#1D3350), each with a faint grid, and every label (the small
+  // caps: half labels, the invitation, the notation, links) lettered in IBM
+  // Plex Mono, served by the app itself. Every label is legible where it lies:
+  // at least 4.5:1, and every caption at least 6:1, measured against the
+  // darkest point of its ground, a grid line, never the flat colour alone.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`draws a sheet and a blueprint, lettered in Plex Mono, every label legible on its grid (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      // the served stylesheet carries the font itself; no third-party font host
+      const css = doc.querySelector("style")!.textContent!;
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const over = ([r, g, b, a = 1], [R, G, B]) => [r * a + R * (1 - a), g * a + G * (1 - a), b * a + B * (1 - a)];
+        // a half's ground, and its grid line laid over it: the darker (or, on the blueprint, the lighter) of the two is the worst case for text
+        const grounds = (half) => {
+          const cs = getComputedStyle(half), flat = rgb(cs.backgroundColor), line = (cs.backgroundImage.match(/rgba?\\([^)]*\\)/) || [null])[0];
+          return { flat, grid: line ? over(rgb(line), flat) : null, image: cs.backgroundImage, size: cs.backgroundSize };
+        };
+        const halves = { stands: grounds(document.querySelector('.stands-half')), kept: grounds(document.querySelector('.kept-half')) };
+        const worst = (el, fg) => { const g = halves[el.closest('.kept-half') ? 'kept' : 'stands']; return Math.min(ratio(fg, g.flat), g.grid ? ratio(fg, g.grid) : Infinity); };
+        const ink = (el) => { const cs = getComputedStyle(el); let k = 1; for (let e = el; e; e = e.parentElement) k *= Number(getComputedStyle(e).opacity);
+          const [r, g, b, a = 1] = rgb(cs.color), half = halves[el.closest('.kept-half') ? 'kept' : 'stands'].flat; return over([r, g, b, a * k], half); };
+        const shown = (el) => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const labels = [...document.querySelectorAll('.two .caps')].filter(shown).map((el) => ({ what: (el.className + ' ' + el.textContent.trim()).slice(0, 60),
+          family: getComputedStyle(el).fontFamily, contrast: worst(el, ink(el)) }));
+        const captions = ['#how', '.kept-half .kept-key', '.stands-half .invite'].map((s) => document.querySelector(s)).filter((el) => el && shown(el))
+          .map((el) => ({ what: el.id || el.className, contrast: worst(el, ink(el)) }));
+        const plex = [...document.fonts].filter((f) => /IBM Plex Mono/.test(f.family) && f.status === 'loaded').length;
+        return { halves, labels, captions, plex };
+      })()`, [size[0], size[1]])) as {
+        halves: Record<"stands" | "kept", { flat: number[]; grid: number[] | null; image: string; size: string }>;
+        labels: { what: string; family: string; contrast: number }[]; captions: { what: string; contrast: number }[]; plex: number;
+      };
+      expect(css, "the stylesheet loads a font from a third-party host").not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+      expect(m.halves.stands.flat.slice(0, 3), "the live half isn't on drafting paper").toEqual([236, 232, 223]);
+      expect(m.halves.kept.flat.slice(0, 3), "the kept half isn't a blueprint").toEqual([29, 51, 80]);
+      for (const k of ["stands", "kept"] as const) {
+        expect(m.halves[k].grid, `the ${k} half has no grid`).not.toBeNull();
+        expect(m.halves[k].image, `the ${k} half's grid isn't ruled both ways`).toMatch(/linear-gradient.*linear-gradient/);
+      }
+      expect(m.plex, "IBM Plex Mono isn't loaded").toBeGreaterThan(0);
+      expect(m.labels.length, "no labels measured").toBeGreaterThan(2);
+      for (const l of m.labels) {
+        expect(l.family, `"${l.what}" isn't lettered in IBM Plex Mono`).toMatch(/^"?IBM Plex Mono"?/);
+        expect(l.contrast, `"${l.what}" is too faint on its grid`).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const c of m.captions) expect(c.contrast, `the ${c.what} is too faint on its grid`).toBeGreaterThanOrEqual(6);
+    }, 90_000);
   }
 
   // The foot is set, not just wrapped. No caption ends on one word alone on its

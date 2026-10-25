@@ -25,3 +25,13 @@ export function threadPath(a: { x: number; y: number }, { notation }: ThreadRect
   const sx = notation.right + 10, sy = notation.top + notation.height / 2, kx = sx + 14, ky = notation.bottom + 8;
   return `M${sx} ${sy}L${kx} ${sy}L${kx} ${ky}L${a.x} ${a.y}`;
 }
+
+// Which territory carries the numbered tag on the house (spec/numbering.test.ts): the one a word is at work on
+// (being rebuilt, or chosen), else the one pointed at; none at rest. Where the line is drawn, the tag is its end.
+export type TagState = { selected: number | null; held: boolean; hovered: number | null; rebuilding: number | null };
+export function tagged({ selected, hovered, rebuilding }: TagState): number | null {
+  return rebuilding ?? selected ?? hovered;
+}
+
+// the tag's number: the position, as the indices above the words and the part notation write it
+export const tagLabel = (position: number) => String(position + 1).padStart(2, "0");

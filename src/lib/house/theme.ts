@@ -1,14 +1,16 @@
 // Monograph: a light architectural-study field, a restrained plaster model
 // drawn with faint ink edges. Red has one job, a body being rebuilt now.
 // An earlier form is an unfired white study model (H1). The kept ship
-// (docs/decisions/0003-settle-and-kept-ships.md) is salvaged timber on a dark
-// umber ground, drawn with pale edges: a second object, not a second plaster.
+// (docs/decisions/0003-settle-and-kept-ships.md) is an ivory model on the
+// blueprint, drawn with white edges: a second object, not a second plaster.
 
 import * as THREE from "three";
 
 export const FIELD = 0xf1eee8;
 export const INK = 0x191714;
 export const RED = 0xc3331c;
+// the kept half's ground: a kept part steps back toward it, never toward the paper
+export const BLUEPRINT = 0x1d3350;
 
 // which body a view draws: the standing house, an earlier form, or the kept ship
 export type Look = "present" | "past" | "kept";
@@ -16,11 +18,15 @@ export type Look = "present" | "past" | "kept";
 // each territory's base colour: walls in near-field plaster, the ground and roof a step darker
 const PRESENT = { mass: 0xeee9df, ground: 0xd9d2c5, roof: 0xc9b9a6, opening: 0x8f9799 };
 const PAST = { mass: 0xf3f0e9, ground: 0xe9e6de, roof: 0xe9e6de, opening: 0xd6d7d2 };
-const KEPT = { mass: 0xb58d62, ground: 0x8f6c49, roof: 0x7a5a3c, opening: 0x3a2d22 };
+const KEPT = { mass: 0xf2ead8, ground: 0xdccfb4, roof: 0xd0c1a2, opening: 0x5d6f86 };
+// read-only, for spec/house-cue.test.ts: the kept house's palette
+export const KEPT_PALETTE: Readonly<typeof KEPT> = KEPT;
 const PALETTE = { present: PRESENT, past: PAST, kept: KEPT };
 export const EDGE = { present: 0.2, past: 0.32, kept: 0.42 };
-// edges are ink on the light field, and pale on the kept ship's dark ground
-export const EDGE_COLOUR = { present: INK, past: INK, kept: 0xefe6d8 };
+// edges are ink on the light field, and white on the kept ship's blueprint
+export const EDGE_COLOUR = { present: INK, past: INK, kept: 0xffffff };
+// where a part recedes to: its own half's ground
+export const RECEDE_TO = { present: FIELD, past: FIELD, kept: BLUEPRINT };
 
 // How one part is drawn: its edges' strength and colour, how far its
 // materials are lightened toward the edge ink (`lift`), or recede toward the

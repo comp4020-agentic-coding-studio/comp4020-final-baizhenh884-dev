@@ -1,8 +1,11 @@
 ---
 // The one page shell: language, viewport, title and the styles every view
-// shares, in Monograph: a light architectural-study field, the sentence set
-// large in Instrument Serif, the house as its body beside it. Visitor words
-// are only ever interpolated as text.
+// shares, as a drawing sheet: the live half on drafting paper, the kept half a
+// blueprint, each ruled with a faint grid; the sentence set large in
+// Instrument Serif, every label lettered in IBM Plex Mono, the house as its
+// body beside it. Visitor words are only ever interpolated as text.
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource/instrument-sans/400.css";
@@ -37,20 +40,31 @@ const image = new URL("/og.png", Astro.url.origin).href;
     <meta name="twitter:card" content="summary_large_image" />
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
-      :root { --kept-ground: #2b241d; --field: #f1eee8; --ink: #191714; --soft: #6f685e; --caption: #5a544b; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16); }
+      :root {
+        /* drafting paper and blueprint; labels and captions are legible on a grid line, not just the flat ground (spec/two-ships-layout.test.ts) */
+        --field: #ece8df; --ink: #191714; --soft: #5a544b; --caption: #3f3a33; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16);
+        --kept-ground: #1d3350; --kept-ink: #eef3f8; --kept-soft: #9fb1c7; --kept-caption: #b9c7d8; --kept-gap: #dce6f2;
+        --grid: rgb(25 23 20 / 0.045); --kept-grid: rgb(255 255 255 / 0.055); --frame: rgb(25 23 20 / 0.22); --kept-frame: rgb(255 255 255 / 0.22);
+        --rule: rgb(25 23 20 / 0.3); --kept-rule: rgb(255 255 255 / 0.28);
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      /* a sheet: a faint grid, ruled both ways, on its own ground */
+      .sheet { background-color: var(--field); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+      .blueprint { background-color: var(--kept-ground); background-image: linear-gradient(var(--kept-grid) 1px, transparent 1px), linear-gradient(90deg, var(--kept-grid) 1px, transparent 1px); background-size: 24px 24px; }
       * { box-sizing: border-box; }
       body {
-        margin: 0; background: var(--field); color: var(--ink);
+        margin: 0; color: var(--ink);
+        background-color: var(--field); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px;
         font: 400 15px/1.45 "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
       }
       main { min-height: 100vh; padding: 4.2vh 5.2vw 4.6vh; overflow-wrap: anywhere; display: flex; flex-direction: column; }
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-      .caps { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; }
+      .caps { font: 500 0.69rem/1.35 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
       a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
       a:hover { text-decoration-thickness: 2px; }
       a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
-      .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--hair); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
+      .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
       .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
       .mast .sub { color: var(--soft); }
       /* the sentence sits in the middle of the page's height, level with the house */
@@ -146,22 +160,42 @@ const image = new URL("/og.png", Astro.url.origin).href;
          rows (heading, sentence, house, foot) are shared, so the two houses stand
          level across the gutter. */
       main:has(> .two) { padding: 0; }
+      /* The question first (spec/question-band.test.ts): a paper strip across both halves, the masthead, the
+         question and Theseus's ship on the left, how to play on the right; folded, the masthead and the question
+         on one line. Read, not decorative: the question is the page's h2. */
+      #question { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 4vw; align-items: end;
+        padding: 3vh 3.6vw 2.6vh; border-bottom: 1px solid var(--rule); }
+      #question .mast { max-width: none; margin: 0; border-bottom: 0; padding-bottom: 0; }
+      #question .question-line { margin: 1.6vh 0 0; font: italic 400 clamp(26px, 2.4vw, 40px)/1.12 "Instrument Serif", serif; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
+      #question .ship { margin: 0.8rem 0 0; font-size: 14px; line-height: 1.5; color: var(--caption); max-width: 62ch; text-wrap: pretty; }
+      #question .how h3 { margin: 0 0 0.6rem; color: var(--soft); }
+      #question .how-to-play { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.55rem; }
+      #question .how-to-play li { counter-increment: step; display: flex; gap: 0.75rem; align-items: baseline; font-size: 14px; line-height: 1.4; color: var(--ink); }
+      #question .how-to-play li::before { content: counter(step); flex: none; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid rgb(25 23 20 / 0.55); border-radius: 50%;
+        font: 500 10.5px/20px var(--mono); text-align: center; color: var(--ink); transform: translateY(-1px); }
+      #question .stacked { display: none; }
+      /* folded: the masthead and the question on one line */
+      #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.4vh; padding-top: 2.2vh; }
+      #question.folded .question-main { display: flex; align-items: baseline; gap: 2vw; min-width: 0; }
+      #question.folded .question-line { margin: 0; font-size: clamp(18px, 1.5vw, 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       /* the house row takes at least half the screen; the notes under it may fall below the first screen */
       .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) auto; min-height: 100vh; }
       .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
-      .stands-half { background: var(--field); }
-      .kept-half { --kept-ink: #efe6d8; --kept-soft: #b9ab97; background: var(--kept-ground); color: var(--kept-ink); }
+      .stands-half, .kept-half { position: relative; }
+      .kept-half { color: var(--kept-ink); }
+      /* each sheet's inset hairline frame (decorative) */
+      .half::before { content: ""; position: absolute; inset: 18px; border: 1px solid var(--frame); pointer-events: none; z-index: 0; }
+      .kept-half::before { border-color: var(--kept-frame); }
       .half-head { display: flex; flex-direction: column; justify-content: end; }
       .half-label { margin: 0 0 1.6vh; color: var(--soft); }
       .kept-half .half-label { color: var(--kept-soft); }
       /* a half's label row; on a phone it also names and links to the other half (hidden side by side) */
       .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
       .to-kept, .to-stands { display: none; white-space: nowrap; color: var(--soft); text-decoration-color: var(--hair); }
-      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(185 171 151 / 0.4); }
+      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(159 177 199 / 0.45); }
       html { scroll-behavior: smooth; }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-      .stands-half .mast, .stands-half .text { max-width: none; }
-      .stands-half .mast { margin-bottom: 2.4vh; }
+      .stands-half .text { max-width: none; }
       /* the live sentence, set to its half: still the largest thing on the page */
       /* side by side, a long sentence steps down through fixed sizes to stay on two lines (src/lib/sentence-step.ts) */
       .two .sentence { --step: 1; font-size: calc(clamp(36px, 3.8vw, 72px) * var(--step)); }
@@ -187,13 +221,33 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
       .kept-sentence mark { text-decoration-color: var(--kept-soft); }
       /* a gap: a blank in the sentence, waiting for the word that stands there now */
-      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-soft); }
+      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-gap); }
+      /* The drawing sheet's numbering (spec/numbering.test.ts): each word's and each gap's position, 01 to 10, small
+         above it, in the leading over its letters. It names a position, like "05 — entry", never a count, and it's
+         drawn, not read: its alternative text is empty, so the sentences are read as their words. */
+      .two .sentence { counter-reset: word; }
+      /* room above each word for its index; on its baseline, so the full stop still sits on the last word's line */
+      .two .sentence .pos { counter-increment: word; padding-top: 12px; margin-top: -6px; padding-bottom: 0.12em; vertical-align: baseline; }
+      .kept-sentence { counter-reset: kept; }
+      .kept-sentence .w { position: relative; display: inline-block; padding-top: 12px; counter-increment: kept; }
+      .two .sentence .pos::before, .kept-sentence .w::before {
+        position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em;
+        color: var(--soft); pointer-events: none; white-space: nowrap; text-decoration: none;
+      }
+      .two .sentence .pos::before { content: counter(word, decimal-leading-zero) / ""; top: 1px; }
+      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; color: var(--kept-soft); }
+      .kept-sentence .gap::before { left: 0; }
+      /* a small laptop: a smaller index in a narrower strip, so the longest words still leave the house on the first screen */
+      @media (min-width: 901px) and (max-width: 1365px) {
+        .two .sentence .pos { padding-top: 11px; }
+        .two .sentence .pos::before { font-size: 9px; top: 4px; }
+      }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
       /* what the kept sentence's words and gaps are: a quiet key under the caption */
-      .kept-half .kept-key { margin: 0; font-size: 15px; line-height: 1.5; color: var(--kept-soft); max-width: 40ch; }
+      .kept-half .kept-key { margin: 0; font-size: 15px; line-height: 1.5; color: var(--kept-caption); max-width: 40ch; }
       .kept-half .earlier { color: var(--kept-soft); }
-      .kept-half .earlier a { text-decoration-color: rgb(185 171 151 / 0.4); }
+      .kept-half .earlier a { text-decoration-color: rgb(159 177 199 / 0.45); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
       .foot #how { margin: 0; }
       .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
@@ -202,14 +256,14 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
 
       /* an earlier house (/?kept=k): the kept ship alone on its own ground, read-only */
-      main:has(> .lone-house) { background: var(--kept-ground); color: #efe6d8; }
-      .lone-house { --kept-ink: #efe6d8; --kept-soft: #b9ab97; display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
-      .lone-house .mast { border-bottom-color: rgb(239 230 216 / 0.16); max-width: none; }
+      main:has(> .lone-house) { background-color: var(--kept-ground); background-image: linear-gradient(var(--kept-grid) 1px, transparent 1px), linear-gradient(90deg, var(--kept-grid) 1px, transparent 1px); background-size: 24px 24px; color: var(--kept-ink); }
+      .lone-house { display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
+      .lone-house .mast { border-bottom-color: var(--kept-rule); max-width: none; }
       .lone-house .mast .sub, .lone-house .half-label, .lone-house .history, .lone-house .about { color: var(--kept-soft); }
       .lone-house .kept-sentence { max-width: 30ch; }
       .lone-house #house-kept { position: relative; flex: 1; min-height: 48vh; }
       .lone-house #house-kept canvas { position: absolute; inset: 0; }
-      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(185 171 151 / 0.4); }
+      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(159 177 199 / 0.45); }
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
@@ -234,9 +288,11 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .thread { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 0.18s; }
       .thread.on { opacity: 1; }
       .thread path { fill: none; stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 1; vector-effect: non-scaling-stroke; }
-      .thread circle { fill: var(--ink); fill-opacity: 0.7; }
+      /* the territory's numbered tag: the line's end, and alone where a word is only pointed at */
+      .thread .tag circle { fill: var(--field); stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; }
+      .thread .tag text { font: 500 10px var(--mono); letter-spacing: 0.04em; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
       .thread.red path { stroke: #c3331c; stroke-opacity: 0.85; }
-      .thread.red circle { fill: #c3331c; fill-opacity: 0.9; }
+      .thread.red .tag circle { stroke: #c3331c; stroke-opacity: 0.9; }
 
       /* the plate's caption, under the house; and the question, at the foot beside About */
       .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
@@ -264,6 +320,15 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .stands-half .foot .earlier { grid-row: 3; margin-top: 0.9rem; }
         .stands-half .foot-aside { grid-column: 2; grid-row: 1 / 5; }
         .stands-half .foot .about { grid-column: 1 / -1; grid-row: 5; margin-top: 1.1rem; }
+        /* a drawing's title block: the foot ruled off from the sheet, its columns divided by a hairline,
+           the question under a rule of its own (decorative: the rules are borders, the reading order is the markup's) */
+        .half > .foot { margin: 0 -1.6vw; padding: 1rem 1.6vw 0.4rem; border-top: 1px solid var(--rule); }
+        .kept-half > .foot { border-top-color: var(--kept-rule); }
+        .stands-half .foot { column-gap: 0; }
+        .stands-half .foot-main > * { padding-right: 1.6vw; }
+        .stands-half .foot-aside { border-left: 1px solid var(--rule); padding-left: 1.6vw; }
+        .stands-half .foot .question { border-top: 1px solid var(--rule); padding-top: 0.8rem; }
+        .stands-half .foot .about { padding-top: 0.8rem; border-top: 1px solid var(--rule); margin-top: 1rem; }
       }
       @media (max-width: 900px) {
         .foot-main, .foot-aside { display: contents; }
@@ -294,7 +359,24 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .mast, .text { max-width: none; }
         .text { margin: 0; padding: 0; }
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
+        /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play in a ruled box */
+        #question { display: block; padding: 0.9rem 1rem 1rem; }
+        #question .mast { margin: 0; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); }
+        #question .question-line { margin-top: 0.7rem; font-size: 24px; line-height: 1.1; }
+        #question .ship { margin-top: 0.45rem; font-size: 13px; line-height: 1.42; }
+        #question .how { margin-top: 0.7rem; }
+        #question .how h3 { margin-bottom: 0.4rem; }
+        #question .how-to-play { gap: 0.3rem; }
+        #question .how-to-play li { font-size: 13px; line-height: 1.38; gap: 0.6rem; }
+        #question .how-to-play li::before { width: 19px; height: 19px; font-size: 9.5px; line-height: 17px; }
+        #question .side-by-side { display: none; }
+        #question .stacked { display: inline; }
+        #question.folded, #question.folded .question-main { display: block; }
+        #question.folded .question-line { margin-top: 0.8rem; font-size: 20px; white-space: normal; }
         .sentence { font-size: 34px; line-height: 1.32; }
+        /* the index takes the room the leading gave the words here */
+        .two .sentence { line-height: 1.1; }
+        .two .sentence .pos { margin-top: -8px; }
         #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-half .kept-key { font-size: 14px; }
         /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
         #how .esc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -310,6 +392,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .two { display: block; min-height: 0; }
         .kept-pointer { display: block; }
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
+        /* the frame sits in the gutter, outside the text, never through it */
+        .half::before { inset: 6px; }
         .half-label { margin-bottom: 0.8rem; }
         .to-kept, .to-stands { display: inline; }
         main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }

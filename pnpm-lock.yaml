@@ -14,6 +14,9 @@ importers:
       '@astrojs/node':
         specifier: ^11.1.6
         version: 11.1.6(astro@7.3.5(@astrojs/markdown-remark@7.3.1)(@types/node@24.13.6)(tsx@4.23.13)(yaml@2.9.1))
+      '@fontsource/ibm-plex-mono':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/instrument-sans':
         specifier: ^5.3.0
         version: 5.3.0
@@ -812,6 +815,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource/ibm-plex-mono@5.3.0':
+    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
   '@fontsource/instrument-sans@5.3.0':
     resolution: {integrity: sha512-QwXc4hb/px3XvSPS2CPAOgey8nyrQFxgxrmXQQ+pN+P51hKdAcchxpg8rSbjANFfPu6VKXhDqkVDucXMZ9CM5g==}
@@ -3486,6 +3492,8 @@ snapshots:
     optional: true
 
   '@exodus/bytes@1.15.1': {}
+
+  '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@fontsource/instrument-sans@5.3.0': {}
 

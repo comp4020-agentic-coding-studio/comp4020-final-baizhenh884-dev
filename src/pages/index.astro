@@ -103,12 +103,32 @@ const how =
       </>
     ) : (
       <>
+        {/* The question first: in full until this visitor has made a change (the server knows from their trace), then
+            the question alone. Never live: it changes only on a fresh page, so another visitor's change never folds it. */}
+        <section id="question" class:list={["sheet", { folded: !!trace?.trace }]} aria-labelledby="question-line">
+          <div class="question-main">
+            <header class="mast">
+              <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
+            </header>
+            <h2 id="question-line" class="question-line">If every word and every part is replaced, is it still the same thing?</h2>
+            {!trace?.trace && (
+              <p class="ship">Theseus’s ship had every plank replaced, one by one. Here the ship is a sentence of ten words and the house it builds, and each visitor replaces a piece at a time.</p>
+            )}
+          </div>
+          {!trace?.trace && (
+            <div class="how">
+              <h3 class="caps">How to play</h3>
+              <ol class="how-to-play">
+                <li><span>Choose any word in the sentence.</span></li>
+                <li><span>Type your own and press Enter. Its part of the house is rebuilt.</span></li>
+                <li><span>Replaced words are kept <span class="side-by-side">on the right</span><span class="stacked">below</span>, building a second house.</span></li>
+              </ol>
+            </div>
+          )}
+        </section>
         <div class="two">
-          <div class="half stands-half" id="stands">
+          <div class="half stands-half sheet" id="stands">
             <div class="half-head">
-              <header class="mast">
-                <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
-              </header>
               {/* on a phone the halves stack: the header row names the other half, as desktop does side by side, and goes there */}
               <div class="head-row">
                 <p class="caps half-label">What stands</p>
@@ -196,7 +216,7 @@ const how =
               </div>
             </div>
           </div>
-          <div class="half kept-half kept-plate" id="kept">
+          <div class="half kept-half kept-plate blueprint" id="kept">
             <div class="half-head">
               <div class="head-row">
                 <p class="caps half-label kept-label">What was kept</p>
@@ -219,7 +239,7 @@ const how =
             </div>
           </div>
         </div>
-        <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><circle r="3" cx="0" cy="0"></circle></svg>
+        <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><g class="tag"><circle r="10" cx="0" cy="0"></circle><text x="0" y="0"></text></g></svg>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
