@@ -17,6 +17,8 @@ export type Look = "present" | "past" | "kept";
 const PRESENT = { mass: 0xeee9df, ground: 0xd9d2c5, roof: 0xc9b9a6, opening: 0x8f9799 };
 const PAST = { mass: 0xf3f0e9, ground: 0xe9e6de, roof: 0xe9e6de, opening: 0xd6d7d2 };
 const KEPT = { mass: 0xb58d62, ground: 0x8f6c49, roof: 0x7a5a3c, opening: 0x3a2d22 };
+// read-only, for spec/house-cue.test.ts: the kept house's palette
+export const KEPT_PALETTE: Readonly<typeof KEPT> = KEPT;
 const PALETTE = { present: PRESENT, past: PAST, kept: KEPT };
 export const EDGE = { present: 0.2, past: 0.32, kept: 0.42 };
 // edges are ink on the light field, and pale on the kept ship's dark ground

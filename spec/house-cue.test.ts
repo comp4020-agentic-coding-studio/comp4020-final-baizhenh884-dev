@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { partTone } from "../src/lib/house/theme";
+import { KEPT_PALETTE, partTone } from "../src/lib/house/theme";
 
 // How one part of a house is drawn, given whether it's chosen, pointed at,
 // receding behind another, or this visitor's own (theme.ts partTone, which
@@ -30,7 +30,24 @@ describe("a part's tone", () => {
   });
 
   it("leaves every other part of the kept house as it was", () => {
-    expect(partTone("kept", rest)).toEqual({ edge: 0.42, edgeColour: 0xefe6d8, lift: 0, recede: 0 });
+    expect(partTone("kept", rest)).toEqual({ edge: 0.42, edgeColour: 0xffffff, lift: 0, recede: 0 });
+  });
+
+  // The kept house is drawn on the blueprint (#1D3350): its solid parts are
+  // cream, light against that ground, and its outlines white. Red stays only
+  // for a part being rebuilt now. How the lit house reads is judged in a
+  // render; this holds the palette it's lit from.
+  it("draws the kept house's solid parts in cream on the blueprint, outlined in white, never red", () => {
+    // relative luminance from the sRGB hex, as a contrast ratio is measured on the page
+    const lum = (hex: number) => [16, 8, 0].map((s) => ((hex >> s) & 255) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const contrast = (a: number, b: number) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+    for (const [role, hex] of Object.entries(KEPT_PALETTE).filter(([r]) => r !== "opening")) {
+      const c = new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
+      expect(contrast(hex, 0x1d3350), `the kept ${role} doesn't read on the blueprint`).toBeGreaterThanOrEqual(7);
+      expect(c.r >= c.b && c.g >= c.b, `the kept ${role} isn't a warm cream`).toBe(true);
+      expect(red(hex), `the kept ${role} is red`).toBe(false);
+    }
+    expect(partTone("kept", rest).edgeColour, "the kept outlines aren't white").toBe(0xffffff);
   });
 
   it("keeps the standing house's cue for your standing word as it was", () => {
