@@ -589,8 +589,9 @@ describe("two ships on GET /", () => {
         const rest = labels.slice(1).map((l) => ({ word: l.textContent, ...line(l) }));
         const mine = line(labels[0].querySelector('mark')), mineLabel = line(labels[0]);
         const boxes = labels.map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
-        return { rest, mine, mineLabel, boxes };
-      })()`, [size[0], size[1]])) as { rest: { word: string; on: boolean; style: string; contrast: number }[]; mine: { style: string; contrast: number }; mineLabel: { on: boolean; contrast: number }; boxes: number[][] };
+        const media = ["(hover: none)", "(hover: hover)", "(any-hover: hover)", "(pointer: fine)", "(pointer: coarse)", "(pointer: none)"].filter((q) => matchMedia(q).matches).join(" ");
+        return { rest, mine, mineLabel, boxes, media };
+      })()`, [size[0], size[1]])) as { rest: { word: string; on: boolean; style: string; contrast: number }[]; mine: { style: string; contrast: number }; mineLabel: { on: boolean; contrast: number }; boxes: number[][]; media: string };
       if (size[0] <= 900) {
         for (const w of m.rest) {
           expect(w.on && w.contrast > 1.05, `"${w.word}" shows no line at rest on a phone`).toBe(true);
@@ -600,7 +601,7 @@ describe("two ships on GET /", () => {
         // your word: its dotted line alone, not doubled by the resting one
         expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
       } else {
-        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest where a pointer can hover`).toBe(false);
+        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest where a pointer can hover (matched: ${m.media})`).toBe(false);
       }
       expect(m.mine.style, "your own word's line isn't dotted").toBe("dotted");
       // the line moves nothing: every word's box is where it is without a mark staged
