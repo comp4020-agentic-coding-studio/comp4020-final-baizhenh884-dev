@@ -481,6 +481,12 @@ hold.
 - On a desktop each house's row takes at least half the screen, both level,
   under the sentence and the invitation; the notes under them may fall below
   the first screen, reachable by scrolling.
+- On a phone, a new visitor's first screen (the question band in full) holds
+  the question, the three steps and the whole live sentence; the house may
+  start one scroll below. Ten 13-letter words run the sentence itself past
+  that screen. Once the band is folded (this visitor has made a change), the
+  live house starts on the first screen, ten 13-letter words included
+  (`spec/two-ships-layout.test.ts`).
 - The visual treatment (fading, layout) is judged, not specified. Its
   direction is Monograph, an architectural-study field: the sentence is the
   protagonist and the house its body; a standing house stays restrained; red
