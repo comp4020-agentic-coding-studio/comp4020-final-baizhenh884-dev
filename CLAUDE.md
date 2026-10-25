@@ -419,6 +419,21 @@ What the code must hold to. The README says why; don't restate it here.
 - Every page has one visible h1 (the masthead's "Theseus"), a header, one
   main, a meta description, Open Graph tags with an image that loads, and a
   favicon (`spec/page-shell.test.ts`).
+- On a desktop the live sentence steps down through a few fixed sizes to
+  stay on two lines, never below a floor at which it still outranks the
+  kept sentence; the step is one function of the words
+  (`src/lib/sentence-step.ts`), shared by the server and the live client.
+  A step never changes under someone: another visitor's change that needs a
+  new step waits while this visitor has a word in hand (a field focused or
+  holding a draft, including moving between words) and applies once they
+  let go. Ten 24-letter words may wrap past two lines at the floor
+  (`spec/sentence-step.test.ts`, `spec/live-client.test.ts`,
+  `spec/two-ships-layout.test.ts`). The step is a prediction from glyph
+  widths, not a measurement in the visitor's browser: two lines is checked
+  only in Chrome on macOS and Linux (the 500-sentence set). Elsewhere
+  (Windows, Safari, Firefox) a rare third line is possible. A third line
+  never shrinks the house: the house row keeps its half-screen floor, so
+  the house moves down by a line at the same size.
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
@@ -463,6 +478,9 @@ hold.
   own holding word fills a thin line until it settles (how much of their
   hold is left), on their own page only, never red, and not with reduced
   motion (`spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
+- On a desktop each house's row takes at least half the screen, both level,
+  under the sentence and the invitation; the notes under them may fall below
+  the first screen, reachable by scrolling.
 - The visual treatment (fading, layout) is judged, not specified. Its
   direction is Monograph, an architectural-study field: the sentence is the
   protagonist and the house its body; a standing house stays restrained; red

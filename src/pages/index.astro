@@ -4,6 +4,7 @@ import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
 import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
 import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
+import { sizeStep } from "../lib/sentence-step";
 import { ensureVisitor } from "../lib/visitor";
 
 const visitor = ensureVisitor(Astro.cookies, Astro.locals);
@@ -119,7 +120,7 @@ const how =
               {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
               <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
               {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
-              <div class="sentence" data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
+              <div class="sentence" data-step={sizeStep(current.map((p) => p.word))} data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
                 {current.slice(0, -1).map((p) => (
                   <>
                     <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />{" "}

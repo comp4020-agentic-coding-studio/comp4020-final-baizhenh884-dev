@@ -4,7 +4,7 @@ import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
 import { drafting, notation } from "../src/lib/house/notation";
 import { anchorOf, threadPath, type ThreadRects } from "../src/lib/house/thread";
-import { measureIn, QUERY_JS, servedPage } from "./chrome";
+import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 
 // The leader line (desktop only): from the chosen word's part notation to its
 // territory, never over text. For every position, with the notation as it
@@ -34,7 +34,7 @@ describe("the leader line", () => {
       it(`never runs over a word or the notation, at any position (1920×1080${longWords ? ", ten long words" : ""}${typing ? ", while typing" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
         const labels = [...doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')];
-        if (longWords) for (const l of labels) l.textContent = "wordmvadgycfe";
+        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const words = labels.map((l) => l.textContent!.trim());
         const texts = words.map((word, position) => (typing ? drafting({ position, word }, "desktop") : notation({ position, word })));
         const m = (await measureIn(doc, `(async () => {

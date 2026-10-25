@@ -6,8 +6,9 @@ import { buildBody } from "../src/lib/house/build";
 import { place } from "../src/lib/house/camera";
 import { drafting, notation as notation_, showDrafting } from "../src/lib/house/notation";
 import { TERRITORIES } from "../src/lib/house/territories";
-import { measureIn, QUERY_JS, servedPage } from "./chrome";
+import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 import { EXTREMES, SENTENCES } from "./house-sentences";
+import { SIZE_STEPS, sizeStep } from "../src/lib/sentence-step";
 
 // The two ships on GET / (docs/decisions/0003-settle-and-kept-ships.md),
 // measured in headless Chrome from the served markup and stylesheet. Two
@@ -47,7 +48,7 @@ type Layout = {
 async function layout(size: [number, number], longNotes = false, longWords = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
   // a staged long sentence, in the measured copy only: ten 13-letter words
-  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
   if (longNotes) {
     const how = doc.querySelector("#how");
     if (!how) throw new Error("GET / has no #how");
@@ -122,7 +123,7 @@ function longestNotations(width: number): string[] {
 // longest notation in turn, as an accepted change shows it (served copy only).
 async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
   const doc = await servedPage(baseUrl);
-  if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
   const labels = longestNotations(size[0]);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
@@ -200,31 +201,126 @@ describe("two ships on GET /", () => {
   }
 
   // The houses are the body of the sentence, not a thumbnail under it: on a
-  // desktop the live half's notes fold into two columns (the rule, your trace
-  // and the links; the captions), so each house's row takes a larger share of
-  // the screen, both rows level, and the page still fits the screen. Measured
-  // with the maker's sentence and an empty kept ship, in the measured copy
-  // only, so the shared sentence's state doesn't decide it. Before the fold,
-  // the rows were 39%, 36% and 32% of these screens (425, 322 and 259px).
-  for (const [name, size, share] of [["1920×1080", [1920, 1080], 0.48], ["1440×900", [1440, 900], 0.42], ["1280×800", [1280, 800], 0.36]] as const) {
-    it(`gives each house a larger share of the screen (${name}: at least ${Math.round(share * 100)}%)`, async () => {
+  // desktop each house's row takes at least half the screen's height, both
+  // rows level, with the live sentence (stepped to two lines) and the
+  // invitation above them on the first screen. The notes under the houses may
+  // fall below the first screen, reachable by scrolling. Measured with the
+  // maker's sentence and with a long one (the live sentence when this was
+  // written), each at the size step GET / renders for it, and an empty kept
+  // ship, in the measured copy only.
+  const LONG_SENTENCE = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
+  const MAKER_SENTENCE = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
+    for (const [which, words] of [["the maker's sentence", MAKER_SENTENCE], ["a long sentence", LONG_SENTENCE]] as const) {
+      it(`gives each house at least half the screen, under the sentence and the invitation (${name}, ${which})`, async () => {
+        const doc = await servedPage(baseUrl);
+        stageWords(doc, [...words]);
+        const m = (await measureIn(doc, `(async () => {
+          await document.fonts.ready;
+          const q = ${QUERY_JS};
+          for (const w of q('.kept-sentence').querySelectorAll('.w')) { w.classList.add('gap'); w.textContent = ''; }
+          const b = (s) => q(s).getBoundingClientRect();
+          const inv = b('.stands-half .invite'), how = b('#how');
+          return { stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top,
+            invTop: inv.top, invBottom: inv.bottom, invShown: getComputedStyle(q('.stands-half .invite')).visibility === 'visible',
+            howTop: how.top, howHeight: how.height, howShown: getComputedStyle(q('#how')).display !== 'none', page: document.documentElement.scrollHeight,
+            scrolls: getComputedStyle(document.documentElement).overflowY !== 'hidden' && getComputedStyle(document.body).overflowY !== 'hidden' };
+        })()`, [size[0], size[1]])) as Record<string, number | boolean>;
+        const at = ` (house rows ${(m.stands as number).toFixed(0)}/${(m.kept as number).toFixed(0)}px of ${size[1]})`;
+        expect(m.stands, "the live house's row is under half the screen" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+        expect(m.kept, "the kept house's row is under half the screen" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+        expect(Math.abs((m.standsTop as number) - (m.keptTop as number)), "the houses aren't level" + at).toBeLessThanOrEqual(1);
+        // the first screen still says what to do, above the house
+        expect(m.invShown, "the invitation isn't shown").toBe(true);
+        expect(m.invBottom, "the invitation is below the first screen").toBeLessThanOrEqual(size[1]);
+        expect(m.invTop, "the invitation isn't above the house").toBeLessThanOrEqual(m.standsTop as number);
+        // the instructions are on the page and reachable by scrolling
+        expect(m.howShown && (m.howHeight as number) > 0, "the instructions aren't shown").toBe(true);
+        expect(m.howTop, "the instructions are past the end of the page").toBeLessThan(m.page as number);
+        expect(m.scrolls, "the page can't scroll to the instructions").toBe(true);
+      }, 90_000);
+    }
+  }
+
+  // A third line never shrinks the house (CLAUDE.md "Enforced"): wherever the
+  // step's prediction misses (an untested platform), the sentence takes a
+  // line more and the house row keeps its half-screen floor, both houses
+  // level. Forced here with long words at the smallest step, where they set
+  // a third line in any browser (the step is pinned, not predicted).
+  for (const [name, size] of [["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
+    it(`keeps each house's half-screen row when the sentence takes a third line (${name})`, async () => {
       const doc = await servedPage(baseUrl);
-      const maker = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
-      doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label').forEach((l, i) => (l.textContent = maker[i]));
+      stageWords(doc, Array(10).fill("wordmvadgycfe"));
+      doc.querySelector(".stands-half .sentence")!.setAttribute("data-step", String(SIZE_STEPS.length - 1));
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         const q = ${QUERY_JS};
-        for (const w of q('.kept-sentence').querySelectorAll('.w')) { w.classList.add('gap'); w.textContent = ''; }
+        const labels = [...document.querySelectorAll('.stands-half .sentence label')];
         const b = (s) => q(s).getBoundingClientRect();
-        return { stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top,
-          page: document.documentElement.scrollHeight, footBottom: Math.max(b('.stands-half .foot').bottom, b('.kept-half .foot').bottom) };
-      })()`, [size[0], size[1]])) as { stands: number; kept: number; standsTop: number; keptTop: number; page: number; footBottom: number };
-      const at = ` (house rows ${m.stands.toFixed(0)}/${m.kept.toFixed(0)}px of ${size[1]})`;
-      expect(m.stands, "the live house's row is too small a share of the screen" + at).toBeGreaterThanOrEqual(size[1] * share);
-      expect(m.kept, "the kept house's row is too small a share of the screen" + at).toBeGreaterThanOrEqual(size[1] * share);
-      expect(Math.abs(m.standsTop - m.keptTop), "the houses aren't level" + at).toBeLessThanOrEqual(1);
-      // and the page still fits the screen: the notes aren't pushed below it
-      expect(m.page, "the page no longer fits the screen" + at).toBeLessThanOrEqual(size[1] + 1);
+        return { lines: new Set(labels.map((l) => Math.round(l.getBoundingClientRect().top))).size, step: q('.stands-half .sentence').getAttribute('data-step'),
+          stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top };
+      })()`, [size[0], size[1]])) as { lines: number; step: string; stands: number; kept: number; standsTop: number; keptTop: number };
+      const at = ` (${m.lines} lines at step ${m.step}; rows ${m.stands.toFixed(0)}/${m.kept.toFixed(0)}px, tops ${m.standsTop.toFixed(0)}/${m.keptTop.toFixed(0)}, screen ${size[1]})`;
+      expect(m.lines, "the staged sentence didn't take a third line, so this proves nothing" + at).toBeGreaterThan(2);
+      expect(m.stands, "a third line shrank the live house's row" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+      expect(m.kept, "a third line shrank the kept house's row" + at).toBeGreaterThanOrEqual(size[1] * 0.5 - 0.5);
+      expect(Math.abs(m.standsTop - m.keptTop), "a third line left the houses unlevel" + at).toBeLessThanOrEqual(1);
+    }, 90_000);
+  }
+
+  // The live sentence stays on two lines on a desktop: it steps down through a
+  // few fixed sizes (src/lib/sentence-step.ts), the step GET / renders. At its
+  // smallest step it still outranks the kept sentence. Ten 24-letter words may
+  // still wrap past two lines at the smallest step: that sentence can't fit
+  // two lines at any size the floor allows, and is checked here only to stay
+  // at the floor and keep the house on the first screen.
+  //
+  // What this proves, and what it doesn't: the step is predicted from glyph
+  // widths, so two lines holds only where this check has run, Chrome on macOS
+  // (locally) and on Linux (CI). On any other platform or browser (Windows,
+  // Safari, Firefox) a sentence near the margin could set a third line. That
+  // costs a line of height, never house size: the half-screen check above
+  // holds the house row at 50vh whatever the sentence does.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
+    it(`keeps the live sentence to two lines, at its step, over the 500-sentence set (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const set = [MAKER_SENTENCE, LONG_SENTENCE, ...SENTENCES];
+      const steps = set.map((w) => sizeStep(w));
+      // For each sentence: its lines at its step, and how much room this browser leaves on its last
+      // line (the column's right edge minus the line's end, as a share of the column). sizeStep()
+      // can't see this platform's glyph widths, so every run reports its tightest sentences: a
+      // failure, and a pass, both say how much margin the step function actually needs here.
+      const out = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const sent = document.querySelector('.stands-half .sentence'), labels = [...sent.querySelectorAll('label')];
+        const col = sent.getBoundingClientRect();
+        const lines = () => new Set(labels.map((l) => Math.round(l.getBoundingClientRect().top))).size;
+        return ${JSON.stringify(set)}.map((ws, i) => {
+          ws.forEach((w, j) => (labels[j].textContent = w)); sent.setAttribute('data-step', ${JSON.stringify(steps)}[i]);
+          const end = sent.querySelector('.end').getBoundingClientRect().right;
+          return { lines: lines(), room: (col.right - end) / col.width, font: parseFloat(getComputedStyle(sent).fontSize) };
+        });
+      })()`, [size[0], size[1]])) as { lines: number; room: number; font: number }[];
+      const say = (i: number) => `"${set[i].join(" ")}" (${out[i].lines} lines at step ${steps[i]}, ${out[i].font}px, last line ${(100 * out[i].room).toFixed(2)}% short of the column)`;
+      const tightest = out.map((_, i) => i).filter((i) => out[i].lines <= 2).sort((a, b) => out[a].room - out[b].room).slice(0, 3).map(say);
+      // always visible: CI shows it as an annotation on the run, so a pass also reports the margin
+      process.stdout.write(`\n::notice title=sentence-step ${name}::tightest two-line sentences: ${tightest.join(" | ")}\n`);
+      const over = out.flatMap((o, i) => (o.lines > 2 ? [say(i)] : []));
+      expect(over.slice(0, 3), `${over.length} sentences wrap past two lines; the tightest that fit: ${tightest.join(" | ")}`).toEqual([]);
+    }, 120_000);
+
+    it(`at its smallest step the live sentence still outranks the kept one, and the longest words keep the house on screen (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      stageWords(doc, Array(10).fill("w".repeat(24)));
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const q = (s) => document.querySelector(s);
+        return { step: q('.stands-half .sentence').getAttribute('data-step'), live: parseFloat(getComputedStyle(q('.stands-half .sentence')).fontSize),
+          kept: parseFloat(getComputedStyle(q('.kept-sentence')).fontSize), houseTop: q('.stands-half #house').getBoundingClientRect().top };
+      })()`, [size[0], size[1]])) as { step: string; live: number; kept: number; houseTop: number };
+      expect(Number(m.step), "ten 24-letter words aren't at the smallest step").toBe(SIZE_STEPS.length - 1);
+      expect(m.live, "at its smallest step the live sentence doesn't outrank the kept one").toBeGreaterThan(m.kept);
+      expect(m.houseTop, "the longest words push the house off the first screen").toBeLessThan(size[1]);
     }, 90_000);
   }
 
@@ -300,7 +396,7 @@ describe("two ships on GET /", () => {
     for (const longWords of [false, true]) {
       it(`invites a stranger to change a word at rest, in the notation's slot, moving nothing (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
-        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = (s) => document.querySelector(s);
@@ -417,7 +513,7 @@ describe("two ships on GET /", () => {
     for (const longWords of [false, true]) {
       it(`outlines the focused word in ink, clear of every neighbouring word (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
-        if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const rows = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const forms = [...document.querySelectorAll('.stands-half .sentence form[action="/replace"]')];
@@ -428,19 +524,26 @@ describe("two ships on GET /", () => {
             const cs = getComputedStyle(input), r = input.getBoundingClientRect();
             const grow = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth);
             const o = { left: r.left - grow, right: r.right + grow, top: r.top - grow, bottom: r.bottom + grow };
-            // the closest any other word comes to the outline (negative: overlapping)
-            let air = Infinity;
+            // the closest any other word comes to the outline (negative: overlapping), and which word that is
+            let air = Infinity, near = -1, nearBox = null;
             forms.forEach((g, j) => {
               if (j === i) return;
               const b = g.querySelector('label').getBoundingClientRect();
               const dx = Math.max(b.left - o.right, o.left - b.right), dy = Math.max(b.top - o.bottom, o.top - b.bottom);
-              air = Math.min(air, Math.max(dx, dy));
+              if (Math.max(dx, dy) < air) { air = Math.max(dx, dy); near = j; nearBox = b; }
             });
-            const out = { word: f.querySelector('label').textContent, focused: document.activeElement === input, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor, ground, air };
+            const fix = (b) => b && [b.left, b.top, b.right, b.bottom].map((v) => +v.toFixed(2));
+            const sentence = document.querySelector('.stands-half .sentence');
+            // everything needed to explain a failure without rerunning it
+            const why = { position: i + 1, neighbour: near + 1, neighbourWord: near >= 0 ? forms[near].querySelector('label').textContent : null,
+              step: sentence.getAttribute('data-step'), fontSize: getComputedStyle(sentence).fontSize, viewport: [innerWidth, innerHeight],
+              field: fix(r), outline: fix({ left: o.left, top: o.top, right: o.right, bottom: o.bottom }), neighbourBox: fix(nearBox),
+              outlineOffset: cs.outlineOffset, outlineWidth: cs.outlineWidth, fonts: document.fonts.status };
+            const out = { word: f.querySelector('label').textContent, focused: document.activeElement === input, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor, ground, air, why };
             input.blur();
             return out;
           });
-        })()`, [size[0], size[1]])) as { word: string; focused: boolean; style: string; width: number; color: string; ground: string; air: number }[];
+        })()`, [size[0], size[1]])) as { word: string; focused: boolean; style: string; width: number; color: string; ground: string; air: number; why: object }[];
         const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const lum = (c: number[]) => c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
         for (const w of rows) {
@@ -449,7 +552,7 @@ describe("two ships on GET /", () => {
           expect(w.width, `"${w.word}"'s focus outline is too thin to see`).toBeGreaterThanOrEqual(2);
           const [a, b] = [lum(rgb(w.color)), lum(rgb(w.ground))].sort((m, n) => n - m);
           expect((a + 0.05) / (b + 0.05), `"${w.word}"'s focus outline doesn't stand out from the ground`).toBeGreaterThanOrEqual(3);
-          expect(w.air, `"${w.word}"'s focus outline touches a neighbouring word`).toBeGreaterThanOrEqual(1);
+          expect(w.air, `"${w.word}"'s focus outline touches a neighbouring word: ${JSON.stringify({ air: +w.air.toFixed(2), ...w.why })}`).toBeGreaterThanOrEqual(1);
         }
       }, 90_000);
     }
@@ -476,7 +579,7 @@ describe("two ships on GET /", () => {
   for (const longWords of [false, true]) {
     it(`links to the kept half and back from the header rows on a phone, never scrolling by itself (390×844${longWords ? ", ten long words" : ""})`, async () => {
       const doc = await servedPage(baseUrl);
-      if (longWords) for (const l of doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')) l.textContent = "wordmvadgycfe";
+      if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
       // where the sentence and house stood without the links: the header row mustn't grow
       const withoutLinks = doc.cloneNode(true) as Document;
       withoutLinks.querySelectorAll("a.to-kept, a.to-stands").forEach((a) => a.remove());
@@ -583,7 +686,12 @@ describe("two ships on GET /", () => {
       expect(how?.textContent, "#how doesn't say Press Escape to cancel").toContain("Press Escape to cancel.");
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
-        const how = document.getElementById('how');
+        // a miss says what the measured page held where the instructions belong (CI once found no #how
+        // here, in a page whose served copy had one), instead of failing inside createTreeWalker
+        const foot = document.querySelector('.stands-half .foot');
+        if (!document.getElementById('how')) throw new Error('the measured page has no #how | ids=' + JSON.stringify([...document.querySelectorAll('[id]')].map((e) => e.id)) +
+          ' foot(600)=' + JSON.stringify(foot ? foot.innerHTML.slice(0, 600) : null) + ' halves=' + document.querySelectorAll('.half').length);
+        const how = (${QUERY_JS})('#how');
         const walker = document.createTreeWalker(how, NodeFilter.SHOW_TEXT);
         let node; while ((node = walker.nextNode()) && !node.textContent.includes('Escape'));
         const el = node.parentElement, r = el.getBoundingClientRect(), cs = getComputedStyle(el);
