@@ -463,8 +463,8 @@ describe("two ships on GET /", () => {
   // A word in hand, being typed over (src/lib/house/notation.ts drafting): the
   // line in the notation's slot names the word being replaced, struck, and
   // the keys, on one line, so it moves nothing and stays as clear of the
-  // house as the notation (checked above, for one line). A long word is
-  // shortened, alone, with an ellipsis; the keys are never cut. Set in the
+  // house as the notation (checked above, for one line). A word too long for
+  // the line is shortened, alone, with an ellipsis; the keys are never cut. Set in the
   // measured copy by the page's own showDrafting(), so the markup and the CSS
   // under test are the page's.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
@@ -499,8 +499,10 @@ describe("two ships on GET /", () => {
         expect(m.house - m.sentence, `${what} pushed the house away`).toBeLessThanOrEqual(20);
       }
       expect(out[0].wasCut, "a short word is shortened").toBe(false);
-      expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
-      expect(out[2].ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
+      // a word is shortened only when the line can't hold it whole: on a phone, the longest word always
+      // is; on a desktop, whether 24 letters fit depends on the label face (IBM Plex Mono holds them at 1920)
+      if (size[0] <= 900) expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
+      for (const m of out.filter((o) => o.wasCut)) expect(m.ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
     }, 120_000);
   }
 
