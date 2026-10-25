@@ -8,8 +8,11 @@
 // using Instrument Serif's advance widths (measured once in Chrome at 1000px,
 // letter-spacing included). The measure is the same in em at every desktop
 // width (font 3.8vw over a column of 50vw - 7.2vw: 11.26em, to 11.41em once the
-// 72px cap is reached) and is taken 3.5% narrower, so a platform's own glyph
-// widths can only choose a smaller step, never leave a third line. 1.5% was
+// 72px cap is reached) and is taken 3.5% narrower, to absorb each platform's
+// own glyph widths. That is shown only for Chrome on macOS and Linux; on an
+// untested platform (Windows, Safari, Firefox) a rare third line is possible,
+// and costs a line of height, never house size (the row keeps its 50vh
+// floor). 1.5% was
 // enough on macOS, where the tightest of the 500-sentence set leaves 1.14% of
 // the column; CI's Linux Chrome set a few of those same lines over 1.2% wider
 // and wrapped them (spec/two-ships-layout.test.ts reports each run's tightest

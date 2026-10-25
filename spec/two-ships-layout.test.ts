@@ -248,6 +248,13 @@ describe("two ships on GET /", () => {
   // still wrap past two lines at the smallest step: that sentence can't fit
   // two lines at any size the floor allows, and is checked here only to stay
   // at the floor and keep the house on the first screen.
+  //
+  // What this proves, and what it doesn't: the step is predicted from glyph
+  // widths, so two lines holds only where this check has run, Chrome on macOS
+  // (locally) and on Linux (CI). On any other platform or browser (Windows,
+  // Safari, Firefox) a sentence near the margin could set a third line. That
+  // costs a line of height, never house size: the half-screen check above
+  // holds the house row at 50vh whatever the sentence does.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]]] as const) {
     it(`keeps the live sentence to two lines, at its step, over the 500-sentence set (${name})`, async () => {
       const doc = await servedPage(baseUrl);
