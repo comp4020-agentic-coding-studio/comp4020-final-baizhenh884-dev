@@ -558,6 +558,59 @@ describe("two ships on GET /", () => {
     }
   }
 
+  // A phone has no hover, so nothing says a word can be changed until it's
+  // touched: there, every word at rest carries a faint solid line under it,
+  // the label's own underline (so the word's box and the sentence's wrap don't
+  // move). It must never be taken for the visitor's own word (a dotted line,
+  // darker) or a kept gap (a blank on the other ground, with no word on it):
+  // solid, never dotted, and fainter than the mark. Anything else keeps today's
+  // rest, with no line until a word is pointed at: a desktop, and a desktop with
+  // no pointer at all (CI's headless Chrome on Linux matches (hover: none) and
+  // (pointer: none) at 1920×1080, and once drew the line there). Staged in the
+  // measured copy: one word marked as the visitor's, as GET / renders one.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
+    it(`marks the words as changeable at rest only on a touch screen, never like your own word (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      const label = doc.querySelector('.stands-half .sentence form[action="/replace"] label')!;
+      const mark = doc.createElement("mark");
+      mark.textContent = label.textContent;
+      label.replaceChildren(mark);
+      const plain = (await measureIn(await servedPage(baseUrl), `(async () => { await document.fonts.ready;
+        return [...document.querySelectorAll('.stands-half .sentence label')].map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }); })()`, [size[0], size[1]])) as number[][];
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ground = rgb(getComputedStyle(document.querySelector('.stands-half')).backgroundColor);
+        // a line's contrast on the field, its alpha laid over the ground
+        const contrast = (c) => { const [r, g, b, a = 1] = rgb(c), k = [r * a + ground[0] * (1 - a), g * a + ground[1] * (1 - a), b * a + ground[2] * (1 - a)];
+          const [x, y] = [lum(k), lum(ground)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const line = (el) => { const cs = getComputedStyle(el); const on = cs.textDecorationLine.includes('underline');
+          return { on, style: cs.textDecorationStyle, contrast: on ? contrast(cs.textDecorationColor) : 1 }; };
+        const labels = [...document.querySelectorAll('.stands-half .sentence label')];
+        const rest = labels.slice(1).map((l) => ({ word: l.textContent, ...line(l) }));
+        const mine = line(labels[0].querySelector('mark')), mineLabel = line(labels[0]);
+        const boxes = labels.map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+        const media = ["(hover: none)", "(hover: hover)", "(any-hover: hover)", "(pointer: fine)", "(pointer: coarse)", "(pointer: none)"].filter((q) => matchMedia(q).matches).join(" ");
+        return { rest, mine, mineLabel, boxes, media };
+      })()`, [size[0], size[1]])) as { rest: { word: string; on: boolean; style: string; contrast: number }[]; mine: { style: string; contrast: number }; mineLabel: { on: boolean; contrast: number }; boxes: number[][]; media: string };
+      if (size[0] <= 900) {
+        for (const w of m.rest) {
+          expect(w.on && w.contrast > 1.05, `"${w.word}" shows no line at rest on a phone`).toBe(true);
+          expect(w.style, `"${w.word}"'s line at rest is drawn like your own word's`).toBe("solid");
+          expect(w.contrast, `"${w.word}"'s line at rest is as strong as your own word's`).toBeLessThan(m.mine.contrast);
+        }
+        // your word: its dotted line alone, not doubled by the resting one
+        expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
+      } else {
+        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest off a touch screen (matched: ${m.media})`).toBe(false);
+      }
+      expect(m.mine.style, "your own word's line isn't dotted").toBe("dotted");
+      // the line moves nothing: every word's box is where it is without a mark staged
+      m.boxes.slice(1).forEach((b, i) => b.forEach((v, k) => expect(Math.abs(v - plain[i + 1][k]), `the resting line moved "${m.rest[i].word}"`).toBeLessThanOrEqual(0.5)));
+    }, 90_000);
+  }
+
   it("never invites on an earlier form (?at=N)", async () => {
     const res = await fetch(new URL("/?at=0", baseUrl));
     expect(res.status).toBe(200);
@@ -648,6 +701,8 @@ describe("two ships on GET /", () => {
   // glanced at: at least 15px on a desktop and 14px on a phone, at a contrast
   // of at least 6:1 on their half's ground (measured over the ground, opacity
   // included). A trace is staged in the measured copy the way GET / renders one.
+  // The invitation is the first line a stranger reads, so it is held to the
+  // same contrast; it keeps its own small caps size (the notation's slot).
   for (const [name, size, px] of [["1920×1080", [1920, 1080], 15], ["phone 390×844", [390, 844], 14]] as const) {
     it(`sets the captions large and dark enough to read (${name})`, async () => {
       const doc = await servedPage(baseUrl);
@@ -662,7 +717,7 @@ describe("two ships on GET /", () => {
         const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
         const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
         const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
-        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key']].map(([what, sel]) => {
+        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key'], ['invitation line', '.stands-half .invite']].map(([what, sel]) => {
           const el = document.querySelector(sel), cs = getComputedStyle(el), ground = rgb(getComputedStyle(el.closest('.half')).backgroundColor);
           const [r, g, b, a = 1] = rgb(cs.color), k = a * opacity(el), c = [r * k + ground[0] * (1 - k), g * k + ground[1] * (1 - k), b * k + ground[2] * (1 - k)];
           const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m);
@@ -670,10 +725,59 @@ describe("two ships on GET /", () => {
         });
       })()`, [size[0], size[1]])) as { what: string; size: number; contrast: number }[];
       for (const r of rows) {
-        expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
+        if (r.what !== "invitation line") expect(r.size, `the ${r.what} are too small to read`).toBeGreaterThanOrEqual(px);
         expect(r.contrast, `the ${r.what} are too faint on their ground`).toBeGreaterThanOrEqual(6);
       }
     }, 60_000);
+  }
+
+  // The foot is set, not just wrapped. No caption ends on one word alone on its
+  // last line ("rebuilt.", "else.", "house."): the measured copy stages a trace
+  // the way GET / renders one, so the trace is held to it too. The site's two
+  // links read as two units: neither breaks inside itself anywhere, and side
+  // by side they share one line, clear of the notes and captions, still last
+  // in reading order (placed by the stylesheet, never moved in the markup).
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`ends no caption on a lone word, and keeps the site's links whole (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      if (!doc.querySelector('section[aria-labelledby="trace-heading"]')) {
+        const section = doc.createElement("section");
+        section.setAttribute("aria-labelledby", "trace-heading");
+        section.innerHTML = '<h2 id="trace-heading">Your trace</h2><p role="status">Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands.</p>';
+        doc.getElementById("how")!.after(section);
+      }
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        // the last two words of an element's text: on different lines, the last stands alone
+        const lone = (el) => {
+          const words = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          for (let n; (n = walker.nextNode()); ) {
+            if (n.parentElement.closest('.sr-only, .esc') && getComputedStyle(n.parentElement).clipPath !== 'none') continue;
+            for (const w of n.textContent.matchAll(/\\S+/g)) words.push([n, w.index, w.index + w[0].length]);
+          }
+          if (words.length < 2) return false;
+          const top = ([n, a, b]) => { const r = document.createRange(); r.setStart(n, a); r.setEnd(n, b); return r.getClientRects()[0].top; };
+          return Math.abs(top(words.at(-1)) - top(words.at(-2))) > 2;
+        };
+        const captions = [['the plate note', '.stands-half .plate-note'], ['the kept plate note', '.kept-half .plate-note'], ['the instructions', '#how'],
+          ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept key', '.kept-half .kept-key'], ['the question', '.stands-half .question']]
+          .map(([what, sel]) => ({ what, lone: lone(document.querySelector(sel)) }));
+        const nav = document.querySelector('.stands-half .foot .about');
+        const links = [...nav.querySelectorAll('a')].map((a) => ({ text: a.textContent, lines: a.getClientRects().length, top: a.getBoundingClientRect().top }));
+        const nb = nav.getBoundingClientRect();
+        const overlaps = [...document.querySelectorAll('.stands-half .foot :is(#how, section, .earlier, .plate-note, .question)')]
+          .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.bottom > nb.top + 0.5 && r.top < nb.bottom - 0.5 && r.right > nb.left && r.left < nb.right; })
+          .map((el) => el.id || el.className || el.tagName);
+        const after = (sel) => { const el = document.querySelector(sel); return !el || !!(el.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING); };
+        return { captions, links, overlaps, last: after('#how') && after('.stands-half .earlier') && after('section[aria-labelledby="trace-heading"]') };
+      })()`, [size[0], size[1]])) as { captions: { what: string; lone: boolean }[]; links: { text: string; lines: number; top: number }[]; overlaps: string[]; last: boolean };
+      for (const c of m.captions) expect(c.lone, `${c.what} ends on a lone word`).toBe(false);
+      for (const l of m.links) expect(l.lines, `"${l.text}" breaks across lines`).toBe(1);
+      if (size[0] > 900) expect(Math.abs(m.links[0].top - m.links[1].top), "the site's links don't share one line").toBeLessThanOrEqual(1);
+      expect(m.overlaps, "the site's links overlap the notes").toEqual([]);
+      expect(m.last, "the site's links aren't last in reading order").toBe(true);
+    }, 90_000);
   }
 
   // A phone has no Escape key: the instructions' "Press Escape to cancel."
