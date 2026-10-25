@@ -563,11 +563,13 @@ describe("two ships on GET /", () => {
   // the label's own underline (so the word's box and the sentence's wrap don't
   // move). It must never be taken for the visitor's own word (a dotted line,
   // darker) or a kept gap (a blank on the other ground, with no word on it):
-  // solid, never dotted, and fainter than the mark. A pointer that can hover
-  // keeps today's rest, with no line until a word is pointed at. Staged in the
+  // solid, never dotted, and fainter than the mark. Anything else keeps today's
+  // rest, with no line until a word is pointed at: a desktop, and a desktop with
+  // no pointer at all (CI's headless Chrome on Linux matches (hover: none) and
+  // (pointer: none) at 1920×1080, and once drew the line there). Staged in the
   // measured copy: one word marked as the visitor's, as GET / renders one.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
-    it(`marks the words as changeable at rest only where there's no hover, never like your own word (${name})`, async () => {
+    it(`marks the words as changeable at rest only on a touch screen, never like your own word (${name})`, async () => {
       const doc = await servedPage(baseUrl);
       const label = doc.querySelector('.stands-half .sentence form[action="/replace"] label')!;
       const mark = doc.createElement("mark");
@@ -601,7 +603,7 @@ describe("two ships on GET /", () => {
         // your word: its dotted line alone, not doubled by the resting one
         expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
       } else {
-        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest where a pointer can hover (matched: ${m.media})`).toBe(false);
+        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest off a touch screen (matched: ${m.media})`).toBe(false);
       }
       expect(m.mine.style, "your own word's line isn't dotted").toBe("dotted");
       // the line moves nothing: every word's box is where it is without a mark staged
