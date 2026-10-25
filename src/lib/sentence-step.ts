@@ -8,14 +8,18 @@
 // using Instrument Serif's advance widths (measured once in Chrome at 1000px,
 // letter-spacing included). The measure is the same in em at every desktop
 // width (font 3.8vw over a column of 50vw - 7.2vw: 11.26em, to 11.41em once the
-// 72px cap is reached) and is taken 1.5% narrower, so a mismeasured edge can
-// only choose a smaller step, never leave a third line (spec/sentence-step.test.ts,
-// spec/two-ships-layout.test.ts). Some sentences can't fit two lines at the
-// smallest step (ten 24-letter words): they stay at the floor and wrap.
+// 72px cap is reached) and is taken 3.5% narrower, so a platform's own glyph
+// widths can only choose a smaller step, never leave a third line. 1.5% was
+// enough on macOS, where the tightest of the 500-sentence set leaves 1.14% of
+// the column; CI's Linux Chrome set a few of those same lines over 1.2% wider
+// and wrapped them (spec/two-ships-layout.test.ts reports each run's tightest
+// lines, so this margin is checked against the platform, not assumed).
+// Some sentences can't fit two lines at the smallest step (ten 24-letter
+// words): they stay at the floor and wrap.
 
 export const SIZE_STEPS = [1, 0.92, 0.85, 0.8] as const;
 
-const MEASURE = 11.26 * 0.985; // em, at step 1
+const MEASURE = 11.26 * 0.965; // em, at step 1
 const TRACKING = -0.012; // em per letter (.sentence letter-spacing)
 const OTHER = 0.5; // em, any character outside printable ASCII
 // advance width in em of each printable ASCII character from "!" (33) to "~" (126)
