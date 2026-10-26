@@ -76,10 +76,14 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     const mobile = size[0] <= 900;
     await send("Emulation.setDeviceMetricsOverride", { width: size[0], height: size[1], deviceScaleFactor: 1, mobile });
     if (mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    // Loaded means this file, complete: a new tab that hasn't begun its navigation is still about:blank, whose
+    // readyState is already "complete", and a check measured there found no page at all (url=about:blank in CI).
+    const page = new URL(`file://${file}`).href;
     for (let i = 0; ; i++) {
-      const ready = await send("Runtime.evaluate", { expression: "document.readyState", returnByValue: true });
-      if (ready.result?.result?.value === "complete") break;
-      if (i > 200) throw new Error("the page did not load");
+      const ready = await send("Runtime.evaluate", { expression: "[document.URL, document.readyState]", returnByValue: true });
+      const [url, state] = ready.result?.result?.value ?? [];
+      if (url === page && state === "complete") break;
+      if (i > 200) throw new Error(`the page did not load: the tab is on ${url} (${state}), not ${page}`);
       await sleep(100);
     }
     const out = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });

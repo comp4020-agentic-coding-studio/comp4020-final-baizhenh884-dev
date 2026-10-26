@@ -325,7 +325,7 @@ describe("two ships on GET /", () => {
       stageWords(doc, Array(10).fill("w".repeat(24)));
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
-        const q = (s) => document.querySelector(s);
+        const q = ${QUERY_JS};
         return { step: q('.stands-half .sentence').getAttribute('data-step'), live: parseFloat(getComputedStyle(q('.stands-half .sentence')).fontSize),
           kept: parseFloat(getComputedStyle(q('.kept-sentence')).fontSize), houseTop: q('.stands-half #house').getBoundingClientRect().top };
       })()`, [size[0], size[1]])) as { step: string; live: number; kept: number; houseTop: number };
@@ -429,7 +429,7 @@ describe("two ships on GET /", () => {
         if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
-          const q = (s) => document.querySelector(s);
+          const q = ${QUERY_JS};
           const inv = q('.stands-half .invite'), part = q('#part');
           if (!inv) return { missing: true };
           const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
@@ -466,7 +466,7 @@ describe("two ships on GET /", () => {
       const doc = await servedPage(baseUrl);
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
-        const q = (s) => document.querySelector(s);
+        const q = ${QUERY_JS};
         const at = () => [...document.querySelectorAll('.stands-half .sentence form[action="/replace"] label')].map((l) => { const r = l.getBoundingClientRect(); return [r.left, r.top]; }).concat([[0, q('.stands-half #house').getBoundingClientRect().top]]);
         const before = at();
         const pos = document.querySelectorAll('.stands-half .sentence .pos')[4];
@@ -509,7 +509,7 @@ describe("two ships on GET /", () => {
         showDrafting(doc.getElementById("part")!, d);
         out.push(await measureIn(doc, `(async () => {
           await document.fonts.ready;
-          const q = (s) => document.querySelector(s);
+          const q = ${QUERY_JS};
           const part = q('#part'), was = part.querySelector('del'), tail = was.nextElementSibling, cs = getComputedStyle(part);
           const r = part.getBoundingClientRect(), t = tail.getBoundingClientRect(), half = q('.stands-half').getBoundingClientRect(), inv = q('.stands-half .invite').getBoundingClientRect();
           return { height: r.height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45, right: r.right, halfRight: half.right, top: r.top, invTop: inv.top,
@@ -672,8 +672,8 @@ describe("two ships on GET /", () => {
       const m = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         const settle = () => new Promise((r) => setTimeout(r, 900)); // a smooth scroll has finished
-        const q = (s) => document.querySelector(s);
-        const down = q('.stands-half a.to-kept'), up = q('.kept-half a.to-stands');
+        const q = ${QUERY_JS};
+        const down = document.querySelector('.stands-half a.to-kept'), up = document.querySelector('.kept-half a.to-stands'); // may be absent: reported as missing
         if (!down || !up) return { missing: { down: !!down, up: !!up } };
         await settle();
         const atLoad = scrollY;
@@ -683,9 +683,9 @@ describe("two ships on GET /", () => {
         const placed = { sentence: t('.stands-half .sentence'), house: t('.stands-half #house'), invite: t('.stands-half .invite') };
         const downBox = box(down), standsLabel = box(q('.stands-half .half-label')), upBox = box(up), keptLabel = box(q('.kept-half .kept-label'));
         const sameStyle = style(down) === style(q('.stands-half .half-label')) && style(up) === style(q('.kept-half .kept-label'));
-        const footer = q('.stands-half .kept-pointer');
+        const footer = document.querySelector('.stands-half .kept-pointer'); // may be absent: reported below, not thrown
         const footerLinked = !!footer && (footer.tagName === 'A' || !!footer.closest('a') || !!footer.querySelector('a'));
-        const target = (a) => q(a.getAttribute('href'));
+        const target = (a) => document.querySelector(a.getAttribute('href')); // may be absent: reported below, not thrown
         down.click(); await settle();
         const house = box(q('#house-kept'));
         const downTarget = !!target(down) && target(down).classList.contains('kept-half');
