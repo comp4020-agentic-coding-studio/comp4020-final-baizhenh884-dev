@@ -28,7 +28,8 @@ describe("the numbering", () => {
         // the kept sentence with gaps and words both, as GET / serves them: alternate positions as gaps
         const kept = doc.querySelector(".kept-sentence")!;
         kept.querySelectorAll(".w").forEach((w, i) => {
-          if (i % 2) { w.className = "w gap"; w.textContent = ""; } else if (!w.textContent) { w.className = "w"; w.textContent = "kept"; }
+          // a gap shows the word still standing there, as GET / serves it
+          if (i % 2) { w.className = "w gap"; w.textContent = ["a", "that", "would", "if", "disappeared"][(i - 1) / 2]; } else if (!w.textContent) { w.className = "w"; w.textContent = "kept"; }
         });
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
@@ -96,7 +97,7 @@ describe("the numbering", () => {
       const doc = await servedPage(baseUrl);
       const kept = doc.querySelector(".kept-sentence")!;
       kept.querySelectorAll(".w").forEach((w, i) => {
-        if (i % 2) { w.className = "w gap"; w.textContent = ""; } else { w.className = "w"; w.textContent = ["Make", "website", "people", "miss", "it"][i / 2]; }
+        if (i % 2) { w.className = "w gap"; w.textContent = ["a", "that", "would", "if", "disappeared"][(i - 1) / 2]; } else { w.className = "w"; w.textContent = ["Make", "website", "people", "miss", "it"][i / 2]; }
       });
       const rows = (await measureIn(doc, `(async () => {
         await document.fonts.ready;

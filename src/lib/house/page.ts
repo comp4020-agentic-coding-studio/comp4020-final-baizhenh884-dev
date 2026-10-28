@@ -263,8 +263,7 @@ export function mountKept(doc: Document): KeptHouse | null {
   const keptSpans = [...doc.querySelectorAll<HTMLElement>(".kept-sentence .w")];
   // keptShipAt() already sets a gap position's word to the position's
   // current live word (src/lib/kept-ship.ts) — the server's own convention,
-  // reused here: read it from the live sentence, since the kept-sentence
-  // markup itself leaves a gap blank.
+  // reused here: read it from the live sentence, the word a gap shows faint.
   const currentWords = [...doc.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"] label')].map((l) =>
     l.textContent!.trim(),
   );

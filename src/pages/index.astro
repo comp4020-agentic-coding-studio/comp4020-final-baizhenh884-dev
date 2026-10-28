@@ -107,8 +107,10 @@ const how =
             the question alone. Never live: it changes only on a fresh page, so another visitor's change never folds it. */}
         <section id="question" class:list={["sheet", { folded: !!trace?.trace }]} aria-labelledby="question-line">
           <div class="question-main">
+            {/* the way to how the house reads a word stands on the masthead's row: one link, kept when the band folds */}
             <header class="mast">
               <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
+              <a class="caps band-house" href="/house/">How the house reads a word</a>
             </header>
             <h2 id="question-line" class="question-line">If every word and every part is replaced, is it still the same thing?</h2>
             {!trace?.trace && (
@@ -119,8 +121,9 @@ const how =
             <div class="how">
               <h3 class="caps">How to play</h3>
               <ol class="how-to-play">
-                <li><span>Choose any word in the sentence.</span></li>
-                <li><span>Type your own and press Enter. Its part of the house is rebuilt.</span></li>
+                {/* each device's own gesture; the layout shows only the device's */}
+                <li><span><span class="on-desktop">Click any word in the sentence.</span><span class="on-phone">Tap any word in the sentence.</span></span></li>
+                <li><span>Type your own and press Enter. Its part of the house is rebuilt from how the word is spelled, not what it means.</span></li>
                 <li><span>Replaced words are kept <span class="side-by-side">on the right</span><span class="stacked">below</span>, building a second house.</span></li>
               </ol>
             </div>
@@ -153,7 +156,10 @@ const how =
               </div>
               <p id="part" class="caps" aria-hidden="true" hidden></p>
               {/* at rest the notation's slot invites a change; choosing a word puts the notation there instead */}
-              <p class="invite caps" aria-hidden="true">Choose any word and type your own</p>
+              <div class="invite-row">
+                <p class="invite caps" aria-hidden="true">Choose any word and type your own</p>
+                <a class="caps invite-house" href="/house/">How the house reads a word</a>
+              </div>
             </div>
             <div id="house" aria-hidden="true"></div>
             <div class="foot">
@@ -223,17 +229,22 @@ const how =
                 <a class="caps to-stands" href="#stands">Back to what stands ↑</a>
               </div>
             </div>
-            {/* the kept sentence is read as words, a gap as "blank" (src/lib/kept-sentence.ts redraws it the same way) */}
-            <p class="kept-sentence">
-              {kept.words.map((w, i) => {
-                const word = kept.gaps[i] ? <><span class="w gap"></span><span class="sr-only">blank</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
-                return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
-              })}
-            </p>
+            {/* the kept sentence is read as words; a gap shows, faint, the word still standing there, read as "still standing:" then the word
+                (src/lib/kept-sentence.ts redraws it the same way) */}
+            <div class="kept-text">
+              <p class="kept-sentence">
+                {kept.words.map((w, i) => {
+                  const word = kept.gaps[i] ? <><span class="sr-only">still standing: </span><span class="w gap">{w}</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
+                  return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
+                })}
+              </p>
+              {/* what the kept sentence is (28 October playtest: it was read as a quiz, or as the original); it lies over the
+                  kept house's empty top band, so it never grows the row both halves share */}
+              <p class="kept-note">Replaced words, back in their places. Faint words still stand.</p>
+            </div>
             <div id="house-kept" aria-hidden="true"></div>
             <div class="foot">
               <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
-              <p class="kept-key">The words above have been replaced in the sentence; the gaps are words that still stand there.</p>
               {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
               {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
             </div>

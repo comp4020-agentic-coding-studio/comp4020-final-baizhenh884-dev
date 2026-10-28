@@ -105,13 +105,14 @@ describe("Kept ships", () => {
 // The rendered markup on GET / (Slice 4): the kept ship is read-only (no
 // forms), shown from the first load; its house is decorative (aria-hidden)
 // while its sentence is readable by a screen reader, each gap read as
-// "blank"; and its text reflects filled-vs-gap exactly as the live sentence
-// changes. Checked over HTTP against the running app, like
+// "still standing: <word>"; and its text reflects filled-vs-gap exactly as the
+// live sentence changes. Checked over HTTP against the running app, like
 // spec/theseus.test.ts.
 //
 // What a screen reader is given: the text of every node not inside an
-// aria-hidden subtree. A gap's visible span stays empty (it is drawn as a
-// blank, spec/two-ships-layout.test.ts); its "blank" is visually hidden text.
+// aria-hidden subtree. A gap shows, faint, the word still standing at its
+// position (spec/two-ships-layout.test.ts); "still standing:" is visually
+// hidden text before it.
 const readable = (el: Element): string => {
   const walk = (n: Node): string =>
     n.nodeType === 3 ? n.textContent ?? "" : n.nodeType === 1 && (n as Element).getAttribute("aria-hidden") === "true" ? "" : [...n.childNodes].map(walk).join("");
@@ -248,28 +249,34 @@ describe("Kept ship markup on GET /", () => {
     const sentence = doc.querySelector(".kept-sentence");
     expect(sentence, "GET / has no kept sentence").not.toBeNull();
     expect(sentence!.closest('[aria-hidden="true"]'), "the kept sentence is hidden from screen readers").toBeNull();
-    // a gap is a blank waiting for its word (drawn as one, spec/two-ships-layout.test.ts), never a glyph standing in for it
-    for (const gap of doc.querySelectorAll(".kept-sentence .w.gap")) expect(gap.textContent, "a gap holds visible text").toBe("");
+    // a gap shows the word still standing at its position in the live sentence (drawn faint, spec/two-ships-layout.test.ts)
+    const live = [...doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
+    [...doc.querySelectorAll(".kept-sentence .w")].forEach((w, i) => {
+      if (w.classList.contains("gap")) expect(w.textContent!.trim(), `gap ${i} doesn't show the word still standing there`).toBe(live[i]);
+    });
   });
 
-  it("reads to a screen reader as ten words, a gap as 'blank', the way the kept ship is derived", async () => {
+  it("reads to a screen reader as ten words, a gap as 'still standing: <word>', the way the kept ship is derived", async () => {
     const doc = await new Visitor().page();
     const sentence = doc.querySelector(".kept-sentence")!;
-    const words = [...sentence.querySelectorAll(".w")].map((w) => (w.classList.contains("gap") ? "blank" : w.textContent!.trim()));
+    const words = [...sentence.querySelectorAll(".w")].map((w) => (w.classList.contains("gap") ? `still standing: ${w.textContent!.trim()}` : w.textContent!.trim()));
     expect(words).toHaveLength(10);
-    expect(readable(sentence), "the kept sentence doesn't read as its words and blanks").toContain(`${words.join(" ")}.`);
+    expect(readable(sentence), "the kept sentence doesn't read as its words, and its gaps as words still standing").toContain(`${words.join(" ")}.`);
   });
 
-  // what the kept sentence is, said once under its house: a first visitor
-  // reads the words above as replaced and the gaps as still standing. GET /
-  // only: an earlier form has no kept half (houses stay level with it,
-  // spec/two-ships-layout.test.ts)
-  const KEPT_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
-  it("says under its house what its words and gaps are, on GET / only", async () => {
+  // what the kept sentence is, said once, under the sentence: its words were
+  // replaced, and a faint word hasn't been yet. GET / only: an earlier form
+  // has no kept half (houses stay level with it, spec/two-ships-layout.test.ts).
+  // The foot's older line ("…the gaps are words that still stand there"),
+  // written for empty gaps, said the same thing in older terms; it's gone.
+  const KEPT_LINE = "Replaced words, back in their places. Faint words still stand.";
+  const OLD_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
+  it("says once what its words and faint words are, on GET / only", async () => {
     const doc = await new Visitor().page();
-    const lines = [...doc.querySelectorAll(".kept-half .foot p")].map((p) => p.textContent?.trim());
-    expect(lines, "the kept half's foot doesn't say what its words and gaps are").toContain(KEPT_LINE);
-    expect(doc.querySelector(".kept-half .foot")?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    const note = doc.querySelector(".kept-half .kept-note");
+    expect(note?.textContent?.trim(), "the kept half doesn't say what its words and faint words are").toBe(KEPT_LINE);
+    expect(note?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    expect(doc.body.textContent, "the foot's older line for empty gaps is still there").not.toContain(OLD_LINE);
     const earlier = new JSDOM(await (await fetch(new URL("/?at=0", baseUrl))).text()).window.document;
     expect(earlier.body.textContent, "an earlier form says what a kept half shows").not.toContain(KEPT_LINE);
   });
