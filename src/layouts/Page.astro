@@ -103,11 +103,10 @@ const image = new URL("/og.png", Astro.url.origin).href;
       @media (hover: hover) {
         .sentence .pos:hover label:not(:has(mark)), .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.35); }
       }
-      /* a touch screen: every word at rest shows it can be changed, by a faint solid line (your own word keeps its dotted one).
-         Coarse as well as no hover: a headless desktop with no pointer at all matches (hover: none) too */
-      @media (hover: none) and (pointer: coarse) {
-        .sentence label:not(:has(mark)) { text-decoration-color: var(--hair); }
-      }
+      /* every word at rest shows it can be changed, by a faint solid line, on every device (your own word keeps its dotted
+         one); pointing darkens it (above, more specific). A desktop showed nothing until hover, and at the 28 October
+         playtest people there didn't see the words could be clicked */
+      .sentence label:not(:has(mark)) { text-decoration-color: var(--hair); }
       /* your holding word: a thin line fills under it until the hold ends (settle mode, your page only); never red */
       .sentence .settling {
         position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; pointer-events: none;
@@ -174,6 +173,11 @@ const image = new URL("/og.png", Astro.url.origin).href;
       #question .how-to-play li::before { content: counter(step); flex: none; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid rgb(25 23 20 / 0.55); border-radius: 50%;
         font: 500 10.5px/20px var(--mono); text-align: center; color: var(--ink); transform: translateY(-1px); }
       #question .stacked { display: none; }
+      /* step 1: a touch screen taps, anything else clicks */
+      #question .on-phone { display: none; }
+      @media (pointer: coarse) { #question .on-phone { display: inline; } #question .on-desktop { display: none; } }
+      /* the band's way to how the house reads a word: with the question, so it stays once folded */
+      #question .band-house { margin-left: 1.2rem; color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
       /* folded: the masthead and the question on one line */
       #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.4vh; padding-top: 2.2vh; }
       #question.folded .question-main { display: flex; align-items: baseline; gap: 2vw; min-width: 0; }
@@ -205,9 +209,12 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .stands-half .text { margin: 0; padding: 0; }
       /* the part notation lies over the house's own empty top band, which no house at rest reaches
          (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
-      .stands-half #part, .stands-half .invite { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
-      .stands-half .invite { color: var(--caption); white-space: nowrap; }
-      .stands-half #part:not([hidden]) ~ .invite { visibility: hidden; }
+      .stands-half #part, .stands-half .invite-row { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
+      /* at rest: the invitation, and beside it the way to how the house reads a word (spec/two-ships-layout.test.ts) */
+      .stands-half .invite-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.6rem; row-gap: 0.3rem; }
+      .stands-half .invite { margin: 0; color: var(--caption); white-space: nowrap; }
+      .stands-half .invite-house { color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
+      .stands-half #part:not([hidden]) ~ .invite-row { visibility: hidden; }
       /* while a replacement is typed: one line, the replaced word struck, and only it shortened when long; the keys are never cut */
       #part:has(> del) { display: flex; white-space: pre; }
       #part > span { flex: none; }
@@ -364,7 +371,12 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play in a ruled box */
         #question { display: block; padding: 0.9rem 1rem 1rem; }
-        #question .mast { margin: 0; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); }
+        #question .mast { margin: 0; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); flex-wrap: nowrap; }
+        /* the masthead's row holds the name and the way to how the house reads a word; the subtitle steps aside for it */
+        #question .mast .sub { display: none; }
+        #question .band-house { margin-left: auto; }
+        /* no room beside the invitation here, and a line of its own would reach the tallest house: the band and the foot carry it */
+        .stands-half .invite-house { display: none; }
         #question .question-line { margin-top: 0.7rem; font-size: 24px; line-height: 1.1; }
         #question .ship { margin-top: 0.45rem; font-size: 13px; line-height: 1.42; }
         #question .how { margin-top: 0.7rem; }
