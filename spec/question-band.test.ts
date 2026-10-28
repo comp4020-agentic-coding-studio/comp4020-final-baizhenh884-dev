@@ -75,6 +75,29 @@ describe("the question first", () => {
     expect(steps[2]).toMatch(/kept/i);
   });
 
+  // The 28 October playtest: nobody knew the house reads a word's spelling, not its meaning (they expected
+  // meaning to change it), and nobody found /house/. Step 2 says so; how to play links to /house/.
+  it("says the house is rebuilt from how a word is spelled, not what it means, and links how it reads a word", async () => {
+    const { doc } = await new Visitor().page("/");
+    const band = doc.querySelector("#question")!;
+    const step2 = text(band.querySelectorAll("ol.how-to-play > li")[1]);
+    expect(step2, "step 2 doesn't say the part is rebuilt from the spelling").toMatch(/spell/i);
+    expect(step2, "step 2 doesn't say meaning doesn't count").toMatch(/not (by |from )?what it means|not its meaning/i);
+    const link = band.querySelector('.how a[href="/house/"]');
+    expect(link, "how to play doesn't link to /house/").not.toBeNull();
+    expect(text(link), "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
+    expect(link!.closest("[aria-hidden='true']"), "the /house/ link is hidden from assistive technology").toBeNull();
+  });
+
+  // Step 1 names the device's own gesture: click on a desktop, tap on a phone. Both are in the page (no
+  // device guess on the server); the layout shows only the device's own (measured in the layout check below).
+  it("names the gesture for each device in step 1: click on a desktop, tap on a phone", async () => {
+    const { doc } = await new Visitor().page("/");
+    const step1 = doc.querySelectorAll("#question ol.how-to-play > li")[0];
+    expect(step1.querySelector(".on-desktop")?.textContent?.trim(), "step 1 has no desktop wording").toMatch(/^Click any word/);
+    expect(step1.querySelector(".on-phone")?.textContent?.trim(), "step 1 has no phone wording").toMatch(/^Tap any word/);
+  });
+
   // what the band says is true of the rules (docs/decisions/0003)
   it("claims nothing the rules don't do", async () => {
     const { doc } = await new Visitor().page("/");
@@ -99,6 +122,8 @@ describe("the question first", () => {
     expect(text(after!.querySelector(".question-line"))).toBe(QUESTION);
     expect(after!.querySelector(".ship"), "the folded band still tells Theseus's ship").toBeNull();
     expect(after!.querySelector("ol.how-to-play"), "the folded band still shows how to play").toBeNull();
+    // /house/ stays one step away once the band is folded: the link stands with the question, not in how to play
+    expect(after!.querySelector('.question-main a[href="/house/"]'), "the folded band loses its link to /house/").not.toBeNull();
     // another visitor's change never folds a stranger's band
     const still = (await stranger.page("/")).doc.querySelector("#question");
     expect(still!.querySelector("ol.how-to-play"), "someone else's change folded a stranger's band").not.toBeNull();
@@ -123,16 +148,20 @@ describe("the question first", () => {
         const over = ([r, g, b, a = 1], [R, G, B]) => [r * a + R * (1 - a), g * a + G * (1 - a), b * a + B * (1 - a)];
         const band = document.querySelector('#question'), bs = getComputedStyle(band);
         const flat = rgb(bs.backgroundColor), line = (bs.backgroundImage.match(/rgba?\\([^)]*\\)/) || [null])[0], grid = line ? over(rgb(line), flat) : flat;
-        const texts = [...band.querySelectorAll('h2, p, li, .caps')].filter((el) => el.getBoundingClientRect().height > 0).map((el) => {
+        const texts = [...band.querySelectorAll('h2, p, li, .caps, a')].filter((el) => el.getBoundingClientRect().height > 0).map((el) => {
           const fg = over(rgb(getComputedStyle(el).color), flat);
           return { what: (el.className || el.tagName) + ' ' + el.textContent.trim().slice(0, 30), contrast: Math.min(ratio(fg, flat), ratio(fg, grid)), caption: !el.matches('.caps, .question-line') };
         });
         const q = band.querySelector('.question-line'), qr = q.getBoundingClientRect(), qs = getComputedStyle(q);
         const steps = [...band.querySelectorAll('ol.how-to-play > li')].map((li) => li.getBoundingClientRect());
+        const shown = (sel) => { const el = band.querySelector(sel); return !!el && el.getBoundingClientRect().width > 0; };
+        const link = band.querySelector('a[href="/house/"]'), lr = link && link.getBoundingClientRect();
         return { texts, qLines: Math.round(qr.height / parseFloat(qs.lineHeight)), qRight: qr.right, width: innerWidth, flat, bottom: band.getBoundingClientRect().bottom,
-          stepsBeside: steps.length ? steps[0].left > qr.right - 1 : null };
+          stepsBeside: steps.length ? steps[0].left > qr.right - 1 : null, click: shown('.on-desktop'), tap: shown('.on-phone'),
+          link: lr ? { shown: lr.width > 0, right: lr.right, bottom: lr.bottom } : null };
       })()`;
-      type M = { texts: { what: string; contrast: number; caption: boolean }[]; qLines: number; qRight: number; width: number; flat: number[]; bottom: number; stepsBeside: boolean | null };
+      type M = { texts: { what: string; contrast: number; caption: boolean }[]; qLines: number; qRight: number; width: number; flat: number[]; bottom: number; stepsBeside: boolean | null;
+        click: boolean; tap: boolean; link: { shown: boolean; right: number; bottom: number } | null };
       const f = (await measureIn(full, measure, [size[0], size[1]])) as M;
       const g = (await measureIn(folded, measure, [size[0], size[1]])) as M;
       expect(f.flat.slice(0, 3), "the band isn't on the drafting paper").toEqual([236, 232, 223]);
@@ -141,6 +170,13 @@ describe("the question first", () => {
       if (size[0] > 900) expect(f.stepsBeside, "the steps aren't beside the question on a desktop").toBe(true);
       else expect(f.stepsBeside, "the steps aren't under the question on a phone").toBe(false);
       if (size[0] > 900) expect(g.qLines, "folded, the question isn't on one line").toBe(1);
+      // step 1 shows the device's own gesture only
+      expect([f.click, f.tap], "step 1 doesn't show only the device's own gesture").toEqual(size[0] > 900 ? [true, false] : [false, true]);
+      // the /house/ link is shown, in full and folded, inside the page
+      for (const [form, x] of [["in full", f], ["folded", g]] as const) {
+        expect(x.link?.shown, `the band's /house/ link isn't shown (${form})`).toBe(true);
+        expect(x.link!.right, `the band's /house/ link runs out of the page (${form})`).toBeLessThanOrEqual(x.width);
+      }
       expect(g.bottom, "folded, the band isn't shorter than in full").toBeLessThan(f.bottom);
     }, 90_000);
   }

@@ -434,11 +434,15 @@ describe("two ships on GET /", () => {
           if (!inv) return { missing: true };
           const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
           const at = () => ({ sentence: q('.stands-half .sentence').getBoundingClientRect().top, house: q('.stands-half #house').getBoundingClientRect().top, kept: q('#house-kept').getBoundingClientRect().top });
+          // the link to /house/ at rest, beside the invitation (the invitation itself is decorative)
+          const link = document.querySelector('.stands-half .invite-row a[href="/house/"]');
+          const seen = (el) => !!el && getComputedStyle(el).visibility === 'visible' && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
           const rest = { inv: box(inv), visible: getComputedStyle(inv).visibility === 'visible' && getComputedStyle(inv).display !== 'none', text: inv.textContent.trim(),
+            link: link ? { seen: seen(link), box: box(link), hidden: link.closest('[aria-hidden="true"]') !== null, text: link.textContent.trim() } : null,
             lineHeight: parseFloat(getComputedStyle(inv).lineHeight) || 18, hidden: inv.closest('[aria-hidden="true"]') !== null, at: at(),
             sentenceBottom: q('.stands-half .sentence').getBoundingClientRect().bottom, half: box(q('.stands-half')) };
           part.hidden = false; part.textContent = '08 — upper-right volume';
-          const chosen = { invVisible: getComputedStyle(inv).visibility === 'visible' && getComputedStyle(inv).display !== 'none', part: box(part), at: at() };
+          const chosen = { invVisible: getComputedStyle(inv).visibility === 'visible' && getComputedStyle(inv).display !== 'none', part: box(part), at: at(), linkSeen: seen(link) };
           return { rest, chosen };
         })()`, [size[0], size[1]])) as any;
         expect(m.missing, "GET / has no invitation under the sentence").toBeUndefined();
@@ -450,8 +454,17 @@ describe("two ships on GET /", () => {
         expect(rest.hidden, "the invitation isn't decorative to assistive technology").toBe(true);
         expect(rest.inv.top, "the invitation isn't under the sentence").toBeGreaterThanOrEqual(rest.sentenceBottom - 1);
         expect(rest.at.house - rest.sentenceBottom, "the invitation pushed the house away from its sentence").toBeLessThanOrEqual(20);
+        // beside it, a real link to /house/ (28 October playtest: nobody found it): on one row with the invitation, inside the half
+        expect(rest.link, "there's no link to /house/ beside the invitation").not.toBeNull();
+        expect(rest.link.seen, "the /house/ link beside the invitation isn't shown at rest").toBe(true);
+        expect(rest.link.hidden, "the /house/ link is hidden from assistive technology").toBe(false);
+        expect(rest.link.text, "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
+        expect(Math.abs(rest.link.box.top - rest.inv.top), "the /house/ link isn't on the invitation's row").toBeLessThanOrEqual(4);
+        expect(rest.link.box.right, "the /house/ link runs out of its half").toBeLessThanOrEqual(rest.half.right + 1);
+        expect(rest.link.box.left >= rest.inv.right || rest.link.box.top >= rest.inv.bottom, "the /house/ link lies on the invitation").toBe(true);
         // choosing a word: the notation takes the same slot, the invitation steps aside, nothing moves
         expect(chosen.invVisible, "the invitation stays while a part's notation is shown").toBe(false);
+        expect(chosen.linkSeen, "the /house/ link stays over the notation while a word is chosen").toBe(false);
         expect(Math.abs(chosen.part.top - rest.inv.top), "the notation isn't in the invitation's slot").toBeLessThanOrEqual(1);
         for (const k of ["sentence", "house", "kept"] as const) expect(Math.abs(chosen.at[k] - rest.at[k]), `choosing a word moves the ${k}`).toBeLessThanOrEqual(0.5);
       }, 90_000);
@@ -590,18 +603,16 @@ describe("two ships on GET /", () => {
     }
   }
 
-  // A phone has no hover, so nothing says a word can be changed until it's
-  // touched: there, every word at rest carries a faint solid line under it,
-  // the label's own underline (so the word's box and the sentence's wrap don't
-  // move). It must never be taken for the visitor's own word (a dotted line,
-  // darker) or a kept gap (a blank on the other ground, with no word on it):
-  // solid, never dotted, and fainter than the mark. Anything else keeps today's
-  // rest, with no line until a word is pointed at: a desktop, and a desktop with
-  // no pointer at all (CI's headless Chrome on Linux matches (hover: none) and
-  // (pointer: none) at 1920×1080, and once drew the line there). Staged in the
+  // Every word at rest carries a faint solid line under it, the label's own
+  // underline (so the word's box and the sentence's wrap don't move), on every
+  // device. It was a phone's alone, a desktop showing nothing until a word was
+  // pointed at; at the 28 October playtest, people on a desktop didn't see the
+  // words could be clicked. It must never be taken for the visitor's own word
+  // (a dotted line, darker) or a kept gap (a blank on the other ground, with no
+  // word on it): solid, never dotted, and fainter than the mark. Staged in the
   // measured copy: one word marked as the visitor's, as GET / renders one.
-  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
-    it(`marks the words as changeable at rest only on a touch screen, never like your own word (${name})`, async () => {
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`marks the words as changeable at rest on every device, never like your own word (${name})`, async () => {
       const doc = await servedPage(baseUrl);
       const label = doc.querySelector('.stands-half .sentence form[action="/replace"] label')!;
       const mark = doc.createElement("mark");
@@ -626,17 +637,13 @@ describe("two ships on GET /", () => {
         const media = ["(hover: none)", "(hover: hover)", "(any-hover: hover)", "(pointer: fine)", "(pointer: coarse)", "(pointer: none)"].filter((q) => matchMedia(q).matches).join(" ");
         return { rest, mine, mineLabel, boxes, media };
       })()`, [size[0], size[1]])) as { rest: { word: string; on: boolean; style: string; contrast: number }[]; mine: { style: string; contrast: number }; mineLabel: { on: boolean; contrast: number }; boxes: number[][]; media: string };
-      if (size[0] <= 900) {
-        for (const w of m.rest) {
-          expect(w.on && w.contrast > 1.05, `"${w.word}" shows no line at rest on a phone`).toBe(true);
-          expect(w.style, `"${w.word}"'s line at rest is drawn like your own word's`).toBe("solid");
-          expect(w.contrast, `"${w.word}"'s line at rest is as strong as your own word's`).toBeLessThan(m.mine.contrast);
-        }
-        // your word: its dotted line alone, not doubled by the resting one
-        expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
-      } else {
-        for (const w of m.rest) expect(w.on && w.contrast > 1.05, `"${w.word}" shows a line at rest off a touch screen (matched: ${m.media})`).toBe(false);
+      for (const w of m.rest) {
+        expect(w.on && w.contrast > 1.05, `"${w.word}" shows no line at rest (matched: ${m.media})`).toBe(true);
+        expect(w.style, `"${w.word}"'s line at rest is drawn like your own word's`).toBe("solid");
+        expect(w.contrast, `"${w.word}"'s line at rest is as strong as your own word's`).toBeLessThan(m.mine.contrast);
       }
+      // your word: its dotted line alone, not doubled by the resting one
+      expect(m.mineLabel.on && m.mineLabel.contrast > 1.05, "your own word carries the resting line under its dotted one").toBe(false);
       expect(m.mine.style, "your own word's line isn't dotted").toBe("dotted");
       // the line moves nothing: every word's box is where it is without a mark staged
       m.boxes.slice(1).forEach((b, i) => b.forEach((v, k) => expect(Math.abs(v - plain[i + 1][k]), `the resting line moved "${m.rest[i].word}"`).toBeLessThanOrEqual(0.5)));
