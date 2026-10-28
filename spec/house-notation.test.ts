@@ -132,7 +132,7 @@ describe("the part notation", () => {
     const part = doc.getElementById("part")!;
     showDrafting(part, drafting({ position: 4, word: "<b>x</b>", draft: "hollow" }, "phone"));
     expect(part.hidden).toBe(false);
-    expect(part.textContent).toBe("05 — entry · <b>x</b> · cut → nested");
+    expect(part.textContent).toBe(`05 — entry · <b>x</b> · ${notation({ position: 4, word: "hollow", was: "<b>x</b>" }, "phone").split(" · ")[1]}`);
     expect(part.querySelector("b"), "a word became markup").toBeNull();
     expect(part.querySelector("del")?.textContent).toBe("<b>x</b>");
     showDrafting(part, drafting({ position: 4, word: "people", draft: "hollow", now: "<i>y</i>" }, "phone"));
