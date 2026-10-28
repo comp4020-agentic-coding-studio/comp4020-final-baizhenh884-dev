@@ -128,7 +128,11 @@ outside this repo: it holds their result and its specs, not the search.
 - The house is never stored: SQLite keeps only the sentence and its history,
   and an earlier form's body is built from that earlier sentence alone.
 - No preview: typing a replacement never changes the house; the new body
-  appears only after the server accepts the change.
+  appears only after the server accepts the change. The notation may name,
+  in text, the family a draft would give its part; the house itself never
+  shows it. Decided after the 28 October playtest: people expected meaning
+  to change the house. A text prediction teaches that spelling decides the
+  form, while the house itself keeps its surprise until the server accepts.
 - Red means only "this body is being rebuilt now"; nothing stays red.
 - Both canvases are decorative to assistive technology; the live sentence
   and the kept sentence are the accessible state, and other visitors'
@@ -200,7 +204,8 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 3. **Deployed:** `flyctl deploy --remote-only --ha=false -a
    comp4020-final-baizhenh884-dev`, then
    `APP_URL=https://comp4020-final-baizhenh884-dev.fly.dev pnpm check`. Against
-   a non-local URL only the read-only checks run: the ones that change the
+   a non-local URL only the read-only checks run (under `caffeinate -i`, so
+   the Mac doesn't sleep mid-run): the ones that change the
    sentence skip themselves, because on production they'd fabricate visitor
    contributions. Verify those behaviours on the live URL by hand, as a
    visitor, and record what you saw as an observation.
@@ -392,8 +397,10 @@ What the code must hold to. The README says why; don't restate it here.
   `spec/kept-sentence.test.ts`); others' changes are announced in one polite
   live region, only from change events newer than what's shown (never a
   load, snapshot or reconnect), a burst coalesced into one announcement, as
-  plain text naming positions and words, never who or when
-  (`spec/live-client.test.ts`).
+  plain text naming positions and words, never who or when; and a draft's
+  prediction in a second polite live region, once typing pauses (never per
+  key), or once that the word was replaced by someone else and to choose it
+  again (`spec/live-client.test.ts`, `spec/house-notation.test.ts`).
 - The part notation names its part's family and, after an accepted change
   (own or another visitor's), the family before and after ("arch → cut", or
   "arch, unchanged") and, on a desktop, every letter test that decided it,
@@ -422,8 +429,14 @@ What the code must hold to. The README says why; don't restate it here.
 - Escape on a word in hand cancels it: it empties the draft as the visitor
   would (so a change it held back applies then), lets go of the field, and
   never submits. While a replacement is typed, the notation's slot names the
-  word being replaced, struck, and the keys, on one line; a long word alone
-  is shortened, the keys never cut (`spec/live-client.test.ts`,
+  part (its number alone on a phone), the word being replaced, struck, and
+  the family the draft would give it, from `notation()`, with the deciding
+  test on a desktop; never the keys, which stay in the rule paragraph. A
+  draft that can't be a word predicts nothing, from its spelling alone
+  (never the blocklist). If another visitor replaced the word: its number,
+  the struck word, "now “X”" and "choose again". One line, clear of every
+  house at rest; only a word is shortened, never the prediction; the struck
+  word never shortened on a desktop (`spec/live-client.test.ts`,
   `spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
 - The focused word field shows a visible keyboard focus (2px, ink) that
   never touches a neighbouring word, on a phone included
@@ -541,6 +554,16 @@ hold.
   there shows an inert notice of the new word, without touching the draft or
   its expected version; the draft is only reconciled once the visitor clears
   it themselves or reloads.
+
+### Known issues
+
+- At 1920, a kept sentence that wraps to three lines (ten long kept words)
+  grows the shared head row, and the live house sits ~23px under its
+  sentence instead of ≤20px. Present on `main` at 8499d6f; repro in
+  `spec/two-ships-layout.test.ts` (`pinShortKept`), whose checks measure
+  with a short kept sentence. The next redesign replaces the side-by-side
+  halves with one stage, which removes that shared row; if it doesn't
+  happen, fix this then.
 
 ## Stop and ask
 

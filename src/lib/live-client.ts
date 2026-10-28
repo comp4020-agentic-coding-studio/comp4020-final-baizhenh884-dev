@@ -1,5 +1,5 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
-import { said as saidOne } from "./house/notation";
+import { foreseen, said as saidOne } from "./house/notation";
 import { latestParts, replacedText, standingText } from "./trace-text";
 import { sizeStep } from "./sentence-step";
 
@@ -51,6 +51,8 @@ export type SettleTrace = {
 const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
 // longer than a crossing (1.9 s, house/motion.ts), so one burst is one announcement
 export const ANNOUNCE_MS = 2500;
+// how long typing pauses before the draft's prediction is said
+export const DRAFT_MS = 700;
 
 export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
 
@@ -181,6 +183,8 @@ export type Options = {
   // this visitor's replaced words in the kept ship shown now, newest first
   // (settle mode): told whenever their own trace changes
   onMine?: (positions: number[]) => void;
+  // told a position whose draft holds a newer word back (that word), or no longer does (null)
+  onHeld?: (position: number, word: string | null) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {
@@ -225,6 +229,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     }
     slot.version.value = String(version);
     slot.input.placeholder = word;
+    if (slot.notice) options.onHeld?.(slot.latest.position, null);
     slot.notice?.remove();
     slot.notice = null;
   }
@@ -236,8 +241,29 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       slot.notice.append(doc.createElement("span"));
       slot.form.after(slot.notice);
     }
-    slot.notice.firstElementChild!.textContent = `changed while you wrote — now “${slot.latest.word}”`;
+    const line = slot.notice.firstElementChild!, text = `changed while you wrote — now “${slot.latest.word}”`;
+    if (line.textContent === text) return;
+    line.textContent = text;
     keepInside(slot.notice);
+    options.onHeld?.(slot.latest.position, slot.latest.word);
+    foresee(slot);
+  }
+
+  // The draft's own polite live region (#foreseen): what the part notation predicts, said once typing
+  // pauses, never per key; or, once, that another visitor replaced the word and to choose it again.
+  // Separate from #news, so neither talks over the other.
+  const foreseenEl = doc.getElementById("foreseen");
+  let foreseeTimer: ReturnType<typeof setTimeout> | null = null;
+  function foresee(slot: Slot): void {
+    if (!foreseenEl) return;
+    if (foreseeTimer) clearTimeout(foreseeTimer);
+    foreseeTimer = setTimeout(() => {
+      foreseeTimer = null;
+      if (!hasDraft(slot)) return;
+      const position = slot.latest.position, word = slot.label.textContent?.trim() ?? "";
+      const text = foreseen({ position, word, draft: slot.input.value, now: slot.notice ? slot.latest.word : undefined });
+      if (text) foreseenEl.textContent = text;
+    }, DRAFT_MS);
   }
 
   // The notice's one line starts under its word and may run past it, but
@@ -471,6 +497,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   // still a word in hand: the step mustn't shift the word being chosen), or a draft emptied
   const isField = (el: EventTarget | null) => [...slots.values()].some((s) => s.input === el);
   doc.addEventListener("focusout", (event) => {
+    if (isField(event.target) && foreseeTimer) { clearTimeout(foreseeTimer); foreseeTimer = null; } // letting go of a word says nothing more of it
     if (isField(event.target) && !isField((event as FocusEvent).relatedTarget)) renderStep();
   });
 
@@ -487,8 +514,11 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   // nothing else (blur included) touches a draft or its expected version.
   doc.addEventListener("input", (event) => {
     for (const slot of slots.values()) {
-      if (event.target !== slot.input || hasDraft(slot) || !slot.notice) continue;
-      if (slot.latest.version > shownVersion(slot)) show(slot);
+      if (event.target !== slot.input) continue;
+      // a draft held back has been said once; typing on doesn't say it again
+      if (hasDraft(slot)) { if (!slot.notice) foresee(slot); continue; }
+      if (foreseeTimer) { clearTimeout(foreseeTimer); foreseeTimer = null; }
+      if (slot.notice && slot.latest.version > shownVersion(slot)) show(slot);
     }
     renderStep(); // an emptied draft may let go of the sentence's last word in hand
     keepAllInside(); // typing can move words, and the notices under them

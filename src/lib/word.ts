@@ -1,11 +1,11 @@
 import { isBlocked } from "./blocklist";
+import { isWordShaped } from "./word-shape";
 
 // A replacement is one token: 1–24 characters (Unicode code points) after
 // trimming, with no whitespace or control characters inside, and not on the
 // maker's blocklist (docs/decisions/0004-maker-blocklist.md).
 export function isValidWord(word: string): boolean {
-  const length = [...word].length;
-  return length >= 1 && length <= 24 && !/[\s\p{Cc}]/u.test(word) && !isBlocked(word);
+  return isWordShaped(word) && !isBlocked(word);
 }
 
 // A category for a refused word, for logging only: never the word's own

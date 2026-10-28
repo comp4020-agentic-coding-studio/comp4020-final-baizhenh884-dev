@@ -33,7 +33,11 @@ type Slot = { position: number; pos: HTMLElement; label: HTMLLabelElement; input
 // A change that crosses (docs/decisions/0003, Slice 5) sends its old part out
 // toward the kept house: `toward` is that house's box on the page.
 export type Crossing = { toward: DOMRect | null };
-export type CurrentHouse = { latest(change: { position: number; word: string }, crossing?: Crossing | null): void };
+export type CurrentHouse = {
+  latest(change: { position: number; word: string }, crossing?: Crossing | null): void;
+  // a draft at `position` holds back a newer word (`now`), or no longer does (null)
+  held(position: number, now: string | null): void;
+};
 
 // `ownCrossing`: whether this visitor's own change, just made (Post/Redirect/Get), crossed
 export function mountCurrent(doc: Document, ownCrossing: (position: number) => Crossing | null = () => null): CurrentHouse | null {
@@ -110,11 +114,14 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
     part.hidden = position === null;
     part.textContent = position === null ? "" : notation({ position, word: words[position], was }, form());
   };
-  // while a replacement is typed: the word it replaces, struck, and the keys; an emptied field goes back to the part
+  // while a replacement is typed: the part, the word it replaces, struck, and the family the draft would give
+  // it (text only: the house never shows it), or, if another visitor replaced the word, the new word and
+  // "choose again"; an emptied field goes back to the part
+  const heldBack = new Map<number, string>();
   const drafted = (s: Slot) => {
     if (!part || selected !== s.position || held) return;
     if (s.input.value === "") annotate(s.position);
-    else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position] }, form())); // the word on screen, which a draft may hold back
+    else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position], draft: s.input.value, now: heldBack.get(s.position) }, form())); // the word on screen, which a draft may hold back
   };
   // the one hairline between the chosen word and its territory, ending in that territory's numbered tag
   // (desktop; red only while that territory is rebuilt)
@@ -217,6 +224,11 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
       const kind: Kind = crossing ? "cross" : "remote";
       view.change(position, words, kind, crossing?.toward ?? null);
       queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, kind); refreshTrace(); });
+    },
+    held(position, now) {
+      if (now === null) heldBack.delete(position);
+      else heldBack.set(position, now);
+      if (slots[position]) drafted(slots[position]);
     },
   };
 }
