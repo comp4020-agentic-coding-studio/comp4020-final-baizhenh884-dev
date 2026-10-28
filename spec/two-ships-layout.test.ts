@@ -44,7 +44,7 @@ type Layout = {
   standsSentence: Box; standsHouse: Box; keptSentence: Box; keptHouse: Box;
   liveSize: number; keptSize: number; keptTextContrast: number;
   gaps: { text: string; contrast: number; cue: string; cueInk: number }[]; keptWords: number[];
-  note: { text: string; contrast: number; size: number; underSentence: boolean; right: number; hidden: boolean } | null;
+  note: { text: string; contrast: number; size: number; underSentence: boolean; right: number; hidden: boolean; lines: number; frameRight: number } | null;
   pointer: Box | null; pointerShown: boolean;
   // the question band above both halves: its question, and its steps while it's in full
   question: Box; steps: Box | null;
@@ -112,7 +112,12 @@ async function layout(size: [number, number], longNotes = false, longWords: bool
       keptTextContrast: ink(keptSentence, 'color'),
       gaps, keptWords: words,
       note: note ? { text: note.textContent.trim(), contrast: onGround(note, 'color'), size: parseFloat(getComputedStyle(note).fontSize),
-        underSentence: noteBox.top >= sentBox.bottom - 1, right: noteBox.right, hidden: note.closest('[aria-hidden="true"]') !== null } : null,
+        // its text's own right edge: a no-wrap line runs past its box, and the text is what meets the frame
+        underSentence: noteBox.top >= sentBox.bottom - 1, right: (() => { const r = document.createRange(); r.selectNodeContents(note); return r.getBoundingClientRect().right; })(),
+        hidden: note.closest('[aria-hidden="true"]') !== null,
+        lines: Math.round(noteBox.height / parseFloat(getComputedStyle(note).lineHeight)),
+        // the kept half's inset hairline frame: its right edge on the page
+        frameRight: (() => { const h = q('.kept-half'), r = h.getBoundingClientRect(), b = getComputedStyle(h, '::before'); return r.right - parseFloat(b.right); })() } : null,
       // the stacked layout's line pointing down to the kept half
       pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
       pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
@@ -219,9 +224,14 @@ function bothHalves(l: Layout): void {
   // empty top band, not under the label: a line there grew the row both halves share and pushed the live house
   // off the first screen with the longest words. The kept house stays clear of it (checked on real geometry below)
   expect(l.note, "there's no line saying what the kept sentence is" + m).not.toBeNull();
-  expect(l.note!.text, "the line under the kept sentence isn't the agreed one" + m).toBe("Replaced words, gathered back in their places. A faint word hasn’t been replaced yet.");
+  expect(l.note!.text, "the line under the kept sentence isn't the agreed one" + m).toBe("Replaced words, back in their places. Faint words still stand.");
   expect(l.note!.underSentence, "the line isn't under the kept sentence" + m).toBe(true);
   expect(l.note!.right, "the line under the kept sentence runs out of its half" + m).toBeLessThanOrEqual(l.kept.right + 1);
+  // on a desktop: one line, with real room before the kept half's frame (it once ended 3px from it at 1280)
+  if (l.viewport > 900) {
+    expect(l.note!.lines, "the line under the kept sentence wraps on a desktop" + m).toBe(1);
+    expect(l.note!.frameRight - l.note!.right, "the line under the kept sentence crowds the kept half's frame" + m).toBeGreaterThanOrEqual(24);
+  }
   expect(l.note!.hidden, "the line under the kept sentence is hidden from assistive technology" + m).toBe(false);
   expect(l.note!.contrast, "the line under the kept sentence is too faint" + m).toBeGreaterThanOrEqual(6);
 }

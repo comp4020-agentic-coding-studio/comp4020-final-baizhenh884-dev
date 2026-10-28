@@ -269,7 +269,7 @@ describe("Kept ship markup on GET /", () => {
   // has no kept half (houses stay level with it, spec/two-ships-layout.test.ts).
   // The foot's older line ("…the gaps are words that still stand there"),
   // written for empty gaps, said the same thing in older terms; it's gone.
-  const KEPT_LINE = "Replaced words, gathered back in their places. A faint word hasn’t been replaced yet.";
+  const KEPT_LINE = "Replaced words, back in their places. Faint words still stand.";
   const OLD_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
   it("says once what its words and faint words are, on GET / only", async () => {
     const doc = await new Visitor().page();
