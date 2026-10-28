@@ -388,7 +388,7 @@ What the code must hold to. The README says why; don't restate it here.
   (`spec/house-live-body.test.ts`). Whether a standing neighbour is kept is
   decided on its geometry, never on its outline or a count.
 - A screen reader reaches what the page shows: the kept sentence is read as
-  its words, each gap as "blank" (`spec/kept-ship.test.ts`,
+  its words, each gap as "still standing: <word>" (`spec/kept-ship.test.ts`,
   `spec/kept-sentence.test.ts`); others' changes are announced in one polite
   live region, only from change events newer than what's shown (never a
   load, snapshot or reconnect), a burst coalesced into one announcement, as
@@ -406,8 +406,19 @@ What the code must hold to. The README says why; don't restate it here.
 - `GET /house/` explains how the house reads a word: the places and parts,
   each part's family order, the letter tests and worked examples, generated
   from `src/lib/house/` so it can't drift. Read-only, never live, never a
-  place to try a word; reached from `/` and `/readme/`
-  (`spec/house-page.test.ts`).
+  place to try a word; reached from `/readme/` and from `/`: the question
+  band's masthead row, in full and folded, and on a desktop beside the
+  invitation at rest, hidden while a word is chosen (`spec/house-page.test.ts`,
+  `spec/question-band.test.ts`, `spec/two-ships-layout.test.ts`).
+- A kept gap shows the word still standing at its position, faint, over a
+  dashed line (a second cue besides lightness: a kept word has no line,
+  your own kept word a dotted one). It keeps the 4.5:1 floor on its grid
+  like any text and a ceiling of 60% of the faintest kept word's contrast.
+  Under the kept sentence: "Replaced words, gathered back in their places. A
+  faint word hasn't been replaced yet." The house at rest stays clear of
+  that line (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October
+  playtest an empty gap was read as a fill-in-the-blank quiz, and the kept
+  sentence as the original.)
 - Escape on a word in hand cancels it: it empties the draft as the visitor
   would (so a change it held back applies then), lets go of the field, and
   never submits. While a replacement is typed, the notation's slot names the
@@ -499,8 +510,14 @@ hold.
 - The question first: above both halves of `GET /`, a band with the
   question, one sentence on Theseus's ship and three numbered steps on how
   to play, in full until this visitor has made a change (from their trace,
-  on the server, never live), then the question alone. Its copy claims
-  nothing the rules don't do (`spec/question-band.test.ts`).
+  on the server, never live), then the question alone. Step 1 names the
+  device's gesture (Click on a desktop, Tap on a touch screen); step 2 says
+  a part is rebuilt from how the word is spelled, not what it means. Its
+  copy claims nothing the rules don't do (`spec/question-band.test.ts`).
+- Every word at rest carries a faint solid underline on every device, so a
+  word reads as clickable before it's pointed at; pointing darkens it
+  (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October playtest,
+  people on a desktop didn't see the words could be clicked.)
 - Every live word and every kept word or gap carries its position, 01–10,
   small above it, always, a phone included; drawn, never read
   (`spec/numbering.test.ts`).
@@ -516,8 +533,7 @@ hold.
   same position as the index above the word.) Under the standing
   house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
   Under the kept house: "Replaced words are kept here, and built back into
-  a house." and under it: "The words above have been replaced in the
-  sentence; the gaps are words that still stand there." At
+  a house." At
   the foot beside About: "If every word and every part is replaced, is it
   still the same thing?" With reduced motion nothing moves and the cue stands
   still for a moment, then clears.
