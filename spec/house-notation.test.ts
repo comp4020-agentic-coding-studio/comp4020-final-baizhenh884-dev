@@ -104,9 +104,10 @@ describe("the part notation", () => {
   });
 
   // Another visitor replaced the word while this one was typing: sending would be refused as stale,
-  // so the line says what to do, and the new word is its own piece, so a long one shrinks alone.
+  // so the line says what to do, and the new word is its own piece, so a long one shrinks alone. It
+  // leads with the part's number on every device: the name would leave no room for two long words.
   it("when the word was replaced while typing, says the new word and to choose again", () => {
-    expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, "desktop")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
+    expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, "desktop")).toEqual({ lead: "05 · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
     expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, "phone")).toEqual({ lead: "05 · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
   });
 

@@ -605,7 +605,8 @@ describe("two ships on GET /", () => {
   // ever shortened (the struck one, or the new one in the stale line), with an
   // ellipsis; the prediction itself is never cut. From 1440 a short struck
   // word stays whole; below, the longest predictions may shorten it. In the
-  // stale line it never does, at any width: only the new word gives way. Read like the notation: at
+  // stale line (which leads with the part's number) it never does, at any
+  // width: only the new word gives way. Read like the notation: at
   // least 4.5:1 on its ground. Set in the measured copy by the page's own
   // showDrafting(), so the markup and the CSS under test are the page's.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
@@ -677,13 +678,14 @@ describe("two ships on GET /", () => {
         }
       } finally { for (const b of bodies) b.dispose(); }
       if (size[0] >= 1440 || size[0] <= 900) expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
-      // in the stale line the struck word is the only thing saying what was replaced: the new word gives way
-      // first, never it, while a short struck word fits; only two 24-letter words on a phone shorten both,
-      // and even then the new word keeps a few letters and "choose again" stays whole (checked above)
-      expect(out[2].pieces.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
-      const both = out[3].pieces, nw = both.find((p: any) => p.tag === "b");
-      expect(nw.width, "the stale line shows nothing of the new word").toBeGreaterThanOrEqual(nw.em * 2.5);
-      if (size[0] > 900) expect(both.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
+      // in the stale line the struck word is the only thing saying what was replaced: never shortened, at
+      // any width, even when it and the new word are both 24 letters; the new word gives way, keeping a few
+      // letters, and "choose again" stays whole (checked above)
+      for (const c of [out[2], out[3]]) {
+        expect(c.pieces.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
+        const nw = c.pieces.find((p: any) => p.tag === "b");
+        expect(nw.width, "the stale line shows nothing of the new word").toBeGreaterThanOrEqual(nw.em * 2.5);
+      }
       // on a phone a 24-letter word can't fit whole beside the rest, so it alone is shortened: struck, or new in the stale line
       if (size[0] <= 900) {
         expect(out[1].pieces.find((p: any) => p.tag === "del").cut, "a 24-letter struck word isn't shortened on its own").toBe(true);
