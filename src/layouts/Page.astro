@@ -43,7 +43,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       :root {
         /* drafting paper and blueprint; labels and captions are legible on a grid line, not just the flat ground (spec/two-ships-layout.test.ts) */
         --field: #ece8df; --ink: #191714; --soft: #5a544b; --caption: #3f3a33; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16);
-        --kept-ground: #1d3350; --kept-ink: #eef3f8; --kept-soft: #9fb1c7; --kept-caption: #b9c7d8; --kept-gap: #dce6f2;
+        --kept-ground: #1d3350; --kept-ink: #eef3f8; --kept-soft: #9fb1c7; --kept-caption: #b9c7d8; --kept-gap: #dce6f2; --kept-faint: var(--kept-soft);
         --grid: rgb(25 23 20 / 0.045); --kept-grid: rgb(255 255 255 / 0.055); --frame: rgb(25 23 20 / 0.22); --kept-frame: rgb(255 255 255 / 0.22);
         --rule: rgb(25 23 20 / 0.3); --kept-rule: rgb(255 255 255 / 0.28);
         --mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -228,7 +228,13 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
       .kept-sentence mark { text-decoration-color: var(--kept-soft); }
       /* a gap: a blank in the sentence, waiting for the word that stands there now */
-      .kept-sentence .gap { display: inline-block; width: 1.8em; height: 0.7em; border-bottom: 2px solid var(--kept-gap); }
+      /* a gap: the word still standing at this position, faint, over a dashed line (a second cue, not lightness alone:
+         a kept word has no line, your own kept word a dotted one). Legible as text, clearly fainter than a kept word
+         (spec/two-ships-layout.test.ts) */
+      .kept-sentence .gap { color: var(--kept-faint); text-decoration: underline dashed 1px var(--kept-faint); text-underline-offset: 0.14em; }
+      /* what the kept sentence is, under its label */
+      .kept-text { position: relative; z-index: 1; min-width: 0; }
+      .kept-note { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; font-size: 14px; line-height: 1.45; color: var(--kept-caption); white-space: nowrap; }
       /* The drawing sheet's numbering (spec/numbering.test.ts): each word's and each gap's position, 01 to 10, small
          above it, in the leading over its letters. It names a position, like "05 — entry", never a count, and it's
          drawn, not read: its alternative text is empty, so the sentences are read as their words. */
@@ -416,6 +422,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
         .two .sentence { font-size: 34px; }
         .kept-sentence { font-size: 26px; line-height: 1.3; }
+        /* stacked, no row is shared: the line takes its two lines in the flow, under the sentence, and the kept house follows */
+        .kept-note { position: static; white-space: normal; margin: -0.4rem 0 1rem; text-wrap: pretty; }
         /* the looser leading here sets a word's letters lower in its line: the gap stands as tall */
         .kept-sentence .gap { height: calc(0.96em - 2px); }
       }
