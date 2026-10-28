@@ -51,6 +51,8 @@ export type SettleTrace = {
 const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
 // longer than a crossing (1.9 s, house/motion.ts), so one burst is one announcement
 export const ANNOUNCE_MS = 2500;
+// not built yet
+export const DRAFT_MS = 0;
 
 export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
 

@@ -36,7 +36,7 @@ describe("the leader line", () => {
         const labels = [...doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')];
         if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
         const words = labels.map((l) => l.textContent!.trim());
-        const texts = words.map((word, position) => (typing ? drafting({ position, word }, "desktop") : notation({ position, word })));
+        const texts = words.map((word, position) => (typing ? drafting({ position, word, draft: "incomprehensibilities" }, "desktop") : notation({ position, word })));
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
@@ -45,7 +45,7 @@ describe("the leader line", () => {
           return ${JSON.stringify(texts)}.map((t) => {
             part.hidden = false;
             if (typeof t === 'string') part.textContent = t;
-            else { part.replaceChildren(...[['span', t.lead], ['del', t.was], ['span', t.tail]].map(([tag, s]) => { const e = document.createElement(tag); e.textContent = s; return e; })); }
+            else { part.replaceChildren(...[['span', t.lead], ['del', t.was], ['span', t.rest]].map(([tag, s]) => { const e = document.createElement(tag); e.textContent = s; return e; })); }
             const range = document.createRange(); range.selectNodeContents(part);
             const out = { words: labels.map(box), sentence: box(q('.stands-half .sentence')), column: box(q('.stands-half .text')), notation: box(range), canvas: box(q('.stands-half #house')) };
             part.hidden = true; part.textContent = '';

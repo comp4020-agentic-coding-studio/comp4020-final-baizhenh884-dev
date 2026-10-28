@@ -596,49 +596,91 @@ describe("two ships on GET /", () => {
   }
 
   // A word in hand, being typed over (src/lib/house/notation.ts drafting): the
-  // line in the notation's slot names the word being replaced, struck, and
-  // the keys, on one line, so it moves nothing and stays as clear of the
-  // house as the notation (checked above, for one line). A word too long for
-  // the line is shortened, alone, with an ellipsis; the keys are never cut. Set in the
-  // measured copy by the page's own showDrafting(), so the markup and the CSS
-  // under test are the page's.
-  for (const [name, size] of [["1920×1080", [1920, 1080]], ["phone 390×844", [390, 844]]] as const) {
-    it(`keeps the drafting line to one line in the notation's slot, shortening only a long word (${name})`, async () => {
+  // line in the notation's slot names the part, the word being replaced,
+  // struck, and the family the draft would give it (on a desktop with the
+  // test that decided it), or, if another visitor replaced the word, the new
+  // word and "choose again". Never the keys. One line, so it moves nothing,
+  // and every house at rest stays clear of it by 8px on a desktop and 16px on
+  // a phone, on real geometry through the page's own camera. Only a long word
+  // is shortened (the struck one, or the new one in the stale line), with an
+  // ellipsis; the prediction itself is never cut. Read like the notation: at
+  // least 4.5:1 on its ground. Set in the measured copy by the page's own
+  // showDrafting(), so the markup and the CSS under test are the page's.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`keeps the drafting line to one line in the notation's slot, clear of the house, shortening only a long word (${name})`, async () => {
       const form = size[0] <= 900 ? "phone" : "desktop";
-      // the longest lead the page can show: the longest part label with its longest family
-      const longest = (word: string) => TERRITORIES.map((_, position) => drafting({ position, word }, form)).reduce((a, b) => (b.lead.length > a.lead.length ? b : a));
-      const cases = ["people", "incomprehensibilities", "w".repeat(24)].map(longest);
+      const W = "w".repeat(24);
+      // the longest prediction the page can show: every part, every draft in the pool, the longest line
+      const pool = ["people", "hollow", "incomprehensibilities", "bookkeeper", "rhythm", "a", W];
+      const longest = (word: string, now?: string) => {
+        let best = drafting({ position: 0, word, draft: pool[0], now }, form);
+        for (let position = 0; position < 10; position++) for (const draft of pool) {
+          const d = drafting({ position, word, draft, now }, form);
+          if (Object.values(d).join("").length > Object.values(best).join("").length) best = d;
+        }
+        return best;
+      };
+      const cases = [longest("people"), longest(W), longest("people", W)];
       const out: any[] = [];
       for (const d of cases) {
         const doc = await servedPage(baseUrl);
+        stageWords(doc, Array(10).fill("wordmvadgycfe"));
         showDrafting(doc.getElementById("part")!, d);
         out.push(await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
-          const part = q('#part'), was = part.querySelector('del'), tail = was.nextElementSibling, cs = getComputedStyle(part);
-          const r = part.getBoundingClientRect(), t = tail.getBoundingClientRect(), half = q('.stands-half').getBoundingClientRect(), inv = q('.stands-half .invite').getBoundingClientRect();
-          return { height: r.height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45, right: r.right, halfRight: half.right, top: r.top, invTop: inv.top,
-            tailRight: t.right, tailCut: tail.scrollWidth > tail.clientWidth + 1, wasCut: was.scrollWidth > was.clientWidth + 1,
-            ellipsis: getComputedStyle(was).textOverflow, struck: getComputedStyle(was).textDecorationLine,
-            house: q('.stands-half #house').getBoundingClientRect().top, sentence: q('.stands-half .sentence').getBoundingClientRect().bottom };
+          const part = q('#part'), cs = getComputedStyle(part), kids = [...part.children];
+          const cut = (el) => el.scrollWidth > el.clientWidth + 1;
+          const r = part.getBoundingClientRect(), half = q('.stands-half').getBoundingClientRect(), inv = q('.stands-half .invite').getBoundingClientRect(), h = q('.stands-half #house').getBoundingClientRect();
+          const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+          const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+          const ground = rgb(getComputedStyle(part.closest('.half')).backgroundColor), [x, y] = [lum(rgb(cs.color)), lum(ground)].sort((m, n) => n - m);
+          return { height: r.height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45, right: r.right, bottom: r.bottom, halfRight: half.right, top: r.top, invTop: inv.top,
+            pieces: kids.map((k) => ({ tag: k.tagName.toLowerCase(), text: k.textContent, cut: cut(k), right: k.getBoundingClientRect().right, ellipsis: getComputedStyle(k).textOverflow, struck: getComputedStyle(k).textDecorationLine })),
+            houseTop: h.top, houseWidth: h.width, houseHeight: h.height, sentence: q('.stands-half .sentence').getBoundingClientRect().bottom, contrast: (x + 0.05) / (y + 0.05) };
         })()`, [size[0], size[1]]));
       }
-      for (const [i, m] of out.entries()) {
-        const what = `"${cases[i].lead}${cases[i].was}${cases[i].tail}"`;
-        expect(m.height, `${what} wraps`).toBeLessThan(m.line * 1.5);
-        expect(m.right, `${what} runs out of its half`).toBeLessThanOrEqual(m.halfRight + 1);
-        expect(m.tailRight, `${what} cuts the keys`).toBeLessThanOrEqual(m.right + 1);
-        expect(m.tailCut, `${what} cuts the keys`).toBe(false);
-        expect(m.struck, `${what} doesn't strike the replaced word`).toContain("line-through");
-        expect(Math.abs(m.top - m.invTop), `${what} isn't in the notation's slot`).toBeLessThanOrEqual(1);
-        expect(m.house - m.sentence, `${what} pushed the house away`).toBeLessThanOrEqual(20);
+      const v = new THREE.Vector3();
+      const bodies = [...SENTENCES, ...EXTREMES, Array(10).fill("wordmvadgycfe")].map((words) => buildBody(words));
+      try {
+        for (const [i, m] of out.entries()) {
+          const what = `"${Object.values(cases[i]).join("")}"`;
+          expect(m.height, `${what} wraps`).toBeLessThan(m.line * 1.5);
+          expect(m.right, `${what} runs out of its half`).toBeLessThanOrEqual(m.halfRight + 1);
+          expect(Math.abs(m.top - m.invTop), `${what} isn't in the notation's slot`).toBeLessThanOrEqual(1);
+          expect(m.houseTop - m.sentence, `${what} pushed the house away`).toBeLessThanOrEqual(20);
+          expect(m.contrast, `${what} is too faint on its ground`).toBeGreaterThanOrEqual(4.5);
+          const struck = m.pieces.find((p: any) => p.tag === "del");
+          expect(struck?.struck, `${what} doesn't strike the replaced word`).toContain("line-through");
+          // only a word may be shortened: the part, the prediction and "choose again" are never cut
+          for (const p of m.pieces) {
+            if (p.tag === "del" || p.tag === "b") { if (p.cut) expect(p.ellipsis, `${what}: a shortened word doesn't end in an ellipsis`).toBe("ellipsis"); }
+            else { expect(p.cut, `${what} cuts "${p.text}"`).toBe(false); expect(p.right, `${what} cuts "${p.text}"`).toBeLessThanOrEqual(m.right + 1); }
+          }
+          // every house at rest stays clear of the line
+          const cam = new THREE.PerspectiveCamera();
+          place(cam, m.houseWidth / m.houseHeight);
+          const clear = m.bottom - m.houseTop + (size[0] <= 900 ? 16 : 8);
+          for (const body of bodies) {
+            body.root.updateMatrixWorld(true);
+            let top = Infinity;
+            body.root.traverse((o) => {
+              const mesh = o as THREE.Mesh;
+              if (!mesh.isMesh) return;
+              const p = mesh.geometry.attributes.position;
+              for (let k = 0; k < p.count; k++) top = Math.min(top, ((1 - v.fromBufferAttribute(p, k).applyMatrix4(mesh.matrixWorld).project(cam).y) / 2) * m.houseHeight);
+            });
+            expect(top, `a house reaches the drafting line ${what}`).toBeGreaterThanOrEqual(clear);
+          }
+        }
+      } finally { for (const b of bodies) b.dispose(); }
+      expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
+      // on a phone a 24-letter word can't fit whole beside the rest, so it alone is shortened: struck, or new in the stale line
+      if (size[0] <= 900) {
+        expect(out[1].pieces.find((p: any) => p.tag === "del").cut, "a 24-letter struck word isn't shortened on its own").toBe(true);
+        expect(out[2].pieces.find((p: any) => p.tag === "b").cut, "a 24-letter new word isn't shortened on its own").toBe(true);
       }
-      expect(out[0].wasCut, "a short word is shortened").toBe(false);
-      // a word is shortened only when the line can't hold it whole: on a phone, the longest word always
-      // is; on a desktop, whether 24 letters fit depends on the label face (IBM Plex Mono holds them at 1920)
-      if (size[0] <= 900) expect(out[2].wasCut, "a 24-letter word isn't shortened on its own").toBe(true);
-      for (const m of out.filter((o) => o.wasCut)) expect(m.ellipsis, "a shortened word doesn't end in an ellipsis").toBe("ellipsis");
-    }, 120_000);
+    }, 180_000);
   }
 
   // The focused word field shows a visible keyboard focus: a 2px outline in

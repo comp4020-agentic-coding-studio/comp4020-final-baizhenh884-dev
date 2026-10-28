@@ -114,7 +114,7 @@ export function mountCurrent(doc: Document, ownCrossing: (position: number) => C
   const drafted = (s: Slot) => {
     if (!part || selected !== s.position || held) return;
     if (s.input.value === "") annotate(s.position);
-    else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position] }, form())); // the word on screen, which a draft may hold back
+    else showDrafting(part, drafting({ position: s.position, word: s.label.textContent?.trim() ?? words[s.position], draft: s.input.value }, form())); // the word on screen, which a draft may hold back
   };
   // the one hairline between the chosen word and its territory, ending in that territory's numbered tag
   // (desktop; red only while that territory is rebuilt)

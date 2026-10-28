@@ -33,17 +33,23 @@ export function said({ position, word, was }: Noted): string {
 // While a replacement is being typed, in the notation's slot: the word being replaced (struck by the page)
 // and the keys. A desktop keeps the part and its family, of the word that stands (typing never previews
 // the house); a phone says only what's being replaced. In pieces, so a long word can be shortened alone.
-export type Drafting = { lead: string; was: string; tail: string };
-export function drafting({ position, word }: Noted, form: Form = "desktop"): Drafting {
+export type Drafting = { lead: string; was: string; rest: string; now?: string; end?: string };
+export type Draft = Noted & { draft: string; now?: string };
+export function drafting({ position, word }: Draft, form: Form = "desktop"): Drafting {
   return form === "phone"
-    ? { lead: "Replacing ", was: word, tail: " · Enter to replace" }
-    : { lead: `${notation({ position, word })} · replacing `, was: word, tail: " · Enter to replace · Esc to cancel" };
+    ? { lead: "Replacing ", was: word, rest: " · Enter to replace" }
+    : { lead: `${notation({ position, word })} · replacing `, was: word, rest: " · Enter to replace · Esc to cancel" };
+}
+
+// not built yet
+export function foreseen(_d: Draft): string {
+  throw new Error("foreseen is not built yet");
 }
 
 // sets the drafting line in the slot, as text: the replaced word is a <del>, never markup of its own
-export function showDrafting(part: HTMLElement, { lead, was, tail }: Drafting): void {
+export function showDrafting(part: HTMLElement, { lead, was, rest }: Drafting): void {
   const doc = part.ownerDocument;
   const span = (text: string, tag = "span") => { const el = doc.createElement(tag); el.textContent = text; return el; };
   part.hidden = false;
-  part.replaceChildren(span(lead), span(was, "del"), span(tail));
+  part.replaceChildren(span(lead), span(was, "del"), span(rest));
 }

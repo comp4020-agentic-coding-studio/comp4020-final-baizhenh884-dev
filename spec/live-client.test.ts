@@ -1,8 +1,8 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it, vi } from "vitest";
-import { said } from "../src/lib/house/notation";
+import { foreseen, said } from "../src/lib/house/notation";
 import { sizeStep } from "../src/lib/sentence-step";
-import { attach, deriveTotal, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
+import { attach, deriveTotal, DRAFT_MS, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -929,6 +929,73 @@ describe("live page reconciliation", () => {
       vi.advanceTimersByTime(2500);
       expect(region(doc).textContent, "a change under a draft wasn't announced").toContain(word);
       expect(slot(doc, position).input.value, "the announcement touched the draft").toBe("mydraft");
+    });
+  });
+
+  // The draft's own polite live region (decided after the 28 October playtest): the part
+  // notation is decorative, so a screen reader hears the same prediction here, once typing
+  // pauses, never per key; and if another visitor replaces the word being typed over, that
+  // it was, and to choose it again. Separate from the region for others' changes, so neither
+  // talks over the other. Silent on load, a snapshot, a reconnect, an emptied or blurred field.
+  describe("the draft's prediction, for a screen reader", () => {
+    const draftRegion = (doc: Document) => {
+      const el = doc.getElementById("foreseen");
+      expect(el, "GET / has no live region for the draft").not.toBeNull();
+      expect(el!.getAttribute("aria-live")).toBe("polite");
+      expect(el!.closest('[aria-hidden="true"]'), "the draft's region is hidden from screen readers").toBeNull();
+      expect(el, "the draft shares the region for others' changes").not.toBe(doc.getElementById("news"));
+      return el!;
+    };
+    afterEach(() => vi.useRealTimers());
+
+    localOnly("says the prediction once typing pauses, once, not per key", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const region = draftRegion(doc);
+      expect(region.textContent?.trim(), "the draft's region speaks on load").toBe("");
+      const said: string[] = [];
+      new doc.defaultView!.MutationObserver(() => { const t = region.textContent?.trim(); if (t) said.push(t); }).observe(region, { childList: true, characterData: true, subtree: true });
+      const { position, word } = positionsOf(doc)[4];
+      slot(doc, position).input.focus();
+      for (const typed of ["h", "ho", "hol", "holl", "hollo", "hollow"]) { type(doc, position, typed); vi.advanceTimersByTime(150); }
+      expect(said, "spoke while still typing").toEqual([]);
+      vi.advanceTimersByTime(DRAFT_MS);
+      await Promise.resolve();
+      expect(said).toEqual([foreseen({ position, word, draft: "hollow" })]);
+      // an emptied field says nothing more
+      type(doc, position, "");
+      vi.advanceTimersByTime(DRAFT_MS * 2);
+      await Promise.resolve();
+      expect(said, "an emptied field spoke").toHaveLength(1);
+    });
+
+    localOnly("says once that the word was replaced by someone else, and leaves the draft alone", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      const { position, version, word } = positionsOf(doc)[4];
+      slot(doc, position).input.focus();
+      type(doc, position, "hollow");
+      vi.advanceTimersByTime(DRAFT_MS);
+      const now = fresh();
+      page.applyChange({ position, word: now, version: version + 1 });
+      vi.advanceTimersByTime(DRAFT_MS);
+      expect(draftRegion(doc).textContent?.trim()).toBe(foreseen({ position, word, draft: "hollow", now }));
+      expect(slot(doc, position).input.value, "the news touched the draft").toBe("hollow");
+      expect(slot(doc, position).version.value, "the draft's version moved").toBe(String(version));
+    });
+
+    localOnly("stays silent on a snapshot or reconnect", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const page = attach(doc);
+      page.applySnapshot(snapshotOf(doc));
+      page.applySnapshot(snapshotOf(doc));
+      vi.advanceTimersByTime(DRAFT_MS * 3);
+      expect(draftRegion(doc).textContent?.trim(), "a snapshot spoke in the draft's region").toBe("");
     });
   });
 
