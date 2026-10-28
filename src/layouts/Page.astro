@@ -215,10 +215,16 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .stands-half .invite { margin: 0; color: var(--caption); white-space: nowrap; }
       .stands-half .invite-house { color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
       .stands-half #part:not([hidden]) ~ .invite-row { visibility: hidden; }
-      /* while a replacement is typed: one line, the replaced word struck, and only it shortened when long; the keys are never cut */
+      /* while a replacement is typed: one line, the replaced word struck, and only a word shortened when long; the prediction is never cut */
       #part:has(> del) { display: flex; white-space: pre; }
       #part > span { flex: none; }
-      #part > del { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-decoration-thickness: 1px; }
+      #part > del, #part > b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      #part > del { text-decoration-thickness: 1px; }
+      #part > b { font-weight: inherit; min-width: 4.5ch; }
+      /* in the stale line the struck word is the only thing saying what was replaced: the new word gives way, down to
+         a few letters; on a desktop the struck word never does. A phone can't hold two 24-letter words whole, so
+         there a long struck word is held to the room the rest leaves */
+      #part:has(> b) > del { flex-shrink: 0; }
       /* the row decides a house's size, never its canvas: the canvas lies over its host */
       #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
       .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
@@ -369,6 +375,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       @media (max-width: 900px) {
         /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
         .thread { display: none; }
+        /* a struck word takes no more than what the rest of the stale line leaves: its number, separators and "choose
+           again", and the new word's few letters, measured at 38ch in the notation's tracked caps */
+        #part:has(> b) > del { max-width: calc(100% - 39.5ch); }
         main { padding: 1.1rem 1rem 1.4rem; }
         .mast, .text { max-width: none; }
         .text { margin: 0; padding: 0; }
