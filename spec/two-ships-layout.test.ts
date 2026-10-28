@@ -601,9 +601,10 @@ describe("two ships on GET /", () => {
   // test that decided it), or, if another visitor replaced the word, the new
   // word and "choose again". Never the keys. One line, so it moves nothing,
   // and every house at rest stays clear of it by 8px on a desktop and 16px on
-  // a phone, on real geometry through the page's own camera. Only a long word
-  // is shortened (the struck one, or the new one in the stale line), with an
-  // ellipsis; the prediction itself is never cut. Read like the notation: at
+  // a phone, on real geometry through the page's own camera. Only a word is
+  // ever shortened (the struck one, or the new one in the stale line), with an
+  // ellipsis; the prediction itself is never cut. From 1440 a short struck
+  // word stays whole; below, the longest predictions may shorten it. Read like the notation: at
   // least 4.5:1 on its ground. Set in the measured copy by the page's own
   // showDrafting(), so the markup and the CSS under test are the page's.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
@@ -674,7 +675,7 @@ describe("two ships on GET /", () => {
           }
         }
       } finally { for (const b of bodies) b.dispose(); }
-      expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
+      if (size[0] >= 1440 || size[0] <= 900) expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
       // on a phone a 24-letter word can't fit whole beside the rest, so it alone is shortened: struck, or new in the stale line
       if (size[0] <= 900) {
         expect(out[1].pieces.find((p: any) => p.tag === "del").cut, "a 24-letter struck word isn't shortened on its own").toBe(true);

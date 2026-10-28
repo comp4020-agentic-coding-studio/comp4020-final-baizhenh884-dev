@@ -57,9 +57,10 @@ describe("the part notation", () => {
 
   // While a replacement is being typed (decided after the 28 October playtest):
   // the word being replaced, struck, and the family the draft would give its
-  // part, never the keys (they're in the rule paragraph). A desktop adds the
-  // test that decided that family, in its yes/no words; a phone doesn't, so
-  // it stays one line. The same rule as an accepted change's notation, from
+  // part, never the keys (they're in the rule paragraph). A desktop names the
+  // part and adds the test that decided that family, in its yes/no words; a
+  // phone leads with the part's number alone (the 01–10 index above its word)
+  // and no test, so it stays one line at 390. The same rule as an accepted change's notation, from
   // describeTerritory(): the prediction is notation({ ..., was }) with the
   // struck word set in. In pieces, so the page strikes the replaced word and
   // shortens only a long word (spec/two-ships-layout.test.ts). Text only:
@@ -75,13 +76,13 @@ describe("the part notation", () => {
 
   it("while typing, names the part, the word being replaced and the family the draft would give it", () => {
     expect(drafting({ position: 4, word: "people", draft: "hollow" }, "desktop")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · arch → nested · not short" });
-    expect(drafting({ position: 4, word: "people", draft: "hollow" }, "phone")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · arch → nested" });
+    expect(drafting({ position: 4, word: "people", draft: "hollow" }, "phone")).toEqual({ lead: "05 · ", was: "people", rest: " · arch → nested" });
     expect(drafting({ position: 4, word: "people", draft: "door" }, "desktop")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · arch, unchanged · mostly round" });
     expect(drafting({ position: 2, word: "website", draft: "brightly" }, "desktop")).toEqual({ lead: "03 — central hall · ", was: "website", rest: " · clerestory → block · not open" });
     for (let p = 0; p < 10; p++) for (const was of WORDS.slice(0, 30)) for (const w of WORDS) {
       const d = drafting({ position: p, word: was, draft: w }, "desktop"), t = lastTest(p, w);
       expect(d).toEqual({ lead: `${label(p)} · `, was, rest: ` · ${change(p, was, w)}${t ? ` · ${t}` : ""}` });
-      expect(drafting({ position: p, word: was, draft: w }, "phone")).toEqual({ lead: `${label(p)} · `, was, rest: ` · ${change(p, was, w)}` });
+      expect(drafting({ position: p, word: was, draft: w }, "phone")).toEqual({ lead: `${label(p).slice(0, 2)} · `, was, rest: ` · ${change(p, was, w)}` });
     }
   });
 
@@ -98,16 +99,15 @@ describe("the part notation", () => {
       expect(drafting({ position: 4, word: "people", draft }, "desktop")).toEqual({ lead: "05 — entry · ", was: "people", rest: "" });
     }
     // surrounding spaces are trimmed, as the server trims them
-    expect(drafting({ position: 4, word: "people", draft: "  hollow " }, "phone")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · arch → nested" });
+    expect(drafting({ position: 4, word: "people", draft: "  hollow " }, "phone")).toEqual({ lead: "05 · ", was: "people", rest: " · arch → nested" });
     expect(drafting({ position: 4, word: "people", draft: "w".repeat(24) }, "phone").rest).not.toBe("");
   });
 
   // Another visitor replaced the word while this one was typing: sending would be refused as stale,
   // so the line says what to do, and the new word is its own piece, so a long one shrinks alone.
   it("when the word was replaced while typing, says the new word and to choose again", () => {
-    for (const form of ["desktop", "phone"] as const) {
-      expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, form)).toEqual({ lead: "05 — entry · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
-    }
+    expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, "desktop")).toEqual({ lead: "05 — entry · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
+    expect(drafting({ position: 4, word: "people", draft: "hollow", now: "X" }, "phone")).toEqual({ lead: "05 · ", was: "people", rest: " · now “", now: "X", end: "” · choose again" });
   });
 
   // the spelling is all it reads: the maker's blocklist never reaches the client
@@ -132,11 +132,11 @@ describe("the part notation", () => {
     const part = doc.getElementById("part")!;
     showDrafting(part, drafting({ position: 4, word: "<b>x</b>", draft: "hollow" }, "phone"));
     expect(part.hidden).toBe(false);
-    expect(part.textContent).toBe(`05 — entry · <b>x</b> · ${notation({ position: 4, word: "hollow", was: "<b>x</b>" }, "phone").split(" · ")[1]}`);
+    expect(part.textContent).toBe(`05 · <b>x</b> · ${notation({ position: 4, word: "hollow", was: "<b>x</b>" }, "phone").split(" · ")[1]}`);
     expect(part.querySelector("b"), "a word became markup").toBeNull();
     expect(part.querySelector("del")?.textContent).toBe("<b>x</b>");
     showDrafting(part, drafting({ position: 4, word: "people", draft: "hollow", now: "<i>y</i>" }, "phone"));
-    expect(part.textContent).toBe("05 — entry · people · now “<i>y</i>” · choose again");
+    expect(part.textContent).toBe("05 · people · now “<i>y</i>” · choose again");
     expect(part.querySelector("i"), "a word became markup").toBeNull();
     // and the plain notation afterwards leaves no struck word behind
     part.textContent = notation({ position: 4, word: "door" });
