@@ -818,7 +818,7 @@ describe("two ships on GET /", () => {
     }, 90_000);
   }
 
-  // The captions (the instructions, your trace, the kept key) are read, not
+  // The captions (the instructions, your trace, the kept note) are read, not
   // glanced at: at least 15px on a desktop and 14px on a phone, at a contrast
   // of at least 6:1 on their half's ground (measured over the ground, opacity
   // included). A trace is staged in the measured copy the way GET / renders one.
@@ -838,7 +838,7 @@ describe("two ships on GET /", () => {
         const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
         const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
         const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
-        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept key', '.kept-half .kept-key'], ['invitation line', '.stands-half .invite']].map(([what, sel]) => {
+        return [['instructions', '#how'], ['trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['kept note', '.kept-half .kept-note'], ['invitation line', '.stands-half .invite']].map(([what, sel]) => {
           const el = document.querySelector(sel), cs = getComputedStyle(el), ground = rgb(getComputedStyle(el.closest('.half')).backgroundColor);
           const [r, g, b, a = 1] = rgb(cs.color), k = a * opacity(el), c = [r * k + ground[0] * (1 - k), g * k + ground[1] * (1 - k), b * k + ground[2] * (1 - k)];
           const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m);
@@ -881,7 +881,7 @@ describe("two ships on GET /", () => {
         const shown = (el) => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
         const labels = [...document.querySelectorAll('.two .caps')].filter(shown).map((el) => ({ what: (el.className + ' ' + el.textContent.trim()).slice(0, 60),
           family: getComputedStyle(el).fontFamily, contrast: worst(el, ink(el)) }));
-        const captions = ['#how', '.kept-half .kept-key', '.stands-half .invite'].map((s) => document.querySelector(s)).filter((el) => el && shown(el))
+        const captions = ['#how', '.kept-half .kept-note', '.stands-half .invite'].map((s) => document.querySelector(s)).filter((el) => el && shown(el))
           .map((el) => ({ what: el.id || el.className, contrast: worst(el, ink(el)) }));
         const plex = [...document.fonts].filter((f) => /IBM Plex Mono/.test(f.family) && f.status === 'loaded').length;
         return { halves, labels, captions, plex };
@@ -936,7 +936,7 @@ describe("two ships on GET /", () => {
           return Math.abs(top(words.at(-1)) - top(words.at(-2))) > 2;
         };
         const captions = [['the plate note', '.stands-half .plate-note'], ['the kept plate note', '.kept-half .plate-note'], ['the instructions', '#how'],
-          ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept key', '.kept-half .kept-key'], ['the question', '.stands-half .question']]
+          ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept note', '.kept-half .kept-note'], ['the question', '.stands-half .question']]
           .map(([what, sel]) => ({ what, lone: lone(document.querySelector(sel)) }));
         const nav = document.querySelector('.stands-half .foot .about');
         const links = [...nav.querySelectorAll('a')].map((a) => ({ text: a.textContent, lines: a.getClientRects().length, top: a.getBoundingClientRect().top }));

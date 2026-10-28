@@ -264,16 +264,19 @@ describe("Kept ship markup on GET /", () => {
     expect(readable(sentence), "the kept sentence doesn't read as its words, and its gaps as words still standing").toContain(`${words.join(" ")}.`);
   });
 
-  // what the kept sentence is, said once under its house: a first visitor
-  // reads the words above as replaced and the gaps as still standing. GET /
-  // only: an earlier form has no kept half (houses stay level with it,
-  // spec/two-ships-layout.test.ts)
-  const KEPT_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
-  it("says under its house what its words and gaps are, on GET / only", async () => {
+  // what the kept sentence is, said once, under the sentence: its words were
+  // replaced, and a faint word hasn't been yet. GET / only: an earlier form
+  // has no kept half (houses stay level with it, spec/two-ships-layout.test.ts).
+  // The foot's older line ("…the gaps are words that still stand there"),
+  // written for empty gaps, said the same thing in older terms; it's gone.
+  const KEPT_LINE = "Replaced words, gathered back in their places. A faint word hasn't been replaced yet.";
+  const OLD_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
+  it("says once what its words and faint words are, on GET / only", async () => {
     const doc = await new Visitor().page();
-    const lines = [...doc.querySelectorAll(".kept-half .foot p")].map((p) => p.textContent?.trim());
-    expect(lines, "the kept half's foot doesn't say what its words and gaps are").toContain(KEPT_LINE);
-    expect(doc.querySelector(".kept-half .foot")?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    const note = doc.querySelector(".kept-half .kept-note");
+    expect(note?.textContent?.trim(), "the kept half doesn't say what its words and faint words are").toBe(KEPT_LINE);
+    expect(note?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    expect(doc.body.textContent, "the foot's older line for empty gaps is still there").not.toContain(OLD_LINE);
     const earlier = new JSDOM(await (await fetch(new URL("/?at=0", baseUrl))).text()).window.document;
     expect(earlier.body.textContent, "an earlier form says what a kept half shows").not.toContain(KEPT_LINE);
   });
