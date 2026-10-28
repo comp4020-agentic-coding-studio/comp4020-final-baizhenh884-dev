@@ -83,8 +83,10 @@ describe("the question first", () => {
     const step2 = text(band.querySelectorAll("ol.how-to-play > li")[1]);
     expect(step2, "step 2 doesn't say the part is rebuilt from the spelling").toMatch(/spell/i);
     expect(step2, "step 2 doesn't say meaning doesn't count").toMatch(/not (by |from )?what it means|not its meaning/i);
-    const link = band.querySelector('.how a[href="/house/"]');
-    expect(link, "how to play doesn't link to /house/").not.toBeNull();
+    // one link, with the question, so it stays when the band folds (two would be read twice)
+    const links = band.querySelectorAll('a[href="/house/"]');
+    expect(links, "the band doesn't link to /house/ exactly once").toHaveLength(1);
+    const link = links[0];
     expect(text(link), "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
     expect(link!.closest("[aria-hidden='true']"), "the /house/ link is hidden from assistive technology").toBeNull();
   });
