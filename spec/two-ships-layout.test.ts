@@ -16,12 +16,16 @@ import { SIZE_STEPS, sizeStep } from "../src/lib/sentence-step";
 // its own house: side by side and equal on a desktop, stacked on a phone,
 // and always on two clearly different grounds. The kept sentence is set as a
 // sentence (legible on its ground, at a size near the live one, but never
-// larger than it: the live sentence stays primary), and a gap is drawn as a
-// visible blank, so a fresh kept ship reads as an empty sentence of ten gaps.
+// larger than it: the live sentence stays primary). A gap shows the word
+// still standing at its position, faint, with a second cue that isn't
+// lightness (a dashed underline): legible as text (4.5:1 on its grid, like
+// any text), and clearly fainter than a kept word (a ceiling). It used to be
+// an empty underline, read at the 28 October playtest as a fill-in-the-blank
+// quiz. A line under the kept half's label says what the sentence is.
 //
-// The shared sentence may hold any state, so the gap check turns every kept
-// word into a gap in the measured copy only (a gap is a ".w.gap" span with
-// no word in it, as GET / serves one), never on the server.
+// The shared sentence may hold any state, so the gap checks stage the kept
+// sentence in the measured copy only (a gap is a ".w.gap" span holding the
+// word still standing, as GET / serves one), never on the server.
 //
 // However long the live half's notes run (how-to, a settle trace naming many
 // standing words, the Earlier link), each house stays directly under its
@@ -39,7 +43,8 @@ type Layout = {
   standsBg: string; keptBg: string; groundContrast: number;
   standsSentence: Box; standsHouse: Box; keptSentence: Box; keptHouse: Box;
   liveSize: number; keptSize: number; keptTextContrast: number;
-  gaps: { width: number; ink: number }[];
+  gaps: { text: string; contrast: number; cue: string; cueInk: number }[]; keptWords: number[];
+  note: { text: string; contrast: number; size: number; underSentence: boolean; right: number; hidden: boolean } | null;
   pointer: Box | null; pointerShown: boolean;
   // the question band above both halves: its question, and its steps while it's in full
   question: Box; steps: Box | null;
@@ -78,12 +83,24 @@ async function layout(size: [number, number], longNotes = false, longWords: bool
     const keptSentence = q('.kept-sentence'), ks = getComputedStyle(keptSentence);
     const opacity = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
     const ink = (el, prop) => { const c = getComputedStyle(el)[prop]; const [r, g, b, a = 1] = rgb(c); return contrast(over('rgba(' + r + ',' + g + ',' + b + ',' + a * opacity(el) + ')', keptBg), rgb(keptBg)); };
-    // every kept word as a gap, as GET / serves one: the empty ship's ten blanks
-    for (const w of keptSentence.querySelectorAll('.w')) { w.classList.add('gap'); w.textContent = ''; }
+    // the kept sentence as GET / serves one part-built: even positions kept, odd ones gaps showing the word still standing
+    const standing = [...document.querySelectorAll('.stands-half .sentence label')].map((l) => l.textContent.trim());
+    keptSentence.querySelectorAll('.w').forEach((w, i) => {
+      if (i % 2) { w.className = 'w gap'; w.textContent = standing[i]; } else { w.className = 'w'; w.textContent = 'kept' + i; }
+    });
+    // a text's contrast at the worst point of its ground (a grid line over the flat colour)
+    const kh = getComputedStyle(q('.kept-half')), gridLine = (kh.backgroundImage.match(/rgba?\([^)]*\)/) || [null])[0];
+    const flat = rgb(keptBg), grid = gridLine ? over(gridLine, keptBg) : flat;
+    const onGround = (el, prop) => { const c = getComputedStyle(el)[prop]; const [r, g, b, a = 1] = rgb(c); const fg = over('rgba(' + r + ',' + g + ',' + b + ',' + a * opacity(el) + ')', keptBg);
+      return Math.min(contrast(fg, flat), contrast(fg, grid)); };
+    const words = [...keptSentence.querySelectorAll('.w:not(.gap)')].map((w) => onGround(w, 'color'));
     const gaps = [...keptSentence.querySelectorAll('.w.gap')].map((g) => {
       const s = getComputedStyle(g);
-      return { width: g.getBoundingClientRect().width / parseFloat(ks.fontSize), ink: parseFloat(s.borderBottomWidth) > 0 ? ink(g, 'borderBottomColor') : 0 };
+      return { text: g.textContent, contrast: onGround(g, 'color'), cue: s.textDecorationLine.includes('underline') ? s.textDecorationStyle : (parseFloat(s.borderBottomWidth) > 0 ? s.borderBottomStyle : 'none'),
+        cueInk: s.textDecorationLine.includes('underline') ? ink(g, 'textDecorationColor') : (parseFloat(s.borderBottomWidth) > 0 ? ink(g, 'borderBottomColor') : 0) };
     });
+    const note = document.querySelector('.kept-half .kept-note');
+    const noteBox = note && note.getBoundingClientRect(), sentBox = keptSentence.getBoundingClientRect();
     return {
       viewport: innerWidth,
       context: { innerWidth, innerHeight, fonts: document.fonts.status, fontsLoaded: [...document.fonts].filter((f) => f.status === 'loaded').length },
@@ -93,7 +110,9 @@ async function layout(size: [number, number], longNotes = false, longWords: bool
       keptSentence: box('.kept-half .kept-sentence'), keptHouse: box('.kept-half #house-kept'),
       liveSize: parseFloat(getComputedStyle(q('.stands-half .sentence')).fontSize), keptSize: parseFloat(ks.fontSize),
       keptTextContrast: ink(keptSentence, 'color'),
-      gaps,
+      gaps, keptWords: words,
+      note: note ? { text: note.textContent.trim(), contrast: onGround(note, 'color'), size: parseFloat(getComputedStyle(note).fontSize),
+        underSentence: noteBox.top >= sentBox.bottom - 1, right: noteBox.right, hidden: note.closest('[aria-hidden="true"]') !== null } : null,
       // the stacked layout's line pointing down to the kept half
       pointer: document.querySelector('.stands-half .kept-pointer') ? box('.stands-half .kept-pointer') : null,
       pointerShown: !!document.querySelector('.stands-half .kept-pointer') && getComputedStyle(q('.stands-half .kept-pointer')).display !== 'none',
@@ -183,12 +202,28 @@ function bothHalves(l: Layout): void {
   expect(l.keptSize / l.liveSize, "the kept sentence is set as a small caption" + m).toBeGreaterThanOrEqual(0.6);
   expect(l.keptSize, "the kept sentence outranks the live one" + m).toBeLessThan(l.liveSize);
   expect(l.keptTextContrast, "the kept sentence isn't legible on its ground" + m).toBeGreaterThanOrEqual(4.5);
-  // an empty kept ship: ten blanks, each wide enough to read as a missing word, and drawn visibly
-  expect(l.gaps, "the kept sentence has no ten gaps" + m).toHaveLength(10);
+  // a gap: the word still standing there, legible as text (4.5:1 on its grid, the floor every text keeps), and
+  // clearly fainter than every kept word (the ceiling: at most 60% of the faintest kept word's contrast)
+  expect(l.gaps, "the staged kept sentence has no five gaps" + m).toHaveLength(5);
+  expect(l.keptWords, "the staged kept sentence has no five kept words" + m).toHaveLength(5);
+  const faintestKept = Math.min(...l.keptWords);
   for (const [i, g] of l.gaps.entries()) {
-    expect(g.width, `gap ${i} is too narrow to read as a missing word` + m).toBeGreaterThanOrEqual(1.2);
-    expect(g.ink, `gap ${i} isn't visible on the kept ground` + m).toBeGreaterThanOrEqual(3);
+    expect(g.text, `gap ${i} doesn't show the word still standing` + m).not.toBe("");
+    expect(g.contrast, `gap "${g.text}" is too faint to read on its grid` + m).toBeGreaterThanOrEqual(4.5);
+    expect(g.contrast, `gap "${g.text}" is as strong as a kept word (${faintestKept.toFixed(2)}:1)` + m).toBeLessThanOrEqual(faintestKept * 0.6);
+    // a second cue, not lightness alone: a dashed line under it, never solid (a word) or dotted (your own word)
+    expect(g.cue, `gap "${g.text}" has no cue but its lightness` + m).toBe("dashed");
+    expect(g.cueInk, `gap "${g.text}"'s dashed line isn't visible on the kept ground` + m).toBeGreaterThanOrEqual(1.5);
   }
+  // under the kept sentence: what it is, as text, like any caption (6:1). Under the sentence, over the kept house's
+  // empty top band, not under the label: a line there grew the row both halves share and pushed the live house
+  // off the first screen with the longest words. The kept house stays clear of it (checked on real geometry below)
+  expect(l.note, "there's no line saying what the kept sentence is" + m).not.toBeNull();
+  expect(l.note!.text, "the line under the kept sentence isn't the agreed one" + m).toBe("Replaced words, gathered back in their places. A faint word hasn't been replaced yet.");
+  expect(l.note!.underSentence, "the line isn't under the kept sentence" + m).toBe(true);
+  expect(l.note!.right, "the line under the kept sentence runs out of its half" + m).toBeLessThanOrEqual(l.kept.right + 1);
+  expect(l.note!.hidden, "the line under the kept sentence is hidden from assistive technology" + m).toBe(false);
+  expect(l.note!.contrast, "the line under the kept sentence is too faint" + m).toBeGreaterThanOrEqual(6);
 }
 
 describe("two ships on GET /", () => {
@@ -231,7 +266,9 @@ describe("two ships on GET /", () => {
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
-          for (const w of q('.kept-sentence').querySelectorAll('.w')) { w.classList.add('gap'); w.textContent = ''; }
+          // the kept sentence as long as GET / makes it: every position a gap showing the word still standing
+          const live = [...document.querySelectorAll('.stands-half .sentence label')].map((l) => l.textContent.trim());
+          q('.kept-sentence').querySelectorAll('.w').forEach((w, i) => { w.className = 'w gap'; w.textContent = live[i]; });
           const b = (s) => q(s).getBoundingClientRect();
           const inv = b('.stands-half .invite'), how = b('#how');
           return { stands: b('.stands-half #house').height, kept: b('#house-kept').height, standsTop: b('.stands-half #house').top, keptTop: b('#house-kept').top,
@@ -369,6 +406,43 @@ describe("two ships on GET /", () => {
       expect(l.steps!.bottom, "how to play runs past the first screen").toBeLessThanOrEqual(844);
       expect(l.standsSentence.bottom, "the live sentence runs past the first screen under the band").toBeLessThanOrEqual(844);
     }, 90_000);
+  }
+
+  // The line under the kept sentence lies over the kept house's own empty top
+  // band, as the part notation does over the live house's: every kept house at
+  // rest stays clear of it, by 8px on a desktop and 16px on a phone, on real
+  // geometry through the page's own camera at the measured canvas size (both
+  // houses are the same body and camera). Measured with the longest kept
+  // sentence: every position a gap showing a long word still standing.
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`keeps every kept house at rest clear of the line under the kept sentence (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      stageWords(doc, Array(10).fill("wordmvadgycfe"));
+      doc.querySelectorAll(".kept-sentence .w").forEach((w) => { w.className = "w gap"; w.textContent = "wordmvadgycfe"; });
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        const q = ${QUERY_JS};
+        const h = q('#house-kept').getBoundingClientRect();
+        return { noteBottom: q('.kept-half .kept-note').getBoundingClientRect().bottom, houseTop: h.top, houseWidth: h.width, houseHeight: h.height };
+      })()`, [size[0], size[1]])) as { noteBottom: number; houseTop: number; houseWidth: number; houseHeight: number };
+      const cam = new THREE.PerspectiveCamera();
+      place(cam, m.houseWidth / m.houseHeight);
+      const clear = m.noteBottom - m.houseTop + (size[0] <= 900 ? 16 : 8); // px from the canvas top
+      const v = new THREE.Vector3();
+      for (const words of [...SENTENCES, ...EXTREMES, Array(10).fill("wordmvadgycfe")]) {
+        const body = buildBody(words);
+        body.root.updateMatrixWorld(true);
+        let top = Infinity;
+        body.root.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const p = mesh.geometry.attributes.position;
+          for (let i = 0; i < p.count; i++) top = Math.min(top, ((1 - v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld).project(cam).y) / 2) * m.houseHeight);
+        });
+        body.dispose();
+        expect(top, `the kept house of "${words.join(" ")}" reaches the line under the kept sentence`).toBeGreaterThanOrEqual(clear);
+      }
+    }, 120_000);
   }
 
   // The part notation ("05 — entry") and the live house. The notation lies
@@ -616,8 +690,8 @@ describe("two ships on GET /", () => {
   // device. It was a phone's alone, a desktop showing nothing until a word was
   // pointed at; at the 28 October playtest, people on a desktop didn't see the
   // words could be clicked. It must never be taken for the visitor's own word
-  // (a dotted line, darker) or a kept gap (a blank on the other ground, with no
-  // word on it): solid, never dotted, and fainter than the mark. Staged in the
+  // (a dotted line, darker) or a kept gap (a faint word with a dashed line, on
+  // the other ground): solid, never dotted, and fainter than the mark. Staged in the
   // measured copy: one word marked as the visitor's, as GET / renders one.
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
     it(`marks the words as changeable at rest on every device, never like your own word (${name})`, async () => {
