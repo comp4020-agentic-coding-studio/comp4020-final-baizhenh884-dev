@@ -414,8 +414,8 @@ What the code must hold to. The README says why; don't restate it here.
   dashed line (a second cue besides lightness: a kept word has no line,
   your own kept word a dotted one). It keeps the 4.5:1 floor on its grid
   like any text and a ceiling of 60% of the faintest kept word's contrast.
-  Under the kept sentence: "Replaced words, gathered back in their places. A
-  faint word hasn't been replaced yet." The house at rest stays clear of
+  Under the kept sentence: "Replaced words, back in their places. Faint
+  words still stand." The house at rest stays clear of
   that line (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October
   playtest an empty gap was read as a fill-in-the-blank quiz, and the kept
   sentence as the original.)
