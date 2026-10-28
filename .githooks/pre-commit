@@ -20,3 +20,17 @@ if [ -n "$hits" ]; then
 	echo "rotated: post on Ed." >&2
 	exit 1
 fi
+
+# Blocks the commit if the project doesn't typecheck, whenever a commit stages
+# .astro or .ts files. `astro check` exits non-zero on any error; its output is
+# shown in full, never silenced, so a failure can't pass as a quiet success.
+# (PR #12's first CI run failed 'astro check' with 108 errors that local runs
+# had hidden: the typecheck was run silenced and only its last line read.)
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(astro|ts)$'; then
+	if ! ./node_modules/.bin/astro check; then
+		echo "" >&2
+		echo "commit blocked: astro check found errors (above)." >&2
+		echo "Fix them and commit again." >&2
+		exit 1
+	fi
+fi
