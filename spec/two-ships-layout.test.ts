@@ -678,12 +678,14 @@ describe("two ships on GET /", () => {
         }
       } finally { for (const b of bodies) b.dispose(); }
       if (size[0] >= 1440 || size[0] <= 900) expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
-      // in the stale line the struck word is the only thing saying what was replaced: never shortened, at
-      // any width, even when it and the new word are both 24 letters; the new word gives way, keeping a few
-      // letters, and "choose again" stays whole (checked above)
-      for (const c of [out[2], out[3]]) {
-        expect(c.pieces.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
-        const nw = c.pieces.find((p: any) => p.tag === "b");
+      // in the stale line the struck word is the only thing saying what was replaced: never shortened on a
+      // desktop, even when it and the new word are both 24 letters. On a phone (358px) a whole 24-letter struck
+      // word can't fit beside the rest (231px), so only there, and only then, it shortens too, keeping more of
+      // itself than the new word. The new word always keeps a few letters; "choose again" stays whole (above).
+      for (const [i, c] of [out[2], out[3]].entries()) {
+        const del = c.pieces.find((p: any) => p.tag === "del"), nw = c.pieces.find((p: any) => p.tag === "b");
+        if (size[0] > 900 || i === 0) expect(del.cut, "the stale line shortens the replaced word").toBe(false);
+        else expect(del.width, "the stale line shortens the replaced word more than the new one").toBeGreaterThan(nw.width);
         expect(nw.width, "the stale line shows nothing of the new word").toBeGreaterThanOrEqual(nw.em * 2.5);
       }
       // on a phone a 24-letter word can't fit whole beside the rest, so it alone is shortened: struck, or new in the stale line
