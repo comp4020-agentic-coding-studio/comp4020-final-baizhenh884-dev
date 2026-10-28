@@ -219,7 +219,7 @@ function bothHalves(l: Layout): void {
   // empty top band, not under the label: a line there grew the row both halves share and pushed the live house
   // off the first screen with the longest words. The kept house stays clear of it (checked on real geometry below)
   expect(l.note, "there's no line saying what the kept sentence is" + m).not.toBeNull();
-  expect(l.note!.text, "the line under the kept sentence isn't the agreed one" + m).toBe("Replaced words, gathered back in their places. A faint word hasn't been replaced yet.");
+  expect(l.note!.text, "the line under the kept sentence isn't the agreed one" + m).toBe("Replaced words, gathered back in their places. A faint word hasn’t been replaced yet.");
   expect(l.note!.underSentence, "the line isn't under the kept sentence" + m).toBe(true);
   expect(l.note!.right, "the line under the kept sentence runs out of its half" + m).toBeLessThanOrEqual(l.kept.right + 1);
   expect(l.note!.hidden, "the line under the kept sentence is hidden from assistive technology" + m).toBe(false);
