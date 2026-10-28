@@ -107,7 +107,7 @@ async function layout(size: [number, number], longNotes = false, longWords: bool
 }
 
 type Notation = {
-  sentenceBottom: number; partBottom: number; footTop: number;
+  sentenceBottom: number; partBottom: number; restBottom: number; footTop: number;
   houseWidth: number; houseHeight: number; houseBottom: number;
   hidden: { sentence: number; house: number; kept: number };
   shown: { text: string; sentence: number; house: number; kept: number }[];
@@ -151,6 +151,8 @@ async function notation(size: [number, number], longWords: boolean): Promise<Not
       return s;
     });
     return {
+      // the row at rest (the invitation, and the way to /house/ beside it, or under it on a phone)
+      restBottom: q('.stands-half .invite-row').getBoundingClientRect().bottom,
       sentenceBottom: q('.stands-half .sentence').getBoundingClientRect().bottom, partBottom,
       footTop: q('.stands-half .foot').getBoundingClientRect().top,
       houseWidth: h.width, houseHeight: h.height, houseBottom: h.bottom, hidden, shown,
@@ -393,12 +395,13 @@ describe("two ships on GET /", () => {
         else expect(n.houseBottom, "the desktop house no longer reaches its notes").toBeGreaterThanOrEqual(n.footTop - 1);
         // level: side by side, the two houses start together
         if (size[0] > 900) expect(Math.abs(n.hidden.kept - n.hidden.house), "the two houses aren't level").toBeLessThanOrEqual(1);
-        // never over a house at rest: every body's topmost point is clear of the notation, by 8px on a
-        // desktop and by a comfortable 16px on a phone, where the notation is the family change only
-        // (measured at 25px; a fraction of a pixel of slack once broke on font metrics alone)
+        // never over a house at rest: every body's topmost point is clear of the notation, and of the row at
+        // rest (the invitation and its /house/ link), by 8px on a desktop and by a comfortable 16px on a
+        // phone, where the notation is the family change only (measured at 25px; a fraction of a pixel of
+        // slack once broke on font metrics alone)
         const cam = new THREE.PerspectiveCamera();
         place(cam, n.houseWidth / n.houseHeight);
-        const clear = n.partBottom - n.hidden.house + (size[0] <= 900 ? 16 : 8); // px from the canvas top
+        const clear = Math.max(n.partBottom, n.restBottom) - n.hidden.house + (size[0] <= 900 ? 16 : 8); // px from the canvas top
         const v = new THREE.Vector3();
         for (const words of [...SENTENCES, ...EXTREMES, Array(10).fill("wordmvadgycfe")]) {
           const body = buildBody(words);
@@ -411,7 +414,7 @@ describe("two ships on GET /", () => {
             for (let i = 0; i < p.count; i++) top = Math.min(top, ((1 - v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld).project(cam).y) / 2) * n.houseHeight);
           });
           body.dispose();
-          expect(top, `"${words.join(" ")}" reaches the part notation`).toBeGreaterThanOrEqual(clear);
+          expect(top, `"${words.join(" ")}" reaches the part notation or the row at rest`).toBeGreaterThanOrEqual(clear);
         }
       }, 120_000);
     }
@@ -454,14 +457,19 @@ describe("two ships on GET /", () => {
         expect(rest.hidden, "the invitation isn't decorative to assistive technology").toBe(true);
         expect(rest.inv.top, "the invitation isn't under the sentence").toBeGreaterThanOrEqual(rest.sentenceBottom - 1);
         expect(rest.at.house - rest.sentenceBottom, "the invitation pushed the house away from its sentence").toBeLessThanOrEqual(20);
-        // beside it, a real link to /house/ (28 October playtest: nobody found it): on one row with the invitation, inside the half
+        // beside it on a desktop, a real link to /house/ (28 October playtest: nobody found it), on the
+        // invitation's row, inside the half. A phone has no room for it (~70px free beside the invitation,
+        // ~207px needed), and a line of its own under the invitation would come within 12px of the tallest
+        // houses (the notation keeps 16px): there the band's masthead link and the foot reach /house/ instead
         expect(rest.link, "there's no link to /house/ beside the invitation").not.toBeNull();
-        expect(rest.link.seen, "the /house/ link beside the invitation isn't shown at rest").toBe(true);
-        expect(rest.link.hidden, "the /house/ link is hidden from assistive technology").toBe(false);
-        expect(rest.link.text, "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
-        expect(Math.abs(rest.link.box.top - rest.inv.top), "the /house/ link isn't on the invitation's row").toBeLessThanOrEqual(4);
-        expect(rest.link.box.right, "the /house/ link runs out of its half").toBeLessThanOrEqual(rest.half.right + 1);
-        expect(rest.link.box.left >= rest.inv.right || rest.link.box.top >= rest.inv.bottom, "the /house/ link lies on the invitation").toBe(true);
+        if (size[0] > 900) {
+          expect(rest.link.seen, "the /house/ link beside the invitation isn't shown at rest").toBe(true);
+          expect(rest.link.hidden, "the /house/ link is hidden from assistive technology").toBe(false);
+          expect(rest.link.text, "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
+          expect(Math.abs(rest.link.box.top - rest.inv.top), "the /house/ link isn't on the invitation's row").toBeLessThanOrEqual(4);
+          expect(rest.link.box.right, "the /house/ link runs out of its half").toBeLessThanOrEqual(rest.half.right + 1);
+          expect(rest.link.box.left >= rest.inv.right, "the /house/ link lies on the invitation").toBe(true);
+        } else expect(rest.link.seen, "a phone shows the /house/ link beside the invitation, where there's no room for it").toBe(false);
         // choosing a word: the notation takes the same slot, the invitation steps aside, nothing moves
         expect(chosen.invVisible, "the invitation stays while a part's notation is shown").toBe(false);
         expect(chosen.linkSeen, "the /house/ link stays over the notation while a word is chosen").toBe(false);
