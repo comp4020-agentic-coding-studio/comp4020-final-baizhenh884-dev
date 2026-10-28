@@ -622,7 +622,7 @@ describe("two ships on GET /", () => {
         }
         return best;
       };
-      const cases = [longest("people"), longest(W), longest("people", W)];
+      const cases = [longest("people"), longest(W), longest("people", W), longest(W, W)];
       const out: any[] = [];
       for (const d of cases) {
         const doc = await servedPage(baseUrl);
@@ -638,7 +638,7 @@ describe("two ships on GET /", () => {
           const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
           const ground = rgb(getComputedStyle(part.closest('.half')).backgroundColor), [x, y] = [lum(rgb(cs.color)), lum(ground)].sort((m, n) => n - m);
           return { height: r.height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45, right: r.right, bottom: r.bottom, halfRight: half.right, top: r.top, invTop: inv.top,
-            pieces: kids.map((k) => ({ tag: k.tagName.toLowerCase(), text: k.textContent, cut: cut(k), right: k.getBoundingClientRect().right, ellipsis: getComputedStyle(k).textOverflow, struck: getComputedStyle(k).textDecorationLine })),
+            pieces: kids.map((k) => ({ tag: k.tagName.toLowerCase(), text: k.textContent, cut: cut(k), right: k.getBoundingClientRect().right, width: k.getBoundingClientRect().width, em: parseFloat(getComputedStyle(k).fontSize), ellipsis: getComputedStyle(k).textOverflow, struck: getComputedStyle(k).textDecorationLine })),
             houseTop: h.top, houseWidth: h.width, houseHeight: h.height, sentence: q('.stands-half .sentence').getBoundingClientRect().bottom, contrast: (x + 0.05) / (y + 0.05) };
         })()`, [size[0], size[1]]));
       }
@@ -677,8 +677,13 @@ describe("two ships on GET /", () => {
         }
       } finally { for (const b of bodies) b.dispose(); }
       if (size[0] >= 1440 || size[0] <= 900) expect(out[0].pieces.some((p: any) => p.cut), "a short word is shortened").toBe(false);
-      // in the stale line the struck word is the only thing saying what was replaced: the new word gives way, never it
+      // in the stale line the struck word is the only thing saying what was replaced: the new word gives way
+      // first, never it, while a short struck word fits; only two 24-letter words on a phone shorten both,
+      // and even then the new word keeps a few letters and "choose again" stays whole (checked above)
       expect(out[2].pieces.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
+      const both = out[3].pieces, nw = both.find((p: any) => p.tag === "b");
+      expect(nw.width, "the stale line shows nothing of the new word").toBeGreaterThanOrEqual(nw.em * 2.5);
+      if (size[0] > 900) expect(both.find((p: any) => p.tag === "del").cut, "the stale line shortens the replaced word").toBe(false);
       // on a phone a 24-letter word can't fit whole beside the rest, so it alone is shortened: struck, or new in the stale line
       if (size[0] <= 900) {
         expect(out[1].pieces.find((p: any) => p.tag === "del").cut, "a 24-letter struck word isn't shortened on its own").toBe(true);
