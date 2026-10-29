@@ -43,9 +43,11 @@ describe("what a word counts", () => {
     expect(wrong.slice(0, 10), `${wrong.length} of ${fixture.rows.length} differ`).toEqual([]);
   });
 
-  it("reads only the written form: letter case and surrounding space change nothing", () => {
+  // the pennant is the exception: it carries the word as written, its case included (decided 30 October)
+  it("reads only the written form: letter case and surrounding space change no count and no part but the pennant", () => {
     expect(counts("  Website ")).toEqual(counts("website"));
-    for (let p = 0; p < 10; p++) expect(partOf(p, "  Website ").value).toEqual(partOf(p, "website").value);
+    for (let p = 0; p < 9; p++) expect(partOf(p, "  Website ").value).toEqual(partOf(p, "website").value);
+    expect(partOf(9, "  Website ").value).toBe("Website");
   });
 
   // decided 30 October: accents are stripped (é counts as e), letters of other scripts count as letters and
