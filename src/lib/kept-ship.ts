@@ -13,7 +13,10 @@
 
 export type KeptChange = { position: number; fromVersion: number; fromWord: string };
 export type CurrentWord = { word: string; version: number };
-export type KeptShip = { ship: number; words: string[]; gaps: boolean[] };
+// `next`: the next ship's words (ship + 1, by the same rule), null where none waits yet. Only the next
+// ship: a word for a ship further ahead (a place replaced a third time before the shown ship completes)
+// isn't shown until its own ship is next, a known limit (CLAUDE.md).
+export type KeptShip = { ship: number; words: string[]; gaps: boolean[]; next: (string | null)[] };
 
 export function deriveKeptShip(changes: readonly KeptChange[], current: readonly CurrentWord[]): KeptShip {
   const m0 = Math.min(...current.map((c) => c.version));
@@ -24,7 +27,7 @@ export function deriveKeptShip(changes: readonly KeptChange[], current: readonly
   const kept = shipWords(changes, ship);
   const words = current.map((c, i) => kept[i] ?? c.word);
   const gaps = kept.map((w) => w === null);
-  return { ship, words, gaps };
+  return { ship, words, gaps, next: shipWords(changes, ship + 1) };
 }
 
 // Ship k: at each position the word that stood at version k, kept once it

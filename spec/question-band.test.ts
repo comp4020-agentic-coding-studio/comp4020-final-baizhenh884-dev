@@ -73,6 +73,13 @@ describe("the question first", () => {
     expect(steps[0]).toMatch(/word/i);
     expect(steps[1]).toMatch(/Enter/);
     expect(steps[2]).toMatch(/kept/i);
+    // replaced words go to the second house, or wait for the next (decided 29 October): the step says both
+    const step3 = band!.querySelectorAll("ol.how-to-play > li")[2];
+    expect(step3.querySelector(".side-by-side")?.textContent).toBe("on the right");
+    expect(step3.querySelector(".stacked")?.textContent).toBe("below");
+    const as = (keep: string, drop: string) => { const c = step3.cloneNode(true) as Element; c.querySelector(drop)?.remove(); return text(c); };
+    expect(as("side-by-side", ".stacked")).toBe("Replaced words are kept on the right: in the second house, or waiting for the next.");
+    expect(as("stacked", ".side-by-side")).toBe("Replaced words are kept below: in the second house, or waiting for the next.");
   });
 
   // The 28 October playtest: nobody knew the house reads a word's spelling, not its meaning (they expected

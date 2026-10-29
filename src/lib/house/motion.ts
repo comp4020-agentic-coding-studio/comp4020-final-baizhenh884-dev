@@ -34,6 +34,9 @@ const clamp = (x: number) => Math.max(0, Math.min(1, x));
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const out3 = (t: number) => 1 - Math.pow(1 - t, 3);
 
+// a crossing part's way out, as a share of its exchange after the mark: it starts at `from` and takes `span`
+const TRAVEL = { from: 0.1, span: 0.6 };
+
 export const TIMING = {
   own: { exchange: 900, hold: 1300, fade: 1000, mark: 0 },
   remote: { exchange: 1300, hold: 1300, fade: 1000, mark: 0.2 },
@@ -67,7 +70,7 @@ export function frameAt(kind: Kind, ms: number, reduced = false): Frame {
       incoming: clamp(i / 0.5),
       drop: 1 - out3(i),
       incomingRed: clamp(i / 0.2) * (1 - clamp((i - 0.55) / 0.45)),
-      travel: cross ? ease(clamp((q - 0.1) / 0.6)) : 0,
+      travel: cross ? ease(clamp((q - TRAVEL.from) / TRAVEL.span)) : 0,
     };
   }
   // the drawing settles back onto the new body, turns to ink, and fades
@@ -82,6 +85,13 @@ export function frameAt(kind: Kind, ms: number, reduced = false): Frame {
     incomingRed: 0,
     travel: cross ? 1 : 0,
   };
+}
+
+// when a crossing part has gone its whole way out of the standing house (ms on its clock); 0 with reduced motion
+export function leavesAt(reduced: boolean): number {
+  if (reduced) return 0;
+  const T = TIMING.cross;
+  return Math.ceil(T.exchange * (T.mark + (1 - T.mark) * (TRAVEL.from + TRAVEL.span)));
 }
 
 // when the crossing part reaches the kept house, on the crossing's own clock: after it has left the standing one

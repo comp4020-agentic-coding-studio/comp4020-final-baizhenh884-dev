@@ -3,6 +3,8 @@ import { afterEach, describe, expect, inject, it, vi } from "vitest";
 import { foreseen, said } from "../src/lib/house/notation";
 import { sizeStep } from "../src/lib/sentence-step";
 import { attach, deriveTotal, DRAFT_MS, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
+import { waitingRow } from "../src/lib/kept-sentence";
+import { frameAt, leavesAt } from "../src/lib/house/motion";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -765,7 +767,7 @@ describe("live page reconciliation", () => {
   // itself, never held back by a draft, and never needs a follow-up
   // snapshot the way the trace sometimes does.
   describe("the kept ship", () => {
-    const ship = (n: number): KeptShip => ({ words: Array(10).fill(`ship${n}`), gaps: Array(10).fill(n === 0) });
+    const ship = (n: number): KeptShip => ({ words: Array(10).fill(`ship${n}`), gaps: Array(10).fill(n === 0), next: Array(10).fill(null) });
 
     localOnly("is told on an initial snapshot", async () => {
       const doc = await (await arrive()).page("/");
@@ -796,10 +798,10 @@ describe("live page reconciliation", () => {
       const doc = await (await arrive()).page("/");
       const moments: unknown[] = [];
       const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
-      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true), next: Array(10).fill(null) };
       page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
       const { position, version } = positionsOf(doc)[0];
-      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position), next: empty.next };
 
       page.applyChange({ position, word: fresh(), version: version + 1, keptShip: filled });
       expect(moments, "a crossing change brought no moment").toEqual([null, { position, kind: "cross" }]);
@@ -812,12 +814,27 @@ describe("live page reconciliation", () => {
       const doc = await (await arrive()).page("/");
       const moments: unknown[] = [];
       const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
-      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true) };
+      const empty: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(true), next: Array(10).fill(null) };
       page.applySnapshot({ ...snapshotOf(doc), keptShip: empty });
       const { position, version } = positionsOf(doc)[0];
-      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position) };
+      const filled: KeptShip = { words: empty.words, gaps: empty.gaps.map((_, i) => i !== position), next: empty.next };
       page.applyChange({ position, word: fresh(), version, keptShip: filled }); // not newer than what's shown
       expect(moments.filter((m) => m !== null), "a stale change brought a moment").toEqual([]);
+    });
+
+    // the waiting row (decided 29 October): a replaced word for the next house is a "wait" moment, from a change only
+    localOnly("brings a wait moment when the replaced word belongs to the next house, never from a snapshot", async () => {
+      const doc = await (await arrive()).page("/");
+      const moments: unknown[] = [];
+      const page = attach(doc, { onKept: (_k, m) => moments.push(m) });
+      const { position, version, word } = positionsOf(doc)[2];
+      const shown: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(false).map((_, i) => i === 8), next: Array(10).fill(null) };
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: shown });
+      const waiting: KeptShip = { ...shown, next: Array.from({ length: 10 }, (_, i) => (i === position ? word : null)) };
+      page.applyChange({ position, word: fresh(), version: version + 1, keptShip: waiting });
+      expect(moments.at(-1)).toEqual({ position, kind: "wait" });
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: { ...waiting, next: Array(10).fill(null) } });
+      expect(moments.at(-1), "a snapshot brought a moment").toBeNull();
     });
 
     localOnly("isn't told twice for a reconnect snapshot whose kept ship didn't change", async () => {
@@ -827,6 +844,69 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) });
       page.applySnapshot({ ...snapshotOf(doc), keptShip: ship(1) }); // a reconnect, nothing new
       expect(heard, "an unchanged kept ship was announced more than once").toEqual([ship(1)]);
+    });
+  });
+
+  // A word waiting for the next house lands when its part does (found in the
+  // 29 October frames: the row showed the word at once, a second before the
+  // part flying toward it had left the live house). While the part is in
+  // flight the row holds that word back; it appears once the part has gone
+  // its whole way out, toward the row. With reduced motion, or when nothing
+  // flies (no house drawn), the page passes no flight and the word is there
+  // at once. Words already waiting never leave the row meanwhile, and a
+  // second change in flight never loses the first one's word.
+  describe("a waiting word, landing", () => {
+    const rowDoc = () => new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next house:</span> <span class="ws"></span></p>').window.document;
+    const next = (at: Record<number, string>) => Array.from({ length: 10 }, (_, i) => at[i] ?? null);
+    const shown = (row: HTMLElement) => (row.hidden ? [] : [...row.querySelectorAll(".ws .w")].map((w) => w.textContent));
+    afterEach(() => vi.useRealTimers());
+
+    it("lands when the crossing part has gone its whole way out, and with reduced motion at once", () => {
+      const at = leavesAt(false);
+      expect(at, "the part never leaves").toBeGreaterThan(0);
+      expect(frameAt("cross", at - 50).travel, "the word would land before its part has left").toBeLessThan(1);
+      expect(frameAt("cross", at).travel, "the word would land after its part has left").toBeGreaterThanOrEqual(0.999);
+      expect(leavesAt(true), "with reduced motion a waiting word still waits for a flight").toBe(0);
+    });
+
+    it("isn't in the row while its part is in flight, and is there after", () => {
+      vi.useFakeTimers();
+      const row = rowDoc().querySelector<HTMLElement>(".waiting")!;
+      const rows = waitingRow(row, next({ 2: "ceremony" }));
+      expect(shown(row)).toEqual(["ceremony"]);
+      rows.land(next({ 2: "ceremony", 6: "wonder" }), 1500);
+      expect(shown(row), "the word is in the row while its part flies").toEqual(["ceremony"]);
+      vi.advanceTimersByTime(1499);
+      expect(shown(row), "the word is in the row while its part flies").toEqual(["ceremony"]);
+      // a redraw meanwhile (your own trace changed) keeps it held
+      rows.show(next({ 2: "ceremony", 6: "wonder" }));
+      expect(shown(row), "a redraw let the word land early").toEqual(["ceremony"]);
+      vi.advanceTimersByTime(1);
+      expect(shown(row), "the word didn't land with its part").toEqual(["ceremony", "wonder"]);
+    });
+
+    it("is there at once when nothing flies", () => {
+      const row = rowDoc().querySelector<HTMLElement>(".waiting")!;
+      const rows = waitingRow(row, next({}));
+      expect(row.hidden).toBe(true);
+      rows.land(next({ 4: "students" }), 0);
+      expect(shown(row)).toEqual(["students"]);
+      expect(row.hidden).toBe(false);
+    });
+
+    it("loses no word when a second part flies before the first has landed", () => {
+      vi.useFakeTimers();
+      const row = rowDoc().querySelector<HTMLElement>(".waiting")!;
+      const rows = waitingRow(row, next({}));
+      rows.land(next({ 1: "two" }), 1500);
+      vi.advanceTimersByTime(800);
+      rows.land(next({ 1: "two", 3: "while" }), 1500);
+      expect(shown(row)).toEqual([]);
+      vi.advanceTimersByTime(1500);
+      expect(shown(row), "a word in flight was lost").toEqual(["two", "while"]);
+      // and the ship completing (its waiting words moving up) empties the row at once
+      rows.show(next({}));
+      expect(row.hidden).toBe(true);
     });
   });
 
@@ -915,6 +995,23 @@ describe("live page reconciliation", () => {
       page.applyChange({ position, word: fresh(), version });
       vi.advanceTimersByTime(5000);
       expect(region(doc).textContent?.trim(), "a stale change was announced").toBe("");
+    });
+
+    // the replaced word waits for the next house: said in the same announcement, coalesced, never who or when
+    localOnly("says that a replaced word waits for the next house, in the same announcement", async () => {
+      const doc = await (await arrive()).page("/");
+      vi.useFakeTimers(); // after the network: fake timers stall fetch
+      const shown: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(false).map((_, i) => i === 8), next: Array(10).fill(null) };
+      const page = attach(doc);
+      page.applySnapshot({ ...snapshotOf(doc), keptShip: shown });
+      const { position, version, word: was } = positionsOf(doc)[2];
+      const word = fresh();
+      page.applyChange({ position, word, version: version + 1, keptShip: { ...shown, next: Array.from({ length: 10 }, (_, i) => (i === position ? was : null)) } });
+      vi.advanceTimersByTime(2500);
+      const text = region(doc).textContent ?? "";
+      expect(text).toContain(said({ position, word, was }));
+      expect(text, "the announcement doesn't say the replaced word waits for the next house").toContain(`“${was}” waits for the next house`);
+      expect(text, "the announcement names a time or a count").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute|waiting words|\bof\b \d/i);
     });
 
     localOnly("announces a change at a position holding a draft, and leaves the draft alone", async () => {

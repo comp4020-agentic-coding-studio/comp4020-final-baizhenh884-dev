@@ -47,13 +47,14 @@ export class KeptStage {
     this.target = kept;
     if (moment?.kind === "later") {
       // the completed ship whole (the word arriving is the one standing at its gap: the same body), for a beat
-      this.put({ words: this.words, gaps: this.gaps.map(() => false) });
+      this.put({ words: this.words, gaps: this.gaps.map(() => false), next: kept.next });
       this.body.arrive(moment.position, now, from);
       this.beat = { start: now, next: kept };
       return;
     }
     this.put(kept);
-    if (moment) this.body.arrive(moment.position, now, from);
+    // a word waiting for the next house isn't in this ship: nothing arrives in the kept house
+    if (moment && moment.kind !== "wait") this.body.arrive(moment.position, now, from);
   }
 
   step(now: number, reduced: boolean): void {

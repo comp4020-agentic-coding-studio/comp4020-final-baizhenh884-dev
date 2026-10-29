@@ -244,7 +244,7 @@ export function mountEarlier(doc: Document): void {
 export function mountLoneHouse(doc: Document): void {
   const words = [...doc.querySelectorAll(".kept-sentence .w")].map((w) => w.textContent!.trim());
   if (words.length !== 10) return;
-  viewIn(doc.getElementById("house-kept"), "kept")?.keptShow({ words, gaps: words.map(() => false) });
+  viewIn(doc.getElementById("house-kept"), "kept")?.keptShow({ words, gaps: words.map(() => false), next: words.map(() => null) });
 }
 
 export type KeptHouse = {
@@ -283,7 +283,10 @@ export function mountKept(doc: Document): KeptHouse | null {
   const view = viewIn(doc.getElementById("house-kept"), "kept");
   if (!view) return null;
   const initialGaps = keptSpans.map((s) => s.classList.contains("gap"));
-  const initial: KeptShip = { words: initialGaps.map((gap, i) => (gap ? currentWords[i] : keptSpans[i].textContent!.trim())), gaps: initialGaps };
+  // the next house's waiting words, read from the row GET / served (index.astro), like the rest
+  const next: (string | null)[] = Array(10).fill(null);
+  for (const w of doc.querySelectorAll<HTMLElement>(".kept-half .waiting .ws .w")) next[Number(w.dataset.n) - 1] = w.textContent!.trim();
+  const initial: KeptShip = { words: initialGaps.map((gap, i) => (gap ? currentWords[i] : keptSpans[i].textContent!.trim())), gaps: initialGaps, next };
   view.keptShow(initial);
   return {
     initial,

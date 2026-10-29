@@ -53,8 +53,10 @@ type Layout = {
   slots: { word: string; under: string[] }[];
 };
 
-async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false, shortSentences = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
+  // both sentences short (the maker's words): what's measured is the notes, not a sentence's length
+  if (shortSentences) { pinShortKept(doc); stageWords(doc, [...STARTING_WORDS]); }
   // a staged long sentence, in the measured copy only: ten 13-letter words, or the words given
   if (longWords) stageWords(doc, longWords === true ? Array(10).fill("wordmvadgycfe") : longWords);
   // the band as GET / folds it for a visitor who has made a change (spec/question-band.test.ts)
@@ -174,7 +176,9 @@ function pinShortKept(doc: Document): void {
 async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
   const doc = await servedPage(baseUrl);
   pinShortKept(doc);
-  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+  // the live sentence staged too, so what's measured is the notation, not whatever an earlier spec file left there
+  // (after spec/blocklist.test.ts its long words step the sentence down and the house sits 20.84px under it)
+  stageWords(doc, longWords ? Array(10).fill("wordmvadgycfe") : [...STARTING_WORDS]);
   const labels = longestNotations(size[0]);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
@@ -266,7 +270,10 @@ describe("two ships on GET /", () => {
     }, 90_000);
 
     it(`keeps each house directly under its sentence, however long the notes (${name})`, async () => {
-      const l = await layout([size[0], size[1]], true);
+      // with both sentences short: what's under test is the notes. A three-line live sentence at its floor step
+      // moves both houses down by a line by contract (CLAUDE.md: "A third line never shrinks the house"), and a
+      // three-line kept sentence is the known issue (pinShortKept); either alone pushes the houses past 15%.
+      const l = await layout([size[0], size[1]], true, false, false, true);
       // directly under: at most a little air (the part notation's line, margins), never the notes
       const near = size[1] * 0.15;
       expect(l.standsHouse.top - l.standsSentence.bottom, "the live house is pushed away from its sentence").toBeLessThanOrEqual(near);
@@ -471,6 +478,91 @@ describe("two ships on GET /", () => {
     }, 120_000);
   }
 
+  // The waiting row (decided 29 October) stands in the kept half's foot, above
+  // the plate note, under the kept house: the next house's words with their
+  // places, wrapping as many lines as it takes (nine 24-letter words at worst),
+  // never over the kept house at rest (real geometry, the page's camera, 8px
+  // on a desktop and 16px on a phone), never over the plate note or the
+  // earlier-house link, legible on its blueprint (the label and the places
+  // at least 4.5:1, the words at least 6:1), and costing the houses nothing:
+  // both rows keep their size and stay level with the row there or not. Below
+  // the first screen is allowed (CLAUDE.md: the notes under the houses may be).
+  const waitingRow = (doc: Document, words: [number, string][]) => {
+    const row = doc.querySelector<HTMLElement>(".kept-half .waiting")!;
+    row.hidden = words.length === 0;
+    const ws = row.querySelector(".ws")!;
+    ws.replaceChildren(...words.flatMap(([i, w], k) => {
+      const span = doc.createElement("span");
+      span.className = "w";
+      span.setAttribute("data-n", String(i + 1).padStart(2, "0"));
+      span.textContent = w;
+      return k ? [doc.createTextNode(" "), span] : [span];
+    }));
+  };
+  for (const [name, size] of [["1920×1080", [1920, 1080]], ["1440×900", [1440, 900]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
+    it(`sets the waiting row under the kept house, legible, clear of the house and the notes, costing the houses nothing (${name})`, async () => {
+      const cases: [number, string][][] = [[[2, "ceremony"], [4, "students"], [6, "wonder"]], Array.from({ length: 9 }, (_, i) => [i, "w".repeat(24)])];
+      const measure = async (words: [number, string][]) => {
+        const doc = await servedPage(baseUrl);
+        pinShortKept(doc);
+        waitingRow(doc, words);
+        return (await measureIn(doc, `(async () => {
+          await document.fonts.ready;
+          const q = ${QUERY_JS};
+          const rgb = (c) => (c.match(/[\\d.]+/g) || []).map(Number);
+          const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+          const ground = rgb(getComputedStyle(q('.kept-half')).backgroundColor);
+          const contrast = (el, prop = 'color') => { const [r, g, b, a = 1] = rgb(getComputedStyle(el, prop === 'color' ? null : '::before').color); const c = [r * a + ground[0] * (1 - a), g * a + ground[1] * (1 - a), b * a + ground[2] * (1 - a)]; const [x, y] = [lum(c), lum(ground)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+          const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+          const row = q('.kept-half .waiting'), ws = [...row.querySelectorAll('.ws .w')];
+          const others = [...document.querySelectorAll('.kept-half .foot :is(.plate-note, .earlier)')].filter((e) => e.getBoundingClientRect().height > 0).map(box);
+          return { row: box(row), shown: getComputedStyle(row).display !== 'none' && row.getBoundingClientRect().height > 0,
+            label: contrast(row.querySelector('.label')), words: ws.map((w) => contrast(w)), places: ws.map((w) => ({ n: getComputedStyle(w, '::before').content, contrast: contrast(w, 'before') })),
+            house: box(q('#house-kept')), stands: box(q('.stands-half #house')), half: box(q('.kept-half')), others };
+        })()`, [size[0], size[1]])) as any;
+      };
+      const none = await measure([]);
+      for (const words of cases) {
+        const m = await measure(words);
+        const what = `${words.length} waiting`;
+        expect(m.shown, `${what}: the row isn't shown`).toBe(true);
+        expect(m.row.top, `${what}: the row isn't under the kept house`).toBeGreaterThanOrEqual(m.house.bottom - 1);
+        expect(m.row.right, `${what}: the row runs out of its half`).toBeLessThanOrEqual(m.half.right + 1);
+        for (const o of m.others) expect(m.row.bottom <= o.top + 0.5 || m.row.top >= o.bottom - 0.5, `${what}: the row overlaps the notes`).toBe(true);
+        expect(m.label, `${what}: the row's label is too faint`).toBeGreaterThanOrEqual(4.5);
+        for (const c of m.words) expect(c, `${what}: a waiting word is too faint`).toBeGreaterThanOrEqual(6);
+        for (const [k, p] of m.places.entries()) {
+          expect(p.n, `${what}: a waiting word doesn't show its place`).toContain(String(words[k][0] + 1).padStart(2, "0"));
+          expect(p.contrast, `${what}: a waiting word's place is too faint`).toBeGreaterThanOrEqual(4.5);
+        }
+        // the houses don't move or shrink for it, and stay level on a desktop
+        for (const k of ["top", "height"] as const) {
+          expect(Math.abs(m.house[k] - none.house[k]), `${what}: the row moved the kept house (${k})`).toBeLessThanOrEqual(0.5);
+          expect(Math.abs(m.stands[k] - none.stands[k]), `${what}: the row moved the live house (${k})`).toBeLessThanOrEqual(0.5);
+        }
+        if (size[0] > 900) expect(Math.abs(m.house.top - m.stands.top), `${what}: the houses aren't level`).toBeLessThanOrEqual(1);
+        // every kept house at rest stays clear of the row
+        const cam = new THREE.PerspectiveCamera();
+        place(cam, m.house.width / m.house.height);
+        const v = new THREE.Vector3();
+        for (const ws of [...SENTENCES, ...EXTREMES]) {
+          const body = buildBody(ws);
+          body.root.updateMatrixWorld(true);
+          let bottom = -Infinity;
+          body.root.traverse((o) => {
+            const mesh = o as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            const p = mesh.geometry.attributes.position;
+            for (let i = 0; i < p.count; i++) bottom = Math.max(bottom, ((1 - v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld).project(cam).y) / 2) * m.house.height);
+          });
+          body.dispose();
+          expect(m.house.top + bottom, `${what}: the kept house of "${ws.join(" ")}" reaches the waiting row`).toBeLessThanOrEqual(m.row.top - (size[0] <= 900 ? 16 : 8));
+        }
+      }
+      expect(none.shown, "the row shows with nothing waiting").toBe(false);
+    }, 180_000);
+  }
+
   // The part notation ("05 — entry") and the live house. The notation lies
   // over the canvas's own empty top band, so the house starts right under
   // the sentence; choosing a word shows the notation without moving anything;
@@ -530,7 +622,8 @@ describe("two ships on GET /", () => {
       it(`invites a stranger to change a word at rest, in the notation's slot, moving nothing (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
         pinShortKept(doc);
-        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+        // the live sentence staged too, as in notation(): measured on the words given, not an earlier file's
+        stageWords(doc, longWords ? Array(10).fill("wordmvadgycfe") : [...STARTING_WORDS]);
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
