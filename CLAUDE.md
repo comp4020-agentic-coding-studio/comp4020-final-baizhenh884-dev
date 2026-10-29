@@ -94,49 +94,68 @@ person may change" section only.
   and adds one new reading of the same sentence, nothing else from the
   existing product contract.
 
-## Scope (Final Project: House integration)
+## Scope (Final Project: the ship, in one harbour)
 
-The Final Project deliberately pivots to the House of Theseus. This section
-supersedes the "smallest slice" rule above for the house itself; the realtime
-limits above (since Crit 9) still hold. The prototypes behind the house live
-outside this repo: it holds their result and its specs, not the search.
+Decided in `docs/decisions/0005-the-ship.md`, which retires the house: its
+grammar, its frozen-grammar rule and its specs are replaced, not edited. The
+realtime limits above (since Crit 9) still hold. The prototype behind the
+ship (`_review_frames/ship-prototype/`) lives outside this repo: it is the
+reference for the look, the scene and the rules, never code to copy.
 
-- The public object is one shared ten-word sentence and one corresponding
-  house, two forms of the same thing. The house is a deterministic
-  representation of the sentence: the forms, `/replace`, the HTTP contract and
-  every existing test are unchanged, and the sentence stays usable without the
-  house or without JS.
-- Ten fixed territories, one per position; each word's written form (the
-  frozen features, with length graded continuously and saturating near 14
-  letters) gives its territory's character. Never by meaning.
-- The grammar and the geometry are frozen. Change them only for a correctness
-  blocker found by a check or by hand, with the evidence; not for taste. Do not
-  reopen a deliberately rejected design or grammar direction without new
-  evidence that changes the reason it was rejected.
-- The one exception: restructuring the grammar's code (e.g. into data tables,
-  so the reason for a family can be read from the rule itself) when its output
-  doesn't change. `spec/house-grammar.test.ts` and its fixture are the proof
-  and pass unmodified: neither is edited in the same change, and a
-  restructure that needs either edited is a grammar change, not a
-  restructure.
-- One word primarily changes its own territory. A neighbour may move only
-  through a structural rule that already exists (the threshold clearing the
-  entry), never because a word was given reach into it.
+- The public object is one shared ten-word sentence and one ship, two forms
+  of the same thing, and the kept sentence and its ship of old planks. The
+  ship is a deterministic representation of the sentence: the forms,
+  `/replace`, the HTTP contract and the backend are unchanged, and the
+  sentence stays usable without the ship or without JS.
+- Ten fixed parts, one per position: 01 ram, 02 hull, 03 prow, 04 stern,
+  05 shields, 06 mast, 07 sail, 08 oars, 09 steering oar, 10 pennant. Each
+  part reads one thing you can count in the word's spelling, from one table
+  (`src/lib/ship/rules.ts`) that the ship, the notation, the prediction and
+  `/ship/` all read, never a second copy. Never by meaning.
+- One word changes only its own part; no part reads another position's word.
+- The rules get one round of tuning, after the informal try by 2–3
+  classmates once the harbour (slice 3) is live; every change in that round
+  records its reason (in its commit and in decision 0005). After it the rules
+  are frozen: change them only for a correctness blocker found by a check or
+  by hand, with the evidence, not for taste. A restructure that leaves every
+  part's output unchanged keeps `spec/ship-rules.test.ts` and its fixture
+  unmodified in the same change; one that needs either edited is a rule
+  change.
+- One harbour, one canvas: the live ship on the water, the kept ship on a
+  slipway, the next ship's waiting planks on a pallet beside it. Once the
+  server has accepted a change, the old plank flies from the live ship to its
+  place (the kept ship's gap, or the pallet): for this visitor's own change
+  and for every other visitor's change arriving live; never on a load, a
+  snapshot or a reconnect. On a phone the camera follows the plank there and
+  back.
 - `three` is the one client rendering library, bundled by Vite. Client
-  JavaScript may render, select and animate the house; it never decides a
+  JavaScript may render, select and animate the ships; it never decides a
   replacement.
-- The house is never stored: SQLite keeps only the sentence and its history,
-  and an earlier form's body is built from that earlier sentence alone.
-- No preview: typing a replacement never changes the house; the new body
-  appears only after the server accepts the change. The notation may name,
-  in text, the family a draft would give its part; the house itself never
-  shows it. Decided after the 28 October playtest: people expected meaning
-  to change the house. A text prediction teaches that spelling decides the
-  form, while the house itself keeps its surprise until the server accepts.
-- Red means only "this body is being rebuilt now"; nothing stays red.
-- Both canvases are decorative to assistive technology; the live sentence
-  and the kept sentence are the accessible state, and other visitors'
-  changes are announced politely, coalesced.
+- The ships are never stored: SQLite keeps only the sentence and its history,
+  and an earlier form's ship is built from that earlier sentence alone.
+- No preview: typing a replacement never changes either ship; the new part
+  appears only after the server accepts the change. The notation may name, in
+  text, what a draft would give its part ("Oars · 7 letters → 7 oars a
+  side"); the ship never shows it. Decided after the 28 October playtest:
+  people expected meaning to change the house. A text prediction teaches that
+  spelling decides the form, while the ship keeps its surprise until the
+  server accepts.
+- Red means only "this part is being rebuilt now"; nothing stays red.
+- The canvas is decorative to assistive technology; the live sentence, the
+  kept sentence and the waiting row are the accessible state, and other
+  visitors' changes are announced politely, coalesced.
+- Without WebGL (or before it loads) the page is the sentence, its forms, the
+  kept sentence and the waiting row, complete and usable; nothing waits on the
+  canvas.
+- Co-presence, partly superseding decision 0001's option B (its own slice,
+  after the harbour): each open `GET /` stream is one anonymous shipwright on
+  the quay or slipway; no name, per-person colour, list or number shown
+  anywhere; server memory only, never stored or logged per stream; the
+  stream carries an anonymous total only. Until that slice merges, the
+  realtime limits above still forbid presence.
+- Until slice 2 merges, the house is still what ships, and the house rules
+  and specs below still bind it; each slice moves its own bullets from house
+  to ship in the same PR, so this file never describes code that isn't there.
 
 ## Stack
 
