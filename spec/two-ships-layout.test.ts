@@ -53,9 +53,10 @@ type Layout = {
   slots: { word: string; under: string[] }[];
 };
 
-async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false, shortKept = false): Promise<Layout> {
+async function layout(size: [number, number], longNotes = false, longWords: boolean | string[] = false, folded = false, shortSentences = false): Promise<Layout> {
   const doc = await servedPage(baseUrl);
-  if (shortKept) pinShortKept(doc);
+  // both sentences short (the maker's words): what's measured is the notes, not a sentence's length
+  if (shortSentences) { pinShortKept(doc); stageWords(doc, [...STARTING_WORDS]); }
   // a staged long sentence, in the measured copy only: ten 13-letter words, or the words given
   if (longWords) stageWords(doc, longWords === true ? Array(10).fill("wordmvadgycfe") : longWords);
   // the band as GET / folds it for a visitor who has made a change (spec/question-band.test.ts)
@@ -267,7 +268,9 @@ describe("two ships on GET /", () => {
     }, 90_000);
 
     it(`keeps each house directly under its sentence, however long the notes (${name})`, async () => {
-      // with a short kept sentence: a three-line one at 1920 is the known issue (pinShortKept)
+      // with both sentences short: what's under test is the notes. A three-line live sentence at its floor step
+      // moves both houses down by a line by contract (CLAUDE.md: "A third line never shrinks the house"), and a
+      // three-line kept sentence is the known issue (pinShortKept); either alone pushes the houses past 15%.
       const l = await layout([size[0], size[1]], true, false, false, true);
       // directly under: at most a little air (the part notation's line, margins), never the notes
       const near = size[1] * 0.15;
