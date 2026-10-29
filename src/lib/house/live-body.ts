@@ -43,7 +43,8 @@ export class LiveBody {
   readonly follows: Follow[] = [];
   readonly arrivals: Arrival[] = [];
 
-  constructor(private look: Look, private drawing: (g: THREE.Group) => THREE.Group) {}
+  // stub (spec/ship-body.test.ts first): the builder and the dressing are accepted, not used yet
+  constructor(private look: Look, private drawing: (g: THREE.Group) => THREE.Group, _build?: (words: readonly string[]) => { root: THREE.Group; groups: THREE.Group[]; dispose(): void }, _dress?: (g: THREE.Group, position: number, look: Look) => void) {}
 
   // the territories standing now, by position (read-only to callers)
   get groups(): readonly THREE.Group[] { return this.current; }
