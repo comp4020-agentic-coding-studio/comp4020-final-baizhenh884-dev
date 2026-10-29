@@ -21,12 +21,15 @@ standing on the left and kept on the right.
 
 The evidence that this didn't land:
 
-- **28 October playtest**
-  ([notes](../exploration/playtest-2026-10-28.md)). People found the page
-  confusing. They didn't know what the kept half was, or how to change
-  anything. They also found it boring. Two fixes already in the contract came out of this playtest: the
-  underlines on words at rest, and the faint "still standing" words in the kept
-  sentence; their reasons are recorded in `CLAUDE.md`.
+- **28 October playtest** ([notes](../exploration/playtest-2026-10-28.md),
+  written up from memory; three classmates on laptops). None of them knew
+  where or how to change anything, or which half to act on, and they asked
+  "how do I play?". Those who found out wanted to know which word was which
+  part, and wanted a preview. They made a quick change or two and left.
+  Nobody said they were bored: "boring" is the maker's reading of how short
+  their visits were. Two fixes already in the contract came out of this
+  playtest: the underlines on words at rest, and the faint "still standing"
+  words in the kept sentence; their reasons are recorded in `CLAUDE.md`.
 - **29 October.** Most replaced words vanished instead of reaching the kept
   half. Near the end of each ship they belonged to the next ship, which the page
   never showed. PR #15 fixed this with the waiting row, the next ship derived
@@ -51,8 +54,9 @@ The fixed parts are unchanged:
    - For: it removes the shared head row that causes the known 1920 issue, and
      it is the smallest structural change.
    - Against: it keeps the house, so the story still needs explaining. It also
-     hides the kept ship behind a toggle, and the playtest's "what is the kept
-     half?" gets harder to answer, not easier. Nothing in it addresses "boring".
+     hides the kept ship behind a toggle, which makes the playtest's confusion
+     about the two halves harder to resolve, not easier. Nothing in it addresses
+     the short visits.
 2. **A visual reskin only.** Keep the house grammar and the two halves, and
    change the palette, type and framing.
    - For: the cheapest option, and no spec churn.
@@ -151,7 +155,8 @@ Decision 0001 rejected visible co-presence for three reasons:
 - it moves attention from the sentence to the size of its audience.
 
 There is new evidence against each:
-- the 28 October playtest found the page boring;
+- at the 28 October playtest, visits were short: a quick change or two, then
+  gone (the maker's reading; nobody said they were bored);
 - the final brief asks for co-presence, and the showcase puts a room full of
   people in front of the page at once;
 - in the harbour, presence can stay on the ship instead of turning into an
