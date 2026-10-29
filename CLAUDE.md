@@ -384,6 +384,19 @@ What the code must hold to. The README says why; don't restate it here.
   isn't a completed ship (not a whole number from 1, the ship still being
   built, or later) is 404. Its number is navigation in the URL only, never
   shown on the page (`spec/kept-houses.test.ts`, `spec/kept-ship.test.ts`).
+- Every replaced word visibly goes to the kept half. One that belongs to
+  the next ship (ship + 1, by the same rule) waits in a row under the kept
+  house, "Waiting for the next house:", in place order with its 01–10
+  index, hidden when none waits; when the ship completes, those words move
+  up into the kept sentence. Derived from `changes` (`next` in
+  `src/lib/kept-ship.ts`, carried by the stream as a derived value),
+  nothing stored. Live for every open `GET /`; the part flies toward the
+  row only from a change event, never a load, snapshot or reconnect, and
+  a phone's "kept below" acknowledgement fires for it too. Real text after
+  the kept sentence, announced in the polite live region, coalesced. No
+  counts. The row never moves or shrinks either house: it lengthens the
+  page instead (`spec/kept-ship.test.ts`, `spec/kept-moment.test.ts`,
+  `spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
 - The house follows authoritative shared state, not a held draft: a newer
   shared word reaches it once, including at a position where a draft keeps the
   word on screen back, and the draft, its expected version and the label stay
@@ -525,8 +538,10 @@ hold.
   to play, in full until this visitor has made a change (from their trace,
   on the server, never live), then the question alone. Step 1 names the
   device's gesture (Click on a desktop, Tap on a touch screen); step 2 says
-  a part is rebuilt from how the word is spelled, not what it means. Its
-  copy claims nothing the rules don't do (`spec/question-band.test.ts`).
+  a part is rebuilt from how the word is spelled, not what it means; step 3
+  says replaced words are kept on the right (below on a phone): in the
+  second house, or waiting for the next. Its copy claims nothing the rules
+  don't do (`spec/question-band.test.ts`).
 - Every word at rest carries a faint solid underline on every device, so a
   word reads as clickable before it's pointed at; pointing darkens it
   (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October playtest,
@@ -545,8 +560,8 @@ hold.
   redesign, the maker's decision of 2026-10-25, so the house names the
   same position as the index above the word.) Under the standing
   house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
-  Under the kept house: "Replaced words are kept here, and built back into
-  a house." At
+  Under the kept house: "Replaced words are kept here: in this house, or
+  waiting for the next." At
   the foot beside About: "If every word and every part is replaced, is it
   still the same thing?" With reduced motion nothing moves and the cue stands
   still for a moment, then clears.
@@ -564,6 +579,11 @@ hold.
   with a short kept sentence. The next redesign replaces the side-by-side
   halves with one stage, which removes that shared row; if it doesn't
   happen, fix this then.
+- Only the next house waits. A word replaced at a position that already
+  has a word waiting (the third time it changes while the current ship is
+  being built) belongs to a ship further ahead and isn't shown until that
+  ship is next (decided 29 October: one waiting row, not a queue of
+  houses). It's kept in `changes` and appears in its ship in time.
 
 ## Stop and ask
 
