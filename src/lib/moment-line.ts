@@ -72,11 +72,12 @@ export function showMomentLine(doc: Document, reduced: boolean, ms = LINE_MS): H
 // grey (never red), with a small nudge downward unless motion is reduced.
 const ACK = {
   cross: "A replaced part was just kept below.",
+  wait: "A replaced word waits below, for the next house.",
   first: "The whole first sentence is now kept below.",
 };
 const restoring = new WeakMap<Element, { timer: number; text: string }>();
 
-export function acknowledgeBelow(doc: Document, kind: "cross" | "first", reduced: boolean, ms = ACK_MS): void {
+export function acknowledgeBelow(doc: Document, kind: "cross" | "first" | "wait", reduced: boolean, ms = ACK_MS): void {
   const pointer = doc.querySelector<HTMLElement>(".stands-half .kept-pointer");
   if (!pointer) return;
   const win = doc.defaultView!;

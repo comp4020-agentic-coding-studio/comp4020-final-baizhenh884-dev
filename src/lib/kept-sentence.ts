@@ -36,7 +36,22 @@ export function renderKeptSentence(el: Element, k: KeptShip, mine: ReadonlySet<n
   el.replaceChildren(...nodes);
 }
 
-// not built yet
-export function renderWaiting(_row: HTMLElement, _next: readonly (string | null)[]): void {
-  throw new Error("renderWaiting is not built yet");
+// The waiting row, as a live page redraws it, in the shape GET / serves: the next house's words in place
+// order, each with its place (drawn from data-n, never read), as text; hidden when nothing waits. No count.
+export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]): void {
+  const doc = row.ownerDocument;
+  const ws = row.querySelector(".ws");
+  if (!ws) return;
+  const nodes: Node[] = [];
+  next.forEach((w, i) => {
+    if (w === null) return;
+    const span = doc.createElement("span");
+    span.className = "w";
+    span.setAttribute("data-n", String(i + 1).padStart(2, "0"));
+    span.textContent = w;
+    if (nodes.length) nodes.push(doc.createTextNode(" "));
+    nodes.push(span);
+  });
+  ws.replaceChildren(...nodes);
+  row.hidden = nodes.length === 0;
 }

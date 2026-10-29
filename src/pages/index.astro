@@ -124,7 +124,7 @@ const how =
                 {/* each device's own gesture; the layout shows only the device's */}
                 <li><span><span class="on-desktop">Click any word in the sentence.</span><span class="on-phone">Tap any word in the sentence.</span></span></li>
                 <li><span>Type your own and press Enter. Its part of the house is rebuilt from how the word is spelled, not what it means.</span></li>
-                <li><span>Replaced words are kept <span class="side-by-side">on the right</span><span class="stacked">below</span>, building a second house.</span></li>
+                <li><span>Replaced words are kept <span class="side-by-side">on the right</span><span class="stacked">below</span>: in the second house, or waiting for the next.</span></li>
               </ol>
             </div>
           )}
@@ -246,7 +246,11 @@ const how =
             </div>
             <div id="house-kept" aria-hidden="true"></div>
             <div class="foot">
-              <p class="plate-note">Replaced words are kept here, and built back into a house.</p>
+              {/* the next house's words (decided 29 October): a replaced word that belongs to the next ship waits here,
+                  in place order with its place, read after the kept sentence; hidden when nothing waits
+                  (src/lib/kept-sentence.ts renderWaiting redraws it the same way) */}
+              <p class="waiting" hidden={!kept.next.some((w) => w !== null)}><span class="label caps">Waiting for the next house:</span> <span class="ws">{kept.next.flatMap((w, i) => (w === null ? [] : [<span class="w" data-n={String(i + 1).padStart(2, "0")}>{w}</span>, " "]))}</span></p>
+              <p class="plate-note">Replaced words are kept here: in this house, or waiting for the next.</p>
               {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
               {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
             </div>
@@ -257,7 +261,7 @@ const how =
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
           import { classifyMoment } from "../lib/kept-moment";
-          import { renderKeptSentence } from "../lib/kept-sentence";
+          import { renderKeptSentence, renderWaiting } from "../lib/kept-sentence";
           import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
           import { BEAT_MS } from "../lib/house/kept-stage";
           import { duration } from "../lib/house/motion";
@@ -271,6 +275,7 @@ const how =
           const standsHost = document.getElementById("house"), keptHost = document.getElementById("house-kept");
           const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null;
           const keptLabel = document.querySelector(".kept-sentence");
+          const waitingRow = document.querySelector<HTMLElement>(".kept-half .waiting");
           const keptHouse = mountKept(document);
           let keptNow: KeptShip | null = keptHouse?.initial ?? null; // the kept ship the page shows
           let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
@@ -281,6 +286,22 @@ const how =
           keptHouse?.mine([...mine][0] ?? null);
           function renderKept(k: KeptShip): void {
             if (keptLabel) renderKeptSentence(keptLabel, k, mine);
+            if (waitingRow) renderWaiting(waitingRow, k.next);
+          }
+          // When the shown ship gives way, its waiting words are the next ship's: they rise from the row into the
+          // kept sentence, each to its own place, rather than reappearing from nowhere. Presentation only.
+          function moveUp(from: (string | null)[]): void {
+            if (reduced() || !waitingRow || !keptLabel) return;
+            const at = new Map([...waitingRow.querySelectorAll<HTMLElement>(".ws .w")].map((w) => [Number(w.dataset.n) - 1, w.getBoundingClientRect()]));
+            requestAnimationFrame(() => {
+              const spans = [...keptLabel.querySelectorAll<HTMLElement>(".w")];
+              from.forEach((w, i) => {
+                const was = at.get(i), to = spans[i];
+                if (w === null || !was || !to) return;
+                const now = to.getBoundingClientRect();
+                to.animate([{ transform: `translate(${was.left - now.left}px, ${was.top - now.top}px)`, opacity: 0.4 }, { transform: "none", opacity: 1 }], { duration: 900, easing: "cubic-bezier(.3,0,.2,1)" });
+              });
+            });
           }
 
           // Ship 1 complete: the one loud line, once, live, as the last part sets down.
@@ -289,7 +310,7 @@ const how =
           function acknowledge(moment: Moment): void {
             const delay = reduced() ? 0 : 2400;
             // ship 1's acknowledgement stays until the line has gone
-            if (moment.kind === "cross" || moment.kind === "first") acknowledgeBelow(document, moment.kind, reduced(), moment.kind === "first" ? delay + LINE_MS + 1000 : ACK_MS);
+            if (moment.kind === "cross" || moment.kind === "first" || moment.kind === "wait") acknowledgeBelow(document, moment.kind, reduced(), moment.kind === "first" ? delay + LINE_MS + 1000 : ACK_MS);
             if (moment.kind === "first") setTimeout(() => showMomentLine(document, reduced()), delay);
           }
 
@@ -305,9 +326,13 @@ const how =
               const before = keptNow;
               keptHouse.apply(k, moment, box(standsHost));
               if (moment.kind === "later" && before) {
-                // the completed ship stands whole for its beat, in words as in its house
-                renderKept({ words: before.words, gaps: before.gaps.map(() => false) });
-                beat = window.setTimeout(() => renderKept(k), (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
+                // the completed ship stands whole for its beat, in words as in its house; its waiting words still wait
+                renderKept({ words: before.words, gaps: before.gaps.map(() => false), next: before.next });
+                beat = window.setTimeout(() => { renderKept(k); moveUp(before.next); }, (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
+              } else if (before && before.gaps.every((g) => !g) && moment.kind === "cross") {
+                // ship 1 was held whole: the first change after it starts ship 2, whose waiting words rise into it
+                renderKept(k);
+                moveUp(before.next);
               } else renderKept(k);
               acknowledge(moment);
             }
@@ -341,11 +366,12 @@ const how =
             keptHouse?.update(ownBefore);
             keptNow = ownBefore;
             moveKept(now, own);
-            return { toward: box(keptHost) };
+            return { toward: box(own.kind === "wait" ? waitingRow : keptHost) };
           });
           const page = attach(document, {
             onLatest: (change) => {
-              const c = crossing && crossing.position === change.position ? { toward: box(keptHost) } : null;
+              // a word for the next house leaves toward the waiting row (shown by then), the rest toward the kept house
+              const c = crossing && crossing.position === change.position ? { toward: box(crossing.kind === "wait" ? waitingRow : keptHost) } : null;
               crossing = null;
               house?.latest(change, c);
             },

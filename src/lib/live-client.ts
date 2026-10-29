@@ -141,10 +141,11 @@ function asStandingItem(v: unknown): StandingItem | null {
 }
 
 function asKeptShip(v: unknown): KeptShip | null {
-  if (!isObject(v) || !Array.isArray(v.words) || !Array.isArray(v.gaps)) return null;
-  if (v.words.length !== 10 || v.gaps.length !== 10) return null;
+  if (!isObject(v) || !Array.isArray(v.words) || !Array.isArray(v.gaps) || !Array.isArray(v.next)) return null;
+  if (v.words.length !== 10 || v.gaps.length !== 10 || v.next.length !== 10) return null;
   if (v.words.some((w) => typeof w !== "string") || v.gaps.some((g) => typeof g !== "boolean")) return null;
-  return { words: v.words as string[], gaps: v.gaps as boolean[] };
+  if (v.next.some((w) => w !== null && typeof w !== "string")) return null;
+  return { words: v.words as string[], gaps: v.gaps as boolean[], next: v.next as (string | null)[] };
 }
 
 function asReplacedItem(v: unknown): ReplacedItem | null {
@@ -564,19 +565,23 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   const heard = new Map<number, string>();
   // the word each heard position held before this burst, so one change can say its part's family change
   const before = new Map<number, string>();
+  // replaced words this burst sent to the next house's waiting row (decided 29 October), by position
+  const waits = new Map<number, string>();
   let speakTimer: ReturnType<typeof setTimeout> | null = null;
-  function announce(change: Position, was: string): void {
+  function announce(change: Position, was: string, waiting = false): void {
     if (!news) return;
     if (!before.has(change.position)) before.set(change.position, was);
+    if (waiting) waits.set(change.position, was);
     heard.delete(change.position);
     heard.set(change.position, change.word);
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = setTimeout(() => {
       speakTimer = null;
       const said = [...heard].sort((a, b) => a[0] - b[0]);
-      const was = new Map(before);
+      const was = new Map(before), waited = [...waits].sort((a, b) => a[0] - b[0]).map(([, w]) => w);
       heard.clear();
       before.clear();
+      waits.clear();
       const words = [...slots.values()].sort((a, b) => a.latest.position - b.latest.position).map((s) => s.latest.word);
       const n = (p: number) => String(p + 1);
       news.textContent =
@@ -585,6 +590,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
           : said.length <= 3
             ? `Changed: words ${said.slice(0, -1).map(([p]) => n(p)).join(", ")} and ${n(said.at(-1)![0])}. The sentence now reads: ${words.join(" ")}.`
             : `Several words changed. The sentence now reads: ${words.join(" ")}.`;
+      if (waited.length) news.textContent += ` ${waited.map((w) => `“${w}”`).join(" and ")} ${waited.length === 1 ? "waits" : "wait"} for the next house.`;
     }, ANNOUNCE_MS);
   }
 
@@ -611,9 +617,10 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       const slot = slots.get(change.position);
       const newer = !!slot && change.version > slot.latest.version;
       const was = slot?.latest.word ?? change.word;
-      if (change.keptShip) tellKept(change.keptShip, newer ? classifyMoment(keptSent, change.keptShip, change.position) : null);
+      const moment = change.keptShip && newer ? classifyMoment(keptSent, change.keptShip, change.position) : null;
+      if (change.keptShip) tellKept(change.keptShip, moment);
       offer(change);
-      if (newer) announce(change, was);
+      if (newer) announce(change, was, moment?.kind === "wait");
       render();
     },
   };

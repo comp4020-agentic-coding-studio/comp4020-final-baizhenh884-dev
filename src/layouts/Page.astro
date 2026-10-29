@@ -266,6 +266,14 @@ const image = new URL("/og.png", Astro.url.origin).href;
       }
       .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
       .kept-half .plate-note { color: var(--kept-ink); }
+      /* the next house's waiting words (decided 29 October): under the kept house, above the plate note; each word
+         carries its place small above it, like the kept sentence's, drawn, never read */
+      .waiting { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.1rem; row-gap: 0.2rem; }
+      .waiting[hidden] { display: none; }
+      .waiting .label { color: var(--kept-soft); margin-right: 0.1rem; }
+      .waiting .ws { display: contents; }
+      .waiting .w { position: relative; display: inline-block; padding-top: 12px; font: italic 400 clamp(20px, 1.5vw, 24px)/1.2 "Instrument Serif", serif; color: var(--kept-ink); overflow-wrap: anywhere; min-width: 0; }
+      .waiting .w::before { content: attr(data-n) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--kept-soft); }
       .kept-half .earlier { color: var(--kept-soft); }
       .kept-half .earlier a { text-decoration-color: rgb(159 177 199 / 0.45); }
       /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */

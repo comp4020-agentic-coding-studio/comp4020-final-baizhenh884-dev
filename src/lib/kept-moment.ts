@@ -6,7 +6,7 @@
 // is classified, never a snapshot, so a reload or reconnect never replays a
 // moment. Pure, so spec/kept-moment.test.ts runs it without a page.
 
-export type KeptShip = { words: string[]; gaps: boolean[]; next?: (string | null)[] };
+export type KeptShip = { words: string[]; gaps: boolean[]; next: (string | null)[] };
 export type MomentKind = "cross" | "first" | "later" | "wait";
 export type Moment = { position: number; kind: MomentKind };
 
@@ -20,5 +20,8 @@ export function classifyMoment(prev: KeptShip | undefined, next: KeptShip, posit
   }
   // ship 1 was held whole: the first change after it starts ship 2, and crosses into it
   if (prev.gaps.every((g) => !g) && !next.gaps[position]) return { position, kind: "cross" };
+  // the replaced word belongs to the next house: it waits under the kept one (a word for a ship further
+  // ahead finds its place already taken there, and shows nothing until its own ship is next)
+  if (prev.next[position] === null && next.next[position] !== null) return { position, kind: "wait" };
   return null;
 }
