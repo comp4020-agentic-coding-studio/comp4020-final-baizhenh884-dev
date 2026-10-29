@@ -176,7 +176,9 @@ function pinShortKept(doc: Document): void {
 async function notation(size: [number, number], longWords: boolean): Promise<Notation> {
   const doc = await servedPage(baseUrl);
   pinShortKept(doc);
-  if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+  // the live sentence staged too, so what's measured is the notation, not whatever an earlier spec file left there
+  // (after spec/blocklist.test.ts its long words step the sentence down and the house sits 20.84px under it)
+  stageWords(doc, longWords ? Array(10).fill("wordmvadgycfe") : [...STARTING_WORDS]);
   const labels = longestNotations(size[0]);
   return (await measureIn(doc, `(async () => {
     await document.fonts.ready;
@@ -620,7 +622,8 @@ describe("two ships on GET /", () => {
       it(`invites a stranger to change a word at rest, in the notation's slot, moving nothing (${name}${longWords ? ", ten long words" : ""})`, async () => {
         const doc = await servedPage(baseUrl);
         pinShortKept(doc);
-        if (longWords) stageWords(doc, Array(10).fill("wordmvadgycfe"));
+        // the live sentence staged too, as in notation(): measured on the words given, not an earlier file's
+        stageWords(doc, longWords ? Array(10).fill("wordmvadgycfe") : [...STARTING_WORDS]);
         const m = (await measureIn(doc, `(async () => {
           await document.fonts.ready;
           const q = ${QUERY_JS};
