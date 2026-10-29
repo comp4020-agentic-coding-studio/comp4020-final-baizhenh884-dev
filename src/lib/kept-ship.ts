@@ -13,7 +13,7 @@
 
 export type KeptChange = { position: number; fromVersion: number; fromWord: string };
 export type CurrentWord = { word: string; version: number };
-export type KeptShip = { ship: number; words: string[]; gaps: boolean[] };
+export type KeptShip = { ship: number; words: string[]; gaps: boolean[]; next: (string | null)[] };
 
 export function deriveKeptShip(changes: readonly KeptChange[], current: readonly CurrentWord[]): KeptShip {
   const m0 = Math.min(...current.map((c) => c.version));
@@ -24,7 +24,7 @@ export function deriveKeptShip(changes: readonly KeptChange[], current: readonly
   const kept = shipWords(changes, ship);
   const words = current.map((c, i) => kept[i] ?? c.word);
   const gaps = kept.map((w) => w === null);
-  return { ship, words, gaps };
+  return { ship, words, gaps, next: [] }; // not built yet
 }
 
 // Ship k: at each position the word that stood at version k, kept once it

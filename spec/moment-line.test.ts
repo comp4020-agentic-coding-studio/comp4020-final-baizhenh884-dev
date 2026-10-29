@@ -70,13 +70,13 @@ describe("ship 1's loud line", () => {
 });
 
 describe("the phone pointer to the kept half", () => {
-  it("acknowledges a crossing or ship 1's completion for a moment, quietly, then returns (390×844)", async () => {
+  it("acknowledges a crossing, a word waiting for the next house, or ship 1's completion for a moment, quietly, then returns (390×844)", async () => {
     const r = (await measureIn(await page(false), `(async () => {
       await document.fonts.ready;
       const p = document.querySelector('.stands-half .kept-pointer');
       const before = p.textContent, soft = getComputedStyle(p).color;
       const out = [];
-      for (const kind of ["cross", "first"]) {
+      for (const kind of ["cross", "first", "wait"]) {
         acknowledgeBelow(document, kind, false, 600);
         await new Promise((r) => setTimeout(r, 200));
         const rgb = getComputedStyle(p).color.match(/[\\d.]+/g).map(Number);
@@ -94,5 +94,6 @@ describe("the phone pointer to the kept half", () => {
       expect(o.after, `${o.kind}: the pointer didn't return`).toBe(r.before);
     }
     expect(r.out[0].during, "a crossing and ship 1's completion read the same").not.toBe(r.out[1].during);
+    expect(r.out[2].during, "a waiting word doesn't say it waits for the next house").toMatch(/next house/i);
   }, 90_000);
 });

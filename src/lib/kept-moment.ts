@@ -6,8 +6,8 @@
 // is classified, never a snapshot, so a reload or reconnect never replays a
 // moment. Pure, so spec/kept-moment.test.ts runs it without a page.
 
-export type KeptShip = { words: string[]; gaps: boolean[] };
-export type MomentKind = "cross" | "first" | "later";
+export type KeptShip = { words: string[]; gaps: boolean[]; next?: (string | null)[] };
+export type MomentKind = "cross" | "first" | "later" | "wait";
 export type Moment = { position: number; kind: MomentKind };
 
 export function classifyMoment(prev: KeptShip | undefined, next: KeptShip, position: number): Moment | null {

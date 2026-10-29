@@ -8,10 +8,14 @@ import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 //          part travels from the standing house into the kept one
 //   first  it closes ship 1's last gap: the loud line, once, live
 //   later  it closes a later ship's last gap: a quiet beat, no line, no hold
-//   null   nothing crosses (the word was not part of the ship being shown)
+//   wait   the replaced word belongs to the next ship: its part leaves toward
+//          the kept half and the word waits under it, for the next house
+//   null   nothing to show (a word for a ship further ahead: a known limit)
 
 const STARTING = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
-const ship = (filled: number[], words = STARTING): KeptShip => ({ words: [...words], gaps: words.map((_, i) => !filled.includes(i)) });
+const none = Array(10).fill(null);
+const ship = (filled: number[], words = STARTING, next: (string | null)[] = none): KeptShip => ({ words: [...words], gaps: words.map((_, i) => !filled.includes(i)), next: [...next] });
+const waiting = (at: Record<number, string>) => none.map((_, i) => at[i] ?? null);
 const all = [...Array(10).keys()];
 
 describe("the moment of a replacement", () => {
@@ -20,8 +24,21 @@ describe("the moment of a replacement", () => {
     expect(classifyMoment(ship([0, 1]), ship([0, 1, 7]), 7)).toEqual({ position: 7, kind: "cross" });
   });
 
-  it("is nothing when the replaced position was already kept in the ship being shown", () => {
+  it("is nothing when the replaced position was already kept and no word waits for the next house there", () => {
     expect(classifyMoment(ship([3]), ship([3]), 3)).toBeNull();
+  });
+
+  it("is a wait when the replaced word belongs to the next house", () => {
+    const filled = all.filter((i) => i !== 8);
+    expect(classifyMoment(ship(filled), ship(filled, STARTING, waiting({ 2: "ceremony" })), 2)).toEqual({ position: 2, kind: "wait" });
+    // a second waiting word, elsewhere
+    expect(classifyMoment(ship(filled, STARTING, waiting({ 2: "ceremony" })), ship(filled, STARTING, waiting({ 2: "ceremony", 4: "students" })), 4)).toEqual({ position: 4, kind: "wait" });
+  });
+
+  it("is nothing for a third replacement at a place whose next-house word already waits (a ship further ahead)", () => {
+    const filled = all.filter((i) => i !== 8);
+    const w = waiting({ 2: "ceremony" });
+    expect(classifyMoment(ship(filled, STARTING, w), ship(filled, STARTING, w), 2)).toBeNull();
   });
 
   it("is the first ship's completion when it closes ship 1's last gap (the ship is then held whole)", () => {

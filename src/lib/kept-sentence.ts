@@ -35,3 +35,8 @@ export function renderKeptSentence(el: Element, k: KeptShip, mine: ReadonlySet<n
   });
   el.replaceChildren(...nodes);
 }
+
+// not built yet
+export function renderWaiting(_row: HTMLElement, _next: readonly (string | null)[]): void {
+  throw new Error("renderWaiting is not built yet");
+}

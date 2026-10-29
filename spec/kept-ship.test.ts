@@ -102,6 +102,67 @@ describe("Kept ships", () => {
   });
 });
 
+// The waiting row (decided 29 October): near the end of a ship most replaced
+// words belong to the next one, and the page showed them nowhere. `next` is
+// the next ship's words, by the same rule (the word that stood at version
+// ship + 1 of each position, once replaced), null where none waits yet:
+// derived from `changes`, nothing stored. Only the next ship: a word for a
+// ship further ahead (a place replaced a third time before the shown ship
+// completes) isn't in it, a known limit (CLAUDE.md).
+describe("the next house's waiting words", () => {
+  it("is empty before any replacement, and while every replaced word fills the shown ship", () => {
+    expect(deriveKeptShip(...Object.values(simulate([])) as [KeptChange[], CurrentWord[]]).next).toEqual(Array(10).fill(null));
+    const { changes, current } = simulate([[3, "ox"], [5, "cat"]]);
+    expect(deriveKeptShip(changes, current).next).toEqual(Array(10).fill(null));
+  });
+
+  it("holds a replaced word that belongs to the next ship, at its own place", () => {
+    // ship 1 has one gap left (8); places 2, 4 and 6 are replaced a second time
+    const round1: [number, string][] = STARTING.map((_, i) => [i, `v2-${i}`] as [number, string]).filter(([i]) => i !== 8);
+    const { changes, current } = simulate([...round1, [2, "v3-2"], [4, "v3-4"], [6, "v3-6"]]);
+    const kept = deriveKeptShip(changes, current);
+    expect(kept.ship).toBe(1);
+    expect(kept.gaps.filter(Boolean)).toHaveLength(1);
+    expect(kept.next).toEqual(STARTING.map((_, i) => ([2, 4, 6].includes(i) ? `v2-${i}` : null)));
+  });
+
+  it("is ship 2's words while ship 1 is held whole", () => {
+    const round1: [number, string][] = STARTING.map((_, i) => [i, `v2-${i}`]);
+    const { changes, current } = simulate([[2, "v2-2"], [2, "v3-2"], ...round1.filter(([i]) => i !== 2)]);
+    const kept = deriveKeptShip(changes, current);
+    expect(kept.ship, "ship 1 isn't held").toBe(1);
+    expect(kept.gaps.every((g) => !g)).toBe(true);
+    expect(kept.next[2], "a word for ship 2, replaced before ship 1 completed, isn't waiting").toBe("v2-2");
+  });
+
+  it("becomes the shown ship's kept words when the shown ship gives way: the same words, moved up", () => {
+    const round1: [number, string][] = STARTING.map((_, i) => [i, `v2-${i}`]);
+    const round2: [number, string][] = [[2, "v3-2"], [7, "v3-7"]];
+    // ship 1 completes and holds; one more change starts ship 2
+    const held = simulate([...round1, ...round2.slice(0, 1)]);
+    const waiting = deriveKeptShip(held.changes, held.current);
+    const after = simulate([...round1, ...round2]);
+    const shown = deriveKeptShip(after.changes, after.current);
+    expect(shown.ship).toBe(2);
+    waiting.next.forEach((w, i) => { if (w !== null) expect(shown.words[i], `the word waiting at ${i} didn't move up`).toBe(w); });
+  });
+
+  it("never holds a word for a ship further ahead (the third-time case, a known limit)", () => {
+    const round1: [number, string][] = STARTING.map((_, i) => [i, `v2-${i}`] as [number, string]).filter(([i]) => i !== 8);
+    const { changes, current } = simulate([...round1, [4, "v3-4"], [4, "v4-4"]]);
+    const kept = deriveKeptShip(changes, current);
+    expect(kept.next[4], "the next house's word at 4 is ship 2's").toBe("v2-4");
+    expect(kept.next.filter((w) => w === "v3-4"), "a ship-3 word is waiting in the next house").toEqual([]);
+  });
+
+  it("holds at most one word per place, in place order", () => {
+    for (const seq of [[[0, "a"], [0, "b"], [0, "c"], [1, "d"]], STARTING.flatMap((_, i) => [[i, `x${i}`], [i, `y${i}`]])] as [number, string][][]) {
+      const { changes, current } = simulate(seq);
+      expect(deriveKeptShip(changes, current).next).toHaveLength(10);
+    }
+  });
+});
+
 // The rendered markup on GET / (Slice 4): the kept ship is read-only (no
 // forms), shown from the first load; its house is decorative (aria-hidden)
 // while its sentence is readable by a screen reader, each gap read as
@@ -279,6 +340,26 @@ describe("Kept ship markup on GET /", () => {
     expect(doc.body.textContent, "the foot's older line for empty gaps is still there").not.toContain(OLD_LINE);
     const earlier = new JSDOM(await (await fetch(new URL("/?at=0", baseUrl))).text()).window.document;
     expect(earlier.body.textContent, "an earlier form says what a kept half shows").not.toContain(KEPT_LINE);
+  });
+
+  // The waiting row (decided 29 October) in the kept half's foot: real text,
+  // read after the kept sentence, the next house's words in place order, each
+  // with its place; hidden when nothing waits. The plate note says where
+  // replaced words go, both ways.
+  it("serves the next house's waiting words under the kept house, as words in place order, after the kept sentence", async () => {
+    const doc = await new Visitor().page();
+    const row = doc.querySelector<HTMLElement>(".kept-half .waiting");
+    expect(row, "GET / has no waiting row").not.toBeNull();
+    expect(row!.closest('[aria-hidden="true"]'), "the waiting row is hidden from screen readers").toBeNull();
+    const sentence = doc.querySelector(".kept-sentence")!;
+    expect(sentence.compareDocumentPosition(row!) & 4, "the waiting row doesn't come after the kept sentence").toBeTruthy();
+    const ws = [...row!.querySelectorAll(".ws .w")];
+    expect(row!.hidden, "the row's visibility doesn't follow whether anything waits").toBe(ws.length === 0);
+    const places = ws.map((w) => Number(w.getAttribute("data-n")));
+    expect(places, "waiting words aren't in place order").toEqual([...places].sort((a, b) => a - b));
+    expect(new Set(places).size, "more than one word waits at a place").toBe(places.length);
+    if (ws.length) expect(readable(row!)).toBe(`Waiting for the next house: ${ws.map((w) => w.textContent).join(" ")}`);
+    expect(doc.querySelector(".kept-half .plate-note")?.textContent?.trim()).toBe("Replaced words are kept here: in this house, or waiting for the next.");
   });
 
   // The shared sentence accumulates every other spec file's replacements, so
