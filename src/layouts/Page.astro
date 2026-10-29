@@ -182,8 +182,13 @@ const image = new URL("/og.png", Astro.url.origin).href;
       #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.4vh; padding-top: 2.2vh; }
       #question.folded .question-main { display: flex; align-items: baseline; gap: 2vw; min-width: 0; }
       #question.folded .question-line { margin: 0; font-size: clamp(18px, 1.5vw, 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      /* the house row takes at least half the screen; the notes under it may fall below the first screen */
-      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) auto; min-height: 100vh; }
+      /* the house row takes at least half the screen; the notes under it may fall below the first screen.
+         The first screen is the four rows the halves share (head, sentence, house, foot), held to the screen by
+         a spacer across them; the fifth row takes whatever the kept foot needs beyond the live one (the words
+         waiting for the next house), so the page grows longer and no house shrinks for it */
+      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) min-content auto; }
+      .two::before { content: ""; grid-column: 1 / -1; grid-row: 1 / 5; min-height: calc(100vh - 3.6vh); visibility: hidden; pointer-events: none; }
+      .kept-half > .foot { grid-row: 4 / span 2; align-self: start; }
       .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
       .stands-half, .kept-half { position: relative; }
       .kept-half { color: var(--kept-ink); }
@@ -426,6 +431,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .sentence form { min-height: 44px; }
         /* the two halves stack: what stands, then what was kept, each a band of its own ground */
         .two { display: block; min-height: 0; }
+        .two::before { display: none; }
         .kept-pointer { display: block; }
         .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
         /* the frame sits in the gutter, outside the text, never through it */
