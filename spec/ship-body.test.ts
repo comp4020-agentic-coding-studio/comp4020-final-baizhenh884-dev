@@ -66,7 +66,9 @@ describe("the ship's body", () => {
   it("changes only its own part when one word changes: no part reads another position's word", () => {
     for (let p = 0; p < 10; p++) for (const w of ["whether", "123", "Café", "incomprehensibilities"]) {
       const a = buildShip(BASE), b = buildShip(at(p, w));
-      expect(form(a.groups[p]), `${w} didn't change the ${PARTS[p]}`).not.toBe(form(b.groups[p]));
+      // its own part changes exactly when the rule says it does
+      const differs = JSON.stringify(partOf(p, BASE[p]).value) !== JSON.stringify(partOf(p, w).value);
+      expect(form(a.groups[p]) !== form(b.groups[p]), `${w} at the ${PARTS[p]}: the part ${differs ? "didn't change" : "changed"}`).toBe(differs);
       a.groups.forEach((g, i) => { if (i !== p) expect(form(g), `${w} at ${PARTS[p]} moved the ${PARTS[i]}`).toBe(form(b.groups[i])); });
       a.dispose(); b.dispose();
     }
