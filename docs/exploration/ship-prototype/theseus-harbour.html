@@ -1,0 +1,792 @@
+<title>Theseus Harbour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one sunlit harbour fills the screen; the sentence sits on a parchment strip at the foot, the story plays over the scene. */
+  :root {
+    color-scheme: light;
+    --ink: #2a2019;
+    --muted: #5e4f3f;
+    --parchment: #f6eedd;
+    --parchment-edge: #dccaa6;
+    --terracotta: #a3442a;
+    --glow: #f6c978;
+    --display: "Cinzel", "Trajan Pro", Georgia, serif;
+    --story: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+    --ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; }
+  body { background: #e8d2ad; color: var(--ink); font-family: var(--ui); overflow: hidden; }
+  #scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--terracotta); outline-offset: 3px; }
+
+  .mast {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 18px); z-index: 3;
+    left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; pointer-events: none;
+  }
+  .mast > * { pointer-events: auto; }
+  .brand { display: grid; gap: 4px; }
+  .brand h1 { margin: 0; font: 600 clamp(20px, 2.4vw, 28px)/1 var(--display); letter-spacing: 0.14em; color: #fffaf0; text-shadow: 0 1px 12px rgba(40, 25, 10, 0.45); }
+  .brand p { margin: 0; max-width: 30ch; font: italic 500 clamp(16px, 1.6vw, 20px)/1.2 var(--story); color: #fffaf0; text-shadow: 0 1px 10px rgba(40, 25, 10, 0.55); }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .chip {
+    border: 1px solid rgba(255, 250, 240, 0.75); background: rgba(42, 32, 25, 0.38); color: #fffaf0; min-height: 34px;
+    font: 500 12px/1 var(--ui); letter-spacing: 0.05em; padding: 9px 13px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .chip:hover { background: rgba(42, 32, 25, 0.58); }
+  .chip.key { background: #fffaf0; color: var(--ink); border-color: #fffaf0; }
+
+  .tag {
+    position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none; transform: translate(-50%, -100%);
+    font: 500 12px/1.3 var(--ui); letter-spacing: 0.04em; color: #fffaf0; text-align: center; white-space: nowrap;
+    text-shadow: 0 1px 8px rgba(30, 20, 10, 0.75); transition: opacity 0.4s;
+  }
+  .tag b { display: block; font: 600 13px/1.2 var(--display); letter-spacing: 0.12em; }
+  .tag::after { content: ""; display: block; width: 1px; height: 18px; margin: 6px auto 0; background: rgba(255, 250, 240, 0.8); }
+  .part-tag {
+    position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none; transform: translate(-50%, calc(-100% - 10px));
+    background: #fffaf0; color: var(--ink); border: 1px solid var(--ink); border-radius: 4px; padding: 5px 9px;
+    font: 600 11px/1 var(--display); letter-spacing: 0.12em; white-space: nowrap; box-shadow: 0 6px 16px rgba(30, 20, 10, 0.25);
+  }
+  .part-tag.kept { background: #23324a; color: #eef3f8; border-color: #eef3f8; }
+
+  .panel {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); width: min(900px, calc(100% - 32px));
+    background: var(--parchment); border: 1px solid var(--parchment-edge); border-radius: 6px;
+    box-shadow: 0 18px 50px rgba(40, 25, 10, 0.28); padding: 14px 22px 12px; display: grid; gap: 8px;
+  }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .eyebrow { margin: 0; font: 600 11px/1 var(--display); letter-spacing: 0.18em; color: var(--muted); }
+  .hint { margin: 0; font: 400 12px/1.3 var(--ui); color: var(--muted); }
+  .sentence { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 10px; font: 500 clamp(24px, 2.5vw, 33px)/1.05 var(--story); }
+  .w {
+    display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; border: 0; background: none; padding: 2px 3px 3px; cursor: pointer;
+    border-bottom: 1.5px solid rgba(42, 32, 25, 0.22); border-radius: 2px 2px 0 0; font: inherit; line-height: 1.05;
+  }
+  .w:hover, .w.hover { background: rgba(163, 68, 42, 0.08); border-bottom-color: var(--terracotta); }
+  .n { font: 600 9.5px/1 var(--ui); letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+  .w.fresh .t { color: var(--terracotta); }
+  .stop { font: 500 clamp(24px, 2.5vw, 33px)/1 var(--story); padding-bottom: 4px; }
+  .edit { display: inline-flex; flex-direction: column; gap: 3px; padding: 2px 3px 3px; background: rgba(246, 201, 120, 0.45); border-bottom: 1.5px solid var(--ink); }
+  .edit input {
+    font: italic 500 clamp(24px, 2.5vw, 33px)/1.05 var(--story); color: var(--terracotta); border: 0; padding: 0; margin: 0; background: transparent;
+    width: 7ch; min-width: 3ch; field-sizing: content; outline: none;
+  }
+  .note { margin: 2px 0 0; font: 500 12px/1.45 var(--ui); letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; min-height: 1.45em; }
+  .note del { color: var(--ink); text-decoration-thickness: 1px; }
+  .note strong { color: var(--terracotta); font-weight: 600; }
+  .waiting { margin: 0; font: 400 13px/1.45 var(--ui); color: var(--muted); border-top: 1px solid var(--parchment-edge); padding-top: 8px; }
+  .waiting em { font: italic 500 17px/1 var(--story); color: var(--ink); }
+
+  /* the shipwright's notes: how a word becomes a plank */
+  .notes {
+    position: fixed; z-index: 6; top: 0; right: 0; bottom: 0; width: min(460px, 100%); overflow-y: auto;
+    background: var(--parchment); color: var(--ink); box-shadow: -18px 0 50px rgba(30, 20, 10, 0.3);
+    padding: calc(env(safe-area-inset-top, 0px) + 22px) max(22px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 28px) 24px;
+  }
+  .notes-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .notes h2 { margin: 0; font: 600 18px/1.2 var(--display); letter-spacing: 0.1em; }
+  .notes .lede { margin: 10px 0 18px; font: italic 500 19px/1.35 var(--story); color: var(--muted); }
+  .close { border: 1px solid var(--ink); background: transparent; border-radius: 999px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; line-height: 1; flex: none; }
+  .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .rules li { display: grid; grid-template-columns: 34px 1fr; gap: 2px 12px; padding: 12px 0; border-top: 1px solid var(--parchment-edge); }
+  .rules .num { grid-row: 1 / 3; font: 600 12px/1.6 var(--display); color: var(--terracotta); letter-spacing: 0.08em; }
+  .rules .what { font: 600 14px/1.35 var(--ui); }
+  .rules .what span { font-weight: 400; color: var(--muted); }
+  .rules .eg { font: 400 13px/1.4 var(--ui); color: var(--muted); }
+  .rules .eg em { font: italic 500 16px/1 var(--story); color: var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .sw { display: inline-flex; align-items: center; gap: 5px; font: 500 12px/1 var(--ui); color: var(--ink); }
+  .sw i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(42, 32, 25, 0.35); display: inline-block; }
+  .paint { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; margin-top: 8px; }
+  .paint span { font: 600 10px/1 var(--ui); text-align: center; padding: 14px 0 4px; border-radius: 3px; color: #fffaf0; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+
+  .story {
+    position: fixed; inset: 0; z-index: 5; display: grid; align-items: end; justify-items: center; pointer-events: none;
+    background: linear-gradient(to top, rgba(28, 20, 12, 0.72), rgba(28, 20, 12, 0.08) 55%, transparent);
+    padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 44px) max(16px, env(safe-area-inset-left, 0px));
+  }
+  .story-card { pointer-events: auto; width: min(760px, 100%); display: grid; gap: 18px; text-align: center; color: #fffaf0; }
+  .story-step { margin: 0; font: 600 11px/1 var(--display); letter-spacing: 0.24em; color: var(--glow); }
+  .story-text { margin: 0; font: italic 500 clamp(24px, 3.4vw, 42px)/1.2 var(--story); text-wrap: balance; text-shadow: 0 2px 18px rgba(20, 12, 6, 0.6); }
+  .story-nav { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn { border: 1px solid #fffaf0; background: #fffaf0; color: var(--ink); font: 600 13px/1 var(--ui); letter-spacing: 0.04em; padding: 13px 20px; border-radius: 999px; cursor: pointer; min-height: 44px; }
+  .btn.ghost { background: transparent; color: #fffaf0; }
+  .moment {
+    position: fixed; z-index: 4; left: 50%; top: 30%; transform: translate(-50%, -50%); width: min(820px, calc(100% - 32px)); text-align: center;
+    margin: 0; font: italic 500 clamp(26px, 3.8vw, 48px)/1.15 var(--story); color: #fffaf0; text-shadow: 0 2px 22px rgba(20, 12, 6, 0.75);
+    opacity: 0; transition: opacity 0.8s; pointer-events: none; text-wrap: balance;
+  }
+  .moment.on { opacity: 1; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  @media (max-width: 640px) {
+    .panel { padding: 10px 12px 9px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: calc(100% - 20px); gap: 6px; }
+    .sentence { gap: 2px 6px; font-size: 23px; }
+    .edit input, .stop { font-size: 23px; }
+    .hint, .eyebrow { display: none; }
+    .n { font-size: 8.5px; }
+    .tag { font-size: 10px; }
+    .tag b { font-size: 11px; }
+    .brand p { font-size: 15px; max-width: 22ch; }
+    .story { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .moment, .tag { transition: none; } }
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<header class="mast">
+  <div class="brand">
+    <h1>THESEUS</h1>
+    <p>If every plank is replaced, is it still the same ship?</p>
+  </div>
+  <div class="tools">
+    <button class="chip key" id="open-notes" type="button" aria-controls="notes">How the planks are made</button>
+    <button class="chip" id="replay" type="button">Replay the story</button>
+    <button class="chip" id="reset" type="button">Reset the demo</button>
+  </div>
+</header>
+
+<div class="tag" id="tag-live"><b>The ship of Theseus</b>still sailing, plank by new plank</div>
+<div class="tag" id="tag-kept"><b>The ship of old planks</b>rebuilt on the slipway</div>
+<div class="part-tag" id="part-live" hidden></div>
+<div class="part-tag kept" id="part-kept" hidden></div>
+
+<section class="panel" id="panel" aria-label="The ship's ten planks">
+  <div class="panel-head">
+    <p class="eyebrow">Ten words · ten planks</p>
+    <p class="hint">Click a word or a part of the ship · drag to look around</p>
+  </div>
+  <div class="sentence" id="sentence"></div>
+  <p class="note" id="note"></p>
+  <p class="waiting" id="waiting" hidden></p>
+  <p class="sr" id="news" aria-live="polite"></p>
+</section>
+
+<aside class="notes" id="notes" aria-labelledby="notes-title" hidden>
+  <div class="notes-head">
+    <h2 id="notes-title">How the planks are made</h2>
+    <button class="close" id="close-notes" type="button" aria-label="Close the notes">×</button>
+  </div>
+  <p class="lede">The shipwright never asks what a word means. Each part reads one thing you can count in how the word is spelled.</p>
+  <ol class="rules" id="rules"></ol>
+</aside>
+
+<section class="story" id="story" aria-label="The story" hidden>
+  <div class="story-card">
+    <p class="story-step" id="story-step"></p>
+    <p class="story-text" id="story-text"></p>
+    <div class="story-nav">
+      <button class="btn ghost" id="story-skip" type="button">Skip</button>
+      <button class="btn" id="story-next" type="button">Next</button>
+    </div>
+  </div>
+</section>
+
+<p class="moment" id="moment"></p>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ---------------- words: what each part counts ---------------- */
+const ORIG = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
+// example data for the demo, not anyone's changes: some planks already replaced, one of them twice
+const DEMO = { 0: ["potato"], 2: ["ceremony", "lantern"], 4: ["students"], 6: ["wonder"], 7: ["whether"] };
+const PARTS = ["Ram", "Hull", "Prow", "Stern", "Shields", "Mast", "Sail", "Oars", "Steering oar", "Pennant"];
+const VOWEL = { a: 0xb23a26, e: 0xd49a2a, i: 0xefe6d0, o: 0x2f5f8c, u: 0x23201d };
+const PAINT = [0x23201d, 0x8e2f22, 0x2f5f8c, 0x3f5a3a, 0x6b3f2a, 0x1f4b56, 0x7a5a1e, 0x4d2c3d, 0x2b3a5c, 0x5c6b3a, 0x8a4b2a, 0x34404a, 0x6e2a2a];
+const hex = (n) => "#" + n.toString(16).padStart(6, "0");
+function feat(word) {
+  const s = String(word).toLowerCase().replace(/[^a-z]/g, "");
+  const has = (set) => [...s].filter((ch) => set.includes(ch));
+  return {
+    s, n: s.length, vowels: has("aeiou"), consonants: s.length - has("aeiou").length, tall: has("bdfhklt").length, hang: has("gjpqy").length,
+    round: has("bcdegopqs").length, rep: s.length - new Set(s).size, first: s[0] ?? "a",
+  };
+}
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+// each rule: what the part reads, and what it makes of it (the notation and the notes both read these)
+const RULES = [
+  { reads: "repeated letters", makes: "blunt ram, beak, or three-pronged trident", what: (f) => (f.rep === 0 ? "blunt ram" : f.rep === 1 ? "beak" : "trident"), why: (f) => plural(f.rep, "repeated letter") },
+  { reads: "the first letter", makes: "the hull's paint", what: (f) => `paint “${f.first.toUpperCase()}”`, why: (f) => `starts with “${f.first}”` },
+  { reads: "round letters (b c d e g o p q s)", makes: "how far the prow curls", what: (f) => (f.round === 0 ? "straight prow" : `curl ×${Math.min(f.round, 6)}`), why: (f) => plural(f.round, "round letter") },
+  { reads: "consonants", makes: "the plumes on the stern", what: (f) => plural(Math.min(Math.max(f.consonants, 1), 9), "plume"), why: (f) => plural(f.consonants, "consonant") },
+  { reads: "vowels", makes: "one shield per vowel, in the vowel's colour", what: (f) => plural(Math.min(f.vowels.length, 8), "shield") + " a side", why: (f) => plural(f.vowels.length, "vowel") },
+  { reads: "tall letters (b d f h k l t)", makes: "how tall the mast stands", what: (f) => `mast height ${Math.min(f.tall, 5)}`, why: (f) => plural(f.tall, "tall letter") },
+  { reads: "every letter", makes: "one stripe per letter: vowels in colour, the rest linen", what: (f) => plural(Math.max(f.n, 1), "stripe"), why: (f) => `spelled ${f.s.toUpperCase().split("").join("·")}` },
+  { reads: "letters", makes: "one oar per letter, each side", what: (f) => plural(Math.min(Math.max(f.n, 1), 12), "oar") + " a side", why: (f) => plural(f.n, "letter") },
+  { reads: "hanging letters (g j p q y)", makes: "how deep the steering oar reaches", what: (f) => `depth ${Math.min(f.hang, 4)}`, why: (f) => plural(f.hang, "hanging letter") },
+  { reads: "the word itself", makes: "the pennant, with the word written on it", what: (f) => `“${f.s}” on the flag`, why: () => "the word, as written" },
+];
+
+/* ---------------- state: the same rule as the site's kept ships ---------------- */
+let hist;
+const now = (i) => hist[i][hist[i].length - 1];
+const shown = () => Math.min(...hist.map((h) => h.length)); // the oldest ship not yet complete
+const keptWord = (i, k = shown()) => (hist[i].length > k ? hist[i][k - 1] : null);
+const waitWord = (i, k = shown()) => (hist[i].length > k + 1 ? hist[i][k] : null);
+function resetState() { hist = ORIG.map((w, i) => [w, ...(DEMO[i] ?? [])]); }
+resetState();
+
+/* ---------------- renderer, sky, light ---------------- */
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const narrow = () => innerWidth < 700;
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+{
+  const c = document.createElement("canvas"); c.width = 4; c.height = 256;
+  const x = c.getContext("2d"), gr = x.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, "#7fb4c9"); gr.addColorStop(0.55, "#cfe0dc"); gr.addColorStop(0.8, "#f2d9ae"); gr.addColorStop(1, "#f0c58f");
+  x.fillStyle = gr; x.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; scene.background = tex;
+}
+scene.fog = new THREE.Fog(0xe9d6b4, 45, 130);
+const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 400);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.enablePan = false;
+controls.minDistance = 7; controls.maxDistance = 70; controls.maxPolarAngle = 1.38; controls.minPolarAngle = 0.35;
+scene.add(new THREE.HemisphereLight(0xfff1d6, 0x6f8a86, 0.95));
+const sun = new THREE.DirectionalLight(0xffdcaa, 2.4);
+sun.position.set(-18, 26, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 24, bottom: -24, near: 1, far: 90 });
+sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: o.r ?? 0.78, metalness: o.m ?? 0, flatShading: !o.smooth, side: o.side ?? THREE.FrontSide, vertexColors: !!o.vc, map: o.map ?? null, transparent: !!o.map });
+const mesh = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; return m; };
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+function rod(a, b, r, mat, seg = 6) {
+  const d = new THREE.Vector3().subVectors(b, a), m = mesh(new THREE.CylinderGeometry(r, r, d.length(), seg), mat);
+  m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return m;
+}
+const tube = (pts, r, mat) => mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => V(...p))), 32, r, 6), mat);
+
+/* ---------------- the sea ---------------- */
+const waterGeo = new THREE.PlaneGeometry(240, 240, 120, 120); waterGeo.rotateX(-Math.PI / 2);
+const wBase = Float32Array.from(waterGeo.attributes.position.array);
+const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ color: 0x2a8296, roughness: 0.32, metalness: 0.05, flatShading: true, transparent: true, opacity: 0.94 }));
+water.receiveShadow = true; scene.add(water);
+const waveH = (x, z, t) => 0.11 * Math.sin(x * 0.33 + t * 0.9) + 0.07 * Math.sin(z * 0.52 - t * 1.25) + 0.045 * Math.sin((x + z) * 0.9 + t * 1.7);
+
+/* ---------------- the shore: Athens, the harbour, the slipway ---------------- */
+const pallet = V(14.2, 1.12, 2.0);
+{
+  const shore = new THREE.Group(); scene.add(shore);
+  const stone = M(0xd9c49c), quay = M(0xc9ad80), white = M(0xf3ede2), blue = M(0x2f5f8c), dark = M(0x4a3b2e), green = M(0x4b6640), wood = M(0x8a633f);
+  shore.add(at(mesh(new THREE.BoxGeometry(110, 3, 34), stone), 0, -0.5, -24));
+  shore.add(at(mesh(new THREE.BoxGeometry(110, 1.2, 1.2), quay), 0, 0.45, -7.2));
+  shore.add(at(mesh(new THREE.BoxGeometry(16, 1.6, 12), quay), 10.5, 0.2, -2.4));
+  shore.add(at(mesh(new THREE.BoxGeometry(15.2, 0.08, 11.2), M(0xd6bf93)), 10.5, 1.04, -2.4));
+  for (const x of [6.4, 9, 11.6, 14.2]) shore.add(at(mesh(new THREE.BoxGeometry(0.6, 0.95, 2), wood), x, 1.45, -3.1));
+  for (const [x, z] of [[4.4, 0.6], [4.4, -6.8], [16.8, 0.6], [16.8, -6.8]]) shore.add(rod(V(x, 1, z), V(x, 7.2, z), 0.08, wood));
+  shore.add(rod(V(18.2, 1, -7.4), V(18.2, 9.2, -7.4), 0.13, wood), rod(V(18.2, 8.9, -7.4), V(12.5, 9.6, -3.4), 0.09, wood), rod(V(12.5, 9.6, -3.4), V(12.5, 7.4, -3.4), 0.015, dark));
+  shore.add(at(mesh(new THREE.BoxGeometry(3.8, 0.16, 2.2), wood), pallet.x, pallet.y, pallet.z));
+  let seed = 7; const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  for (let k = 0; k < 34; k++) {
+    const x = -34 + rnd() * 52, z = -10.5 - rnd() * 13, w = 1.6 + rnd() * 2, h = 1.3 + rnd() * 2.4, d = 1.6 + rnd() * 1.6;
+    if (x > 2 && z > -13) continue;
+    shore.add(at(mesh(new THREE.BoxGeometry(w, h, d), white), x, 1 + h / 2, z));
+    shore.add(at(mesh(new THREE.BoxGeometry(0.42, 0.75, 0.05), rnd() > 0.5 ? blue : dark), x + (rnd() - 0.5) * (w - 0.6), 1.38, z + d / 2 + 0.02));
+    if (rnd() > 0.82) shore.add(at(mesh(new THREE.SphereGeometry(Math.min(w, d) * 0.38, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), blue), x, 1 + h, z));
+  }
+  shore.add(at(mesh(new THREE.CylinderGeometry(7, 13, 6, 9), M(0xc9b48a)), -8, 2.5, -27));
+  const temple = new THREE.Group(); temple.position.set(-8, 5.5, -27); shore.add(temple);
+  temple.add(at(mesh(new THREE.BoxGeometry(6, 0.5, 3.4), white), 0, 0.25, 0));
+  for (let k = 0; k < 7; k++) for (const z of [-1.3, 1.3]) temple.add(at(mesh(new THREE.CylinderGeometry(0.14, 0.16, 2.2, 8), white), -2.6 + k * 0.866, 1.6, z));
+  temple.add(at(mesh(new THREE.BoxGeometry(6, 0.35, 3.2), white), 0, 2.85, 0));
+  const roof = mesh(new THREE.CylinderGeometry(1.75, 1.75, 6.1, 3), white); roof.rotation.set(Math.PI / 2, 0, Math.PI / 2); roof.scale.set(1, 1, 0.34); roof.position.y = 3.3; temple.add(roof);
+  for (let k = 0; k < 16; k++) { const x = -30 + rnd() * 48, z = -11 - rnd() * 14; if (x > 2 && z > -13) continue; shore.add(at(mesh(new THREE.ConeGeometry(0.4, 2.6 + rnd() * 1.5, 7), green), x, 2.3, z)); }
+  for (const [x, z, s] of [[-60, -70, 9], [-25, -85, 13], [35, -78, 10], [70, -62, 7]]) { const isl = new THREE.Mesh(new THREE.ConeGeometry(s * 1.8, s, 7), M(0x9fb1ad)); isl.position.set(x, s / 2 - 1, z); isl.scale.z = 0.5; scene.add(isl); }
+}
+
+/* ---------------- the ship: ten parts, one per word ---------------- */
+const HL = 3.8;
+const xAt = (u) => -HL + 2 * HL * u;                          // u = 0 stern, 1 bow
+const bAt = (u) => 0.95 * Math.pow(Math.max(Math.sin(Math.PI * u), 0), 0.55);
+const sAt = (u) => 0.5 + 0.75 * Math.pow(u, 7) + 1.15 * Math.pow(1 - u, 7);
+const dAt = (u) => 0.12 + 0.88 * Math.pow(Math.max(Math.sin(Math.PI * u), 0), 0.35);
+const C = { black: 0x221d19, red: 0xa3442a, ochre: 0xc9933c, cream: 0xefe3c8, bronze: 0xb0803c, wood: 0x8c6340, dark: 0x5a3f28, linen: 0xf0e4cb };
+function textTexture(word) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 128; const x = c.getContext("2d");
+  x.fillStyle = "#f3e7cc"; x.fillRect(0, 0, 512, 128);
+  x.fillStyle = "#2a2019"; x.font = "italic 600 72px 'Cormorant Garamond', Georgia, serif"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText(word, 256, 68, 480);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+const build = [
+  // 01 ram: repeated letters
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), br = M(C.bronze, { m: 0.55, r: 0.4 }), L = 1.1;
+    const cone = (r, z) => { const c = mesh(new THREE.ConeGeometry(r, L, 7), br); c.rotation.z = -Math.PI / 2; c.position.set(HL + L / 2 - 0.05, -0.08, z); return c; };
+    if (f.rep >= 2) g.add(cone(0.11, -0.22), cone(0.13, 0), cone(0.11, 0.22));
+    else if (f.rep === 1) g.add(cone(0.22, 0));
+    else { g.add(at(mesh(new THREE.BoxGeometry(L * 0.8, 0.36, 0.42), br), HL + L * 0.35, -0.1, 0)); g.add(at(mesh(new THREE.BoxGeometry(0.22, 0.52, 0.52), br), HL + L * 0.72, -0.1, 0)); }
+    return g;
+  },
+  // 02 hull: the first letter picks the paint; the keel and deck come with it
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), nu = 44, nv = 16, paint = PAINT[(f.first.charCodeAt(0) - 97 + 26) % 13];
+    const pos = [], col = [], idx = [], c = new THREE.Color();
+    for (let i = 0; i <= nu; i++) {
+      const u = i / nu, x = xAt(u), b = bAt(u), s = sAt(u), d = dAt(u);
+      for (let j = 0; j <= nv; j++) {
+        const a = Math.PI * j / nv, y = s - d * Math.sin(a), z = -b * Math.cos(a), depth = s - y;
+        pos.push(x, y, z); c.setHex(depth > 0.09 && depth < 0.16 ? C.cream : paint); col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) { const a = i * (nv + 1) + j, b = a + nv + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    g.add(mesh(geo, M(0xffffff, { vc: true, side: THREE.DoubleSide, r: 0.6 })));
+    const sh = new THREE.Shape(), N = 30;
+    for (let i = 0; i <= N; i++) { const u = 0.04 + 0.92 * i / N; i ? sh.lineTo(xAt(u), bAt(u) * 0.86) : sh.moveTo(xAt(u), bAt(u) * 0.86); }
+    for (let i = N; i >= 0; i--) { const u = 0.04 + 0.92 * i / N; sh.lineTo(xAt(u), -bAt(u) * 0.86); }
+    const deck = mesh(new THREE.ShapeGeometry(sh), M(C.wood, { side: THREE.DoubleSide })); deck.rotation.x = -Math.PI / 2; deck.position.y = 0.3; g.add(deck);
+    g.add(at(mesh(new THREE.BoxGeometry(2 * HL * 0.9, 0.14, 0.16), M(C.dark)), 0, sAt(0.5) - dAt(0.5) + 0.02, 0));
+    return g;
+  },
+  // 03 prow: round letters curl it
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), r = Math.min(f.round, 6), mat = M(C.black), y0 = sAt(1) - 0.15, pts = [];
+    const turn = r * 0.75, steps = 18; // total turn in radians, more round letters, more curl
+    let x = HL, y = y0, ang = Math.PI * 0.42;
+    for (let k = 0; k <= steps; k++) { pts.push([x, y, 0]); const seg = 0.11 + 0.02 * (steps - k) / steps; ang += turn / steps; x += Math.cos(ang) * seg; y += Math.sin(ang) * seg; }
+    g.add(tube(pts, 0.08, mat));
+    g.add(at(mesh(new THREE.SphereGeometry(0.11, 8, 6), M(C.ochre, { m: 0.4 })), ...pts[pts.length - 1]));
+    for (const s of [-1, 1]) { // the painted eyes
+      const u = 0.9, er = 0.17, eye = new THREE.Group();
+      eye.add(new THREE.Mesh(new THREE.CircleGeometry(er, 16), new THREE.MeshStandardMaterial({ color: C.cream, side: THREE.DoubleSide })));
+      eye.add(at(new THREE.Mesh(new THREE.CircleGeometry(er * 0.45, 12), new THREE.MeshStandardMaterial({ color: 0x111111, side: THREE.DoubleSide })), 0, 0, 0.004));
+      eye.position.set(xAt(u), sAt(u) - 0.24, s * (bAt(u) * Math.cos(0.3) + 0.012)); eye.rotation.y = s > 0 ? -0.35 : Math.PI + 0.35; g.add(eye);
+    }
+    return g;
+  },
+  // 04 stern: one plume per consonant
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), n = Math.min(Math.max(f.consonants, 1), 9), y0 = sAt(0) - 0.2;
+    for (let p = 0; p < n; p++) {
+      const t = n === 1 ? 0 : p / (n - 1) - 0.5, z = t * 0.9, lift = 1 - Math.abs(t) * 0.5;
+      g.add(tube([[-HL, y0, z * 0.2], [-HL - 0.35, y0 + 0.7 * lift, z * 0.7], [-HL - 0.15, y0 + 1.35 * lift, z], [-HL + 0.3, y0 + 1.5 * lift, z * 1.05]], 0.045, M(p % 2 ? C.ochre : C.black)));
+    }
+    return g;
+  },
+  // 05 shields: one per vowel, in the vowel's colour
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), vs = f.vowels.slice(0, 8), r = 0.25;
+    for (const s of [-1, 1]) vs.forEach((v, q) => {
+      const u = 0.22 + 0.56 * (q + 0.5) / Math.max(vs.length, 1), sh = mesh(new THREE.CylinderGeometry(r, r, 0.05, 14), M(VOWEL[v]));
+      sh.rotation.x = Math.PI / 2; sh.position.set(xAt(u), sAt(u) + 0.12, s * (bAt(u) + 0.04)); g.add(sh);
+      g.add(at(mesh(new THREE.SphereGeometry(r * 0.25, 8, 6), M(C.bronze, { m: 0.5 })), xAt(u), sAt(u) + 0.12, s * (bAt(u) + 0.08)));
+    });
+    if (!vs.length) g.add(at(mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), M(C.wood)), 0, sAt(0.5), 0)); // nothing to hang
+    return g;
+  },
+  // 06 mast: tall letters raise it
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), h = 4.45 + 0.42 * Math.min(f.tall, 5), mat = M(C.wood), rope = M(0x4b3a2a);
+    g.add(rod(V(0.35, 0.3, 0), V(0.35, h, 0), 0.1, mat, 8));
+    if (f.tall >= 3) g.add(at(mesh(new THREE.CylinderGeometry(0.32, 0.25, 0.45, 10, 1, true), M(C.dark, { side: THREE.DoubleSide })), 0.35, h - 0.55, 0));
+    g.add(rod(V(0.35, h - 0.2, 0), V(HL - 0.3, sAt(0.96), 0), 0.015, rope), rod(V(0.35, h - 0.2, 0), V(-HL + 0.4, sAt(0.05), 0), 0.015, rope));
+    for (const s of [-1, 1]) g.add(rod(V(0.35, h - 0.6, 0), V(0.1, sAt(0.5), s * bAt(0.5)), 0.012, rope));
+    return g;
+  },
+  // 07 sail: one stripe per letter; vowels in colour, the rest linen
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), letters = f.s || "a", W = 3.3, H = 2.3, yTop = 4.2, cols = letters.length * 2;
+    g.add(rod(V(0.48, yTop, -W / 2 - 0.25), V(0.48, yTop, W / 2 + 0.25), 0.05, M(C.wood)));
+    const geo = new THREE.PlaneGeometry(W, H, cols, 8); geo.rotateY(Math.PI / 2); geo.toNonIndexed();
+    const flat = geo.toNonIndexed(), p = flat.attributes.position, col = [], c = new THREE.Color();
+    for (let i = 0; i < p.count; i += 3) {
+      const zc = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3, k = Math.min(letters.length - 1, Math.floor((0.5 - zc / W) * letters.length));
+      const ch = letters[Math.max(0, k)]; c.setHex(VOWEL[ch] ?? C.linen);
+      for (let j = 0; j < 3; j++) col.push(c.r, c.g, c.b);
+    }
+    for (let i = 0; i < p.count; i++) { const z = p.getZ(i), y = p.getY(i); p.setX(i, 0.3 * (1 - (2 * z / W) ** 2) * (1 - (2 * y / H) ** 2)); }
+    flat.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); flat.computeVertexNormals();
+    g.add(at(mesh(flat, M(0xffffff, { vc: true, side: THREE.DoubleSide, r: 0.9 })), 0.56, yTop - H / 2 - 0.05, 0));
+    return g;
+  },
+  // 08 oars: one per letter, each side
+  (w, o = {}) => {
+    const g = new THREE.Group(), f = feat(w), per = Math.min(Math.max(f.n, 1), 12), mat = M(C.wood);
+    g.userData.oars = [];
+    for (const s of [-1, 1]) for (let q = 0; q < per; q++) {
+      const u = 0.2 + 0.6 * (q + 0.5) / per, piv = new THREE.Group();
+      piv.position.set(xAt(u), sAt(u) - 0.06, s * bAt(u));
+      const tip = o.kept ? V(-0.5, 1.5, s * 0.9) : V(0, -1.05, s * 2.1);
+      piv.add(rod(V(0, 0, 0), tip, 0.03, mat, 5));
+      const blade = mesh(new THREE.BoxGeometry(0.06, 0.22, 0.55), mat); blade.position.copy(tip).multiplyScalar(1.02); blade.rotation.x = o.kept ? s * 0.9 : s * -0.45; piv.add(blade);
+      piv.userData.phase = q; g.add(piv); g.userData.oars.push(piv);
+    }
+    return g;
+  },
+  // 09 steering oar: hanging letters reach deeper
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), L = 0.75 + 0.3 * Math.min(f.hang, 4), mat = M(C.wood), u = 0.12;
+    for (const s of [-1, 1]) {
+      const a = V(xAt(u) + 0.2, sAt(u) + 0.35, s * (bAt(u) + 0.05)), b = V(xAt(u) - 0.55 * L, -0.55 * L, s * (bAt(u) + 0.5 * L));
+      g.add(rod(a, b, 0.05, mat));
+      const blade = mesh(new THREE.BoxGeometry(0.08, 0.5 + 0.35 * L, 0.34), mat); blade.position.copy(b); blade.rotation.set(s * 0.45, 0, 0.5); g.add(blade);
+    }
+    return g;
+  },
+  // 10 pennant: the word itself, written on the flag
+  (w) => {
+    const g = new THREE.Group(), f = feat(w), L = 0.9 + 0.13 * Math.min(Math.max(f.n, 2), 12), H = 0.5;
+    g.add(rod(V(-2.55, 0.35, 0), V(-2.55, 3.15, 0), 0.035, M(C.wood)));
+    const geo = new THREE.PlaneGeometry(L, H, 14, 2); geo.translate(-L / 2, 0, 0);
+    const tex = textTexture(f.s || "?"), flag = mesh(geo, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 }));
+    flag.position.set(-2.55, 3.15 - H / 2, 0); flag.userData.wave = Float32Array.from(geo.attributes.position.array); g.add(flag); g.userData.flag = flag;
+    return g;
+  },
+];
+
+/* ---------------- two ships ---------------- */
+const SCALE = 1.3;
+const live = new THREE.Group(); live.position.set(-4.2, 0, 4.2); live.rotation.y = -0.22; live.scale.setScalar(SCALE); scene.add(live);
+const kept = new THREE.Group(); kept.position.set(10.4, 2.05, -3.1); kept.rotation.y = -0.06; kept.scale.setScalar(SCALE); scene.add(kept);
+const waitingRack = new THREE.Group(); scene.add(waitingRack);
+const liveParts = Array(10).fill(null), keptParts = Array(10).fill(null);
+const buildKept = (i, w) => build[i](w, { kept: true });
+
+function weather(g) { // an old plank: bleached, like driftwood
+  const drift = new THREE.Color(0xcbb894), c = new THREE.Color();
+  g.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.material.clone(); o.material.color.lerp(drift, o.material.map ? 0.15 : 0.5);
+    const col = o.geometry.getAttribute("color");
+    if (col) { o.material.color.setHex(0xffffff); for (let k = 0; k < col.count; k++) { c.fromBufferAttribute(col, k).lerp(drift, 0.55); col.setXYZ(k, c.r, c.g, c.b); } col.needsUpdate = true; }
+  });
+  return g;
+}
+function ghost(g) { // a plank still standing in the harbour: drawn as an outline
+  const meshes = []; g.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  for (const o of meshes) {
+    const l = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 35), new THREE.LineBasicMaterial({ color: 0xe9f3fb, transparent: true, opacity: 0.42, depthWrite: false }));
+    l.position.copy(o.position); l.quaternion.copy(o.quaternion); l.scale.copy(o.scale); o.parent.add(l); o.parent.remove(o);
+  }
+  g.userData.ghost = true; return g;
+}
+function setLive(i, grow = false) {
+  if (liveParts[i]) live.remove(liveParts[i]);
+  const g = build[i](now(i)); g.userData.pos = i; live.add(g); liveParts[i] = g;
+  if (grow) popIn(g);
+}
+function setKept(i, grow = false) {
+  if (keptParts[i]) kept.remove(keptParts[i]);
+  const k = keptWord(i), g = k !== null ? weather(buildKept(i, k)) : ghost(buildKept(i, now(i)));
+  g.userData.pos = i; kept.add(g); keptParts[i] = g;
+  if (grow) popIn(g);
+}
+const rackSlot = (n) => V(pallet.x - 1.4 + (n % 4) * 0.95, pallet.y + 0.45, pallet.z - 0.45 + Math.floor(n / 4) * 0.9);
+function mini(i, word) {
+  const inner = weather(buildKept(i, word)), box = new THREE.Box3().setFromObject(inner), c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  inner.position.sub(c); const wrap = new THREE.Group(); wrap.add(inner); wrap.scale.setScalar(0.8 / Math.max(size.x, size.y, size.z)); wrap.userData.pos = i; return wrap;
+}
+function setRack() {
+  waitingRack.clear(); let n = 0;
+  for (let i = 0; i < 10; i++) { const w = waitWord(i); if (w !== null) { const m = mini(i, w); m.position.copy(rackSlot(n++)); waitingRack.add(m); } }
+}
+function rebuildAll() { for (let i = 0; i < 10; i++) { setLive(i); setKept(i); } setRack(); }
+
+/* ---------------- motion ---------------- */
+const tweens = [];
+const ease = (k) => 1 - Math.pow(1 - k, 3), back = (k) => 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+function tween(dur, update, done) { if (reduced || dur <= 0) { update(1); done?.(); return; } tweens.push({ t0: performance.now(), dur, update, done }); }
+function popIn(g) { g.scale.setScalar(0.001); tween(650, (k) => g.scale.setScalar(Math.max(0.001, back(k)))); }
+const centerOf = (obj) => new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+function fly(obj, to, scaleTo, dur, done) {
+  scene.attach(obj); const from = obj.position.clone(), s0 = obj.scale.x, c0 = centerOf(obj), off = from.clone().sub(c0), spin = (Math.random() - 0.5) * 1.2;
+  const r0 = obj.rotation.y, rise = 5.5;
+  tween(dur, (k) => {
+    const e = ease(k), p = new THREE.Vector3().lerpVectors(c0, to, e); p.y += Math.sin(Math.PI * e) * rise;
+    const s = s0 + (scaleTo - s0) * e; obj.scale.setScalar(s); obj.position.copy(p).addScaledVector(off, s / s0); obj.rotation.y = r0 + spin * Math.sin(Math.PI * e);
+  }, () => { scene.remove(obj); done?.(); });
+}
+function puff(at) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0xfff6e6, transparent: true, opacity: 0.9 }), bits = [];
+  for (let k = 0; k < 14; k++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.07 + Math.random() * 0.06), mat); b.position.copy(at); b.userData.v = V((Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3); scene.add(b); bits.push(b); }
+  tween(900, (k) => { for (const b of bits) { b.position.addScaledVector(b.userData.v, 0.016); b.userData.v.y -= 0.09; } mat.opacity = 0.9 * (1 - k); }, () => bits.forEach((b) => scene.remove(b)));
+}
+
+/* ---------------- camera ---------------- */
+const VIEWS = {
+  both: () => (narrow() ? { pos: V(3, 32, 47), target: V(3, 0.4, -0.6) } : { pos: V(3, 11.5, 28.5), target: V(3.2, 1.4, -0.2) }),
+  harbour: () => ({ pos: V(-0.8, 13, 30), target: V(-3.6, 1.4, 3.6) }),
+  slipway: () => ({ pos: V(13.5, 13, 21), target: V(10.4, 2.4, -2.6) }),
+};
+const home = () => (narrow() ? VIEWS.harbour() : VIEWS.both());
+function flyCam(v, dur = 1800) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  tween(dur, (k) => { const e = ease(k); camera.position.lerpVectors(p0, v.pos, e); controls.target.lerpVectors(t0, v.target, e); });
+}
+
+/* ---------------- the sentence strip ---------------- */
+const sentenceEl = document.getElementById("sentence"), noteEl = document.getElementById("note"), waitingEl = document.getElementById("waiting"), newsEl = document.getElementById("news");
+const panelEl = document.getElementById("panel");
+let sel = null, hover = null, fresh = null;
+const pad = (i) => String(i + 1).padStart(2, "0");
+function renderSentence() {
+  sentenceEl.replaceChildren();
+  ORIG.forEach((_, i) => {
+    const label = `${pad(i)} · ${PARTS[i]}`;
+    if (i === sel) {
+      const box = document.createElement("label"); box.className = "edit"; box.htmlFor = "plank";
+      const n = document.createElement("span"); n.className = "n"; n.textContent = label; box.append(n);
+      const input = document.createElement("input"); input.id = "plank"; input.autocomplete = "off"; input.spellcheck = false; input.maxLength = 24; input.placeholder = now(i);
+      input.setAttribute("aria-label", `New word for place ${pad(i)}, the ${PARTS[i].toLowerCase()}, now “${now(i)}”`);
+      input.addEventListener("input", () => renderNote(input.value));
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); replace(i, input.value.trim()); } if (e.key === "Escape") { e.preventDefault(); choose(null); } });
+      box.append(input); sentenceEl.append(box); input.focus();
+    } else {
+      const b = document.createElement("button"); b.type = "button"; b.className = "w" + (i === fresh ? " fresh" : "") + (i === hover ? " hover" : "");
+      const n = document.createElement("span"); n.className = "n"; n.textContent = label;
+      const t = document.createElement("span"); t.className = "t"; t.textContent = now(i); b.append(n, t);
+      b.setAttribute("aria-label", `Place ${pad(i)}, the ${PARTS[i].toLowerCase()}: ${now(i)}`);
+      b.addEventListener("click", () => choose(i));
+      b.addEventListener("pointerenter", () => setHover(i)); b.addEventListener("pointerleave", () => setHover(null));
+      b.addEventListener("focus", () => setHover(i)); b.addEventListener("blur", () => setHover(null));
+      sentenceEl.append(b);
+    }
+    if (i === 9) { const s = document.createElement("span"); s.className = "stop"; s.textContent = "."; sentenceEl.append(s); }
+  });
+  renderNote("");
+  waitingEl.replaceChildren();
+  const waits = ORIG.map((_, i) => [i, waitWord(i)]).filter(([, w]) => w !== null);
+  waitingEl.hidden = !waits.length;
+  if (waits.length) {
+    waitingEl.append("Old planks waiting for the next ship: ");
+    waits.forEach(([i, w], k) => { const em = document.createElement("em"); em.textContent = w; waitingEl.append(em, ` (${pad(i)} · ${PARTS[i].toLowerCase()})${k < waits.length - 1 ? ", " : ""}`); });
+  }
+  renderRules();
+}
+function renderNote(draft) {
+  noteEl.replaceChildren();
+  if (sel === null) { noteEl.textContent = "Every word is a plank. The ship reads how a word is spelled, never what it means."; return; }
+  const i = sel, r = RULES[i], before = r.what(feat(now(i))), ok = /^[A-Za-z]{1,24}$/.test(draft);
+  const add = (tag, text) => { const e = document.createElement(tag); e.textContent = text; noteEl.append(e); };
+  add("span", `${pad(i)} · ${PARTS[i]} reads ${r.reads.replace(/ \(.*\)/, "")} · `); add("del", now(i)); add("span", " · ");
+  if (!draft) add("span", `${before}. Type a new word · Enter to fit it · Esc to cancel`);
+  else if (!ok) add("span", "one word, letters only");
+  else { const f = feat(draft), after = r.what(f); add("span", `${before} → `); add("strong", after === before ? `${after}, unchanged` : after); add("span", ` · ${r.why(f)}`); }
+}
+function choose(i) {
+  sel = i; renderSentence(); setHover(i);
+  if (i !== null && narrow()) flyCam(VIEWS.harbour(), 900);
+}
+
+/* ---------------- which part is which: glow and a tag on both ships ---------------- */
+const partLive = document.getElementById("part-live"), partKept = document.getElementById("part-kept");
+function glow(g, on) {
+  g?.traverse((o) => {
+    if (o.isMesh) o.material.emissive?.setHex(on ? 0x6b3a08 : 0x000000);
+    if (o.isLineSegments) { o.material.color.setHex(on ? 0xf6c978 : 0xe9f3fb); o.material.opacity = on ? 0.95 : 0.42; }
+  });
+}
+function setHover(i) {
+  hover = i ?? sel;
+  liveParts.forEach((g, k) => glow(g, k === hover)); keptParts.forEach((g, k) => glow(g, k === hover));
+  document.querySelectorAll(".w").forEach((b, k) => b.classList.toggle("hover", false));
+  partLive.hidden = partKept.hidden = hover === null;
+  if (hover !== null) { partLive.textContent = `${pad(hover)} · ${PARTS[hover]}`; partKept.textContent = `${pad(hover)} · kept`; }
+}
+function placeTag(el, obj) {
+  if (el.hidden || !obj) return;
+  const box = new THREE.Box3().setFromObject(obj), top = V((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2).project(camera);
+  el.style.left = `${Math.min(innerWidth - 60, Math.max(60, (top.x * 0.5 + 0.5) * innerWidth))}px`; el.style.top = `${Math.max(70, (-top.y * 0.5 + 0.5) * innerHeight)}px`;
+}
+
+/* ---------------- a replacement: the old plank goes to the slipway ---------------- */
+function replace(i, word) {
+  if (!/^[A-Za-z]{1,24}$/.test(word) || word.toLowerCase() === now(i).toLowerCase()) { renderNote(word); return; }
+  const k = shown(), v = hist[i].length, oldPart = liveParts[i], oldWord = now(i);
+  hist[i].push(word); fresh = i; sel = null;
+  const toKept = v === k;
+  liveParts[i] = null; setLive(i, true); puff(centerOf(liveParts[i])); setHover(null);
+  glow(oldPart, false);
+  if (narrow()) flyCam(VIEWS.slipway(), 1200);
+  if (toKept) {
+    const to = centerOf(keptParts[i]);
+    fly(oldPart, to, SCALE, 1700, () => { setKept(i, true); puff(to); landed(k); });
+  } else {
+    const n = Math.max(0, ORIG.slice(0, i + 1).filter((_, q) => waitWord(q, k) !== null).length - 1), size = new THREE.Box3().setFromObject(oldPart).getSize(new THREE.Vector3());
+    fly(oldPart, rackSlot(n), 0.8 * SCALE / Math.max(size.x, size.y, size.z), 1500, () => { setRack(); landed(k); });
+  }
+  newsEl.textContent = toKept ? `“${oldWord}” was carried to the slipway and fitted into the ship of old planks.` : `“${oldWord}” waits on the slipway for the next ship.`;
+  renderSentence();
+}
+function landed(kBefore) {
+  if (shown() > kBefore) completeShip(kBefore);
+  else if (narrow()) setTimeout(() => flyCam(VIEWS.harbour(), 1200), reduced ? 0 : 900);
+}
+const ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+function completeShip(k) {
+  const m = document.getElementById("moment");
+  m.textContent = `Every plank of the ${ORD[k - 1] ?? "old"} ship has been replaced, and every one of them was kept.`;
+  m.classList.add("on");
+  setTimeout(() => {
+    m.classList.remove("on");
+    for (const mm of [...waitingRack.children]) fly(mm, centerOf(keptParts[mm.userData.pos]), SCALE, 1400);
+    setTimeout(() => { for (let i = 0; i < 10; i++) setKept(i, true); setRack(); renderSentence(); if (narrow()) flyCam(VIEWS.harbour(), 1200); }, reduced ? 0 : 1400);
+  }, reduced ? 2500 : 3800);
+}
+
+/* ---------------- the shipwright's notes ---------------- */
+const notesEl = document.getElementById("notes"), rulesEl = document.getElementById("rules");
+function renderRules() {
+  rulesEl.replaceChildren();
+  RULES.forEach((r, i) => {
+    const li = document.createElement("li"), f = feat(now(i));
+    const num = document.createElement("span"); num.className = "num"; num.textContent = pad(i);
+    const what = document.createElement("span"); what.className = "what"; what.textContent = `${PARTS[i]} `;
+    const reads = document.createElement("span"); reads.textContent = `reads ${r.reads}: ${r.makes}.`; what.append(reads);
+    const eg = document.createElement("span"); eg.className = "eg"; eg.append("Now: ");
+    const em = document.createElement("em"); em.textContent = now(i); eg.append(em, ` → ${r.what(f)} (${r.why(f)})`);
+    li.append(num, what, eg);
+    if (i === 4 || i === 6) {
+      const lg = document.createElement("span"); lg.className = "legend";
+      for (const [v, c] of Object.entries(VOWEL)) { const sw = document.createElement("span"); sw.className = "sw"; const dot = document.createElement("i"); dot.style.background = hex(c); sw.append(dot, v); lg.append(sw); }
+      if (i === 6) { const sw = document.createElement("span"); sw.className = "sw"; const dot = document.createElement("i"); dot.style.background = hex(C.linen); sw.append(dot, "other letters"); lg.append(sw); }
+      li.append(document.createElement("span"), lg);
+    }
+    if (i === 1) {
+      const p = document.createElement("span"); p.className = "paint";
+      for (let k = 0; k < 13; k++) { const s = document.createElement("span"); s.style.background = hex(PAINT[k]); s.textContent = String.fromCharCode(65 + k) + String.fromCharCode(78 + k); p.append(s); }
+      li.append(document.createElement("span"), p);
+    }
+    rulesEl.append(li);
+  });
+}
+document.getElementById("open-notes").addEventListener("click", () => { notesEl.hidden = false; document.getElementById("close-notes").focus(); });
+document.getElementById("close-notes").addEventListener("click", () => { notesEl.hidden = true; document.getElementById("open-notes").focus(); });
+
+/* ---------------- pick a part on the ship ---------------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let downAt = null;
+function partAt(e) {
+  ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects([live, kept], true).find((h) => h.object.isMesh);
+  let o = hit?.object; while (o && o.userData.pos === undefined) o = o.parent;
+  return o ? o.userData.pos : null;
+}
+canvas.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener("pointerup", (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6 || !storyEl.hidden) return;
+  const p = partAt(e); if (p !== null) choose(p);
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse" || e.buttons || !storyEl.hidden || sel !== null) return;
+  const p = partAt(e); if (p !== hover) setHover(p); canvas.style.cursor = p === null ? "" : "pointer";
+});
+
+/* ---------------- the story ---------------- */
+const storyEl = document.getElementById("story"), stepEl = document.getElementById("story-step"), textEl = document.getElementById("story-text"), nextBtn = document.getElementById("story-next");
+const BEATS = [
+  { text: "Theseus sailed home to Athens. The people kept his ship in the harbour, to remember him.", cam: () => ({ pos: V(-2, 15, 40), target: V(-2, 2, -6) }), enter: () => { kept.visible = false; waitingRack.visible = false; } },
+  { text: "When a plank rotted, they fitted a new one. Then another, and another, until not one original plank was left.", cam: () => ({ pos: V(1, 5.5, 15), target: V(-4.2, 1.8, 4.2) }), enter: () => pulseAll() },
+  { text: "But someone kept every old plank, and built them back into a ship.", cam: () => ({ pos: V(17, 7.5, 9.5), target: V(10.4, 2.6, -3.1) }), enter: () => assembleStory() },
+  { text: "Now two ships stand in the harbour. Which one is the ship of Theseus?", cam: () => VIEWS.both(), enter: () => {} },
+  { text: "Here, each plank is a word. Replace one, and watch where the old plank goes.", cam: () => home(), enter: () => { for (let i = 0; i < 10; i++) setKept(i); waitingRack.visible = true; } },
+];
+let beat = 0;
+function pulseAll() {
+  liveParts.forEach((g, i) => setTimeout(() => {
+    if (!g) return; glow(g, true);
+    tween(420, (k) => g.scale.setScalar(1 + 0.12 * Math.sin(Math.PI * k)), () => { g.scale.setScalar(1); glow(g, false); });
+    puff(centerOf(g));
+  }, reduced ? 0 : 300 + i * 260));
+}
+function assembleStory() {
+  kept.visible = true;
+  for (let i = 0; i < 10; i++) { if (keptParts[i]) kept.remove(keptParts[i]); const g = weather(buildKept(i, ORIG[i])); g.userData.pos = i; kept.add(g); keptParts[i] = g; g.scale.setScalar(0.001); setTimeout(() => popIn(g), reduced ? 0 : 300 + i * 220); }
+}
+function showBeat(n) {
+  beat = n; const b = BEATS[n]; stepEl.textContent = ["I", "II", "III", "IV", "V"][n]; textEl.textContent = b.text;
+  nextBtn.textContent = n === BEATS.length - 1 ? "Replace a plank" : "Next";
+  flyCam(b.cam(), 2200); b.enter();
+}
+function startStory() {
+  sel = null; renderSentence(); setHover(null); notesEl.hidden = true;
+  storyEl.hidden = false; panelEl.hidden = true; controls.enabled = false; tags.forEach((t) => (t.el.style.opacity = 0));
+  resize(); showBeat(0); nextBtn.focus();
+}
+function endStory() {
+  storyEl.hidden = true; panelEl.hidden = false; controls.enabled = true; kept.visible = true; waitingRack.visible = true;
+  for (let i = 0; i < 10; i++) { setKept(i); keptParts[i].scale.setScalar(1); }
+  resize(); flyCam(home(), 1600);
+  try { localStorage.setItem("theseus-story-seen", "1"); } catch {}
+}
+nextBtn.addEventListener("click", () => (beat < BEATS.length - 1 ? showBeat(beat + 1) : endStory()));
+document.getElementById("story-skip").addEventListener("click", endStory);
+document.getElementById("replay").addEventListener("click", startStory);
+document.getElementById("reset").addEventListener("click", () => { resetState(); fresh = null; sel = null; rebuildAll(); renderSentence(); setHover(null); });
+addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!storyEl.hidden) endStory(); else if (!notesEl.hidden) document.getElementById("close-notes").click();
+});
+
+/* ---------------- labels over the ships ---------------- */
+const tags = [{ el: document.getElementById("tag-live"), obj: live, at: V(0, 5.6, 0) }, { el: document.getElementById("tag-kept"), obj: kept, at: V(0, 5.4, 0) }];
+function placeTags() {
+  for (const t of tags) {
+    const p = t.obj.localToWorld(t.at.clone()).project(camera);
+    t.el.style.left = `${Math.min(innerWidth - 90, Math.max(90, (p.x * 0.5 + 0.5) * innerWidth))}px`; t.el.style.top = `${Math.max(110, (-p.y * 0.5 + 0.5) * innerHeight)}px`;
+    if (storyEl.hidden) t.el.style.opacity = p.z < 1 && hover === null ? 1 : 0;
+  }
+  placeTag(partLive, liveParts[hover]); placeTag(partKept, keptParts[hover]);
+}
+
+/* ---------------- loop ---------------- */
+function resize() {
+  renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.fov = narrow() ? 46 : 36;
+  // the sentence strip covers the foot of the screen: lift the picture's centre above it
+  const lift = panelEl.hidden ? 0 : Math.min(panelEl.getBoundingClientRect().height * 0.45, innerHeight * 0.16);
+  camera.setViewOffset(innerWidth, innerHeight, 0, lift, innerWidth, innerHeight); camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+const clock = new THREE.Clock();
+function frame() {
+  const t = clock.getElapsedTime(), nowMs = performance.now();
+  for (let k = tweens.length - 1; k >= 0; k--) { const tw = tweens[k], p = Math.min(1, (nowMs - tw.t0) / tw.dur); tw.update(p); if (p >= 1) { tweens.splice(k, 1); tw.done?.(); } }
+  if (!reduced) {
+    const a = waterGeo.attributes.position.array;
+    for (let k = 0; k < a.length; k += 3) a[k + 1] = waveH(wBase[k], wBase[k + 2], t);
+    waterGeo.attributes.position.needsUpdate = true; waterGeo.computeVertexNormals();
+    live.position.y = waveH(live.position.x, live.position.z, t) * 0.9 - 0.02;
+    live.rotation.x = 0.025 * Math.sin(t * 1.1); live.rotation.z = 0.018 * Math.sin(t * 0.8 + 1);
+    for (const o of liveParts[7]?.userData.oars ?? []) o.rotation.y = 0.28 * Math.sin(t * 1.4 + o.userData.phase * 0.06) * Math.sign(o.position.z);
+    for (const part of [liveParts[9], keptParts[9]]) {
+      const fl = part?.userData.flag; if (!fl || part.userData.ghost) continue;
+      const p = fl.geometry.attributes.position, base = fl.userData.wave, amp = part === keptParts[9] ? 0.35 : 1;
+      for (let k = 0; k < p.count; k++) { const x = base[3 * k]; p.setZ(k, amp * 0.1 * Math.sin(x * 4 - t * 5) * -x); }
+      p.needsUpdate = true;
+    }
+  }
+  controls.update(); placeTags(); renderer.render(scene, camera); requestAnimationFrame(frame);
+}
+
+rebuildAll(); renderSentence(); resize();
+{ const v = home(); camera.position.copy(v.pos); controls.target.copy(v.target); }
+let seen = false; try { seen = localStorage.getItem("theseus-story-seen") === "1"; } catch {}
+if (!seen) startStory();
+frame();
+</script>
