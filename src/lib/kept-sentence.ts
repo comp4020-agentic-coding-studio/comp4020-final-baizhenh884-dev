@@ -57,8 +57,27 @@ export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]
 }
 
 // The waiting row on a live page: `show` redraws it as the kept ship says; `land` brings a word for the next house
-// in once its part, flying toward the row, has got there (`inMs`; 0 when nothing flies).
-export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void } {
-  renderWaiting(row, next);
-  return { show: (n) => renderWaiting(row, n), land: (n) => renderWaiting(row, n) };
+// in once its part, flying toward the row, has got there (`inMs`; 0 when nothing flies). Until then that place is
+// held back, through any redraw; a place no longer waiting (the ship completed) is let go at once.
+export type WaitingRow = { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void };
+
+export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): WaitingRow {
+  const win = row.ownerDocument.defaultView!;
+  const flying = new Map<number, number>(); // place → its landing timer
+  let truth = [...next];
+  const draw = () => renderWaiting(row, truth.map((w, i) => (flying.has(i) ? null : w)));
+  const show = (n: readonly (string | null)[]) => {
+    truth = [...n];
+    for (const [i, t] of flying) if (truth[i] === null) { win.clearTimeout(t); flying.delete(i); }
+    draw();
+  };
+  draw();
+  return {
+    show,
+    land(n, inMs) {
+      const arriving = n.flatMap((w, i) => (w !== null && truth[i] === null && !flying.has(i) ? [i] : []));
+      if (inMs > 0) for (const i of arriving) flying.set(i, win.setTimeout(() => { flying.delete(i); draw(); }, inMs));
+      show(n);
+    },
+  };
 }
