@@ -186,6 +186,21 @@ describe("the ship, live", () => {
     l.dispose();
   });
 
+  // the outgoing part is released whole once its exchange ends: geometries and materials, so a busy room leaks nothing
+  it("releases a replaced part's geometries and materials once its exchange ends", () => {
+    const l = live();
+    const old = l.groups[7], geos = new Set<THREE.BufferGeometry>(), mats = new Set<THREE.Material>();
+    old.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { geos.add(m.geometry); mats.add(m.material as THREE.Material); } });
+    let g = 0, m = 0;
+    for (const x of geos) x.addEventListener("dispose", () => g++);
+    for (const x of mats) x.addEventListener("dispose", () => m++);
+    l.change(7, at(7, "whether"), "remote", 0);
+    l.step(1e9, false);
+    expect(g, "a replaced part's geometry wasn't released").toBe(geos.size);
+    expect(m, "a replaced part's material wasn't released").toBe(mats.size);
+    l.dispose();
+  });
+
   it("settles a run of changes, two at one position, on the fresh ship", () => {
     const l = live(), f = live();
     let words = [...BASE];
