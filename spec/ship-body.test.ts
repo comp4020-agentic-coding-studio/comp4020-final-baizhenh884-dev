@@ -94,7 +94,7 @@ describe("the ship's body", () => {
       expect(marked(g(7), "oar"), `${w}: oars`).toHaveLength(2 * (partOf(7, w).value as number));
       s.dispose();
     }
-  });
+  }, 30_000); // 129 whole ships
 
   it("raises the mast, curls the prow and lowers the steering oar step by step with their counts", () => {
     const height = (w: string) => { const s = buildShip(Array(10).fill(w)), b = new THREE.Box3().setFromObject(s.groups[5]); s.dispose(); return b.max.y; };
@@ -173,7 +173,7 @@ describe("the ship, live", () => {
       if (m.length) bad.push(`${PARTS[p]} ← ${w}: ${m.join(", ")}`);
     }
     expect(bad.slice(0, 5), `${bad.length} wrong`).toEqual([]);
-  });
+  }, 30_000); // 490 live changes: about 2.8 s here, past Vitest's 5 s default on the CI runner
 
   it("exchanges only the changed part: every other part keeps its standing group", () => {
     const l = live();
