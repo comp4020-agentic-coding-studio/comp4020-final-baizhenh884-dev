@@ -6,7 +6,7 @@
 // `groups` is ever released.
 
 import * as THREE from "three";
-import { buildBody, type BuiltBody } from "./build";
+import { buildBody } from "./build";
 import { arrivalAt, duration, frameAt, type Arrival as ArrivalFrame, type Frame, type Kind } from "./motion";
 import { dress, type Look, undress } from "./theme";
 
@@ -38,13 +38,18 @@ const signature = (g: THREE.Group) => {
 export class LiveBody {
   readonly root = new THREE.Group();
   private current: THREE.Group[] = [];
-  private plan: BuiltBody["plan"] | null = null;
   readonly exchanges: Exchange[] = [];
   readonly follows: Follow[] = [];
   readonly arrivals: Arrival[] = [];
 
-  // stub (spec/ship-body.test.ts first): the builder and the dressing are accepted, not used yet
-  constructor(private look: Look, private drawing: (g: THREE.Group) => THREE.Group, _build?: (words: readonly string[]) => { root: THREE.Group; groups: THREE.Group[]; dispose(): void }, _dress?: (g: THREE.Group, position: number, look: Look) => void) {}
+  // `build` makes a whole body of ten groups owned by position (the house's, or the ship's: src/lib/ship/build.ts);
+  // `dressing` gives each adopted group its look (the house's theme by default; the ship arrives dressed)
+  constructor(
+    private look: Look,
+    private drawing: (g: THREE.Group) => THREE.Group,
+    private build: (words: readonly string[]) => { groups: THREE.Group[] } = buildBody,
+    private dressing: (g: THREE.Group, position: number, look: Look) => void = dress,
+  ) {}
 
   // the territories standing now, by position (read-only to callers)
   get groups(): readonly THREE.Group[] { return this.current; }
@@ -54,9 +59,8 @@ export class LiveBody {
   show(words: readonly string[]): void {
     this.finishAll();
     for (const g of this.current) this.release(g, true, true);
-    const next = buildBody(words);
+    const next = this.build(words);
     this.current = next.groups.map((g, i) => this.adopt(g, i));
-    this.plan = next.plan;
   }
 
   // One position's word changed. The body is rebuilt from the whole new
@@ -68,7 +72,7 @@ export class LiveBody {
   change(position: number, words: readonly string[], kind: Kind, now: number, across = new THREE.Vector3()): void {
     if (!this.current.length) return this.show(words);
     this.finishAll();
-    const next = buildBody(words);
+    const next = this.build(words);
     next.groups.forEach((incoming, i) => {
       const standing = this.current[i];
       if (i !== position && signature(standing) === signature(incoming)) {
@@ -85,7 +89,6 @@ export class LiveBody {
         this.exchanges.push({ start: now, kind, position, outgoing: standing, incoming: this.current[i], trace, away, across: kind === "cross" ? across.clone() : new THREE.Vector3(), inY: kind === "own" ? 1.1 : 0.8 });
       } else this.follows.push({ start: now, outgoing: standing, incoming: this.current[i] });
     });
-    this.plan = next.plan;
   }
 
   // A crossing part arrives in this (kept) body: the territory standing at
@@ -130,7 +133,7 @@ export class LiveBody {
   // ---------------------------------------------------------------------------
 
   private adopt(g: THREE.Group, i: number): THREE.Group {
-    dress(g, i, this.look);
+    this.dressing(g, i, this.look);
     g.userData.position = i;
     this.root.add(g);
     return g;
