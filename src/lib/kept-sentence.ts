@@ -55,3 +55,10 @@ export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]
   ws.replaceChildren(...nodes);
   row.hidden = nodes.length === 0;
 }
+
+// The waiting row on a live page: `show` redraws it as the kept ship says; `land` brings a word for the next house
+// in once its part, flying toward the row, has got there (`inMs`; 0 when nothing flies).
+export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void } {
+  renderWaiting(row, next);
+  return { show: (n) => renderWaiting(row, n), land: (n) => renderWaiting(row, n) };
+}

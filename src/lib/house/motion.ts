@@ -84,6 +84,11 @@ export function frameAt(kind: Kind, ms: number, reduced = false): Frame {
   };
 }
 
+// when a crossing part has gone its whole way out of the standing house (ms on its clock); 0 with reduced motion
+export function leavesAt(_reduced: boolean): number {
+  return 0;
+}
+
 // when the crossing part reaches the kept house, on the crossing's own clock: after it has left the standing one
 const ARRIVE = { start: 1500, travel: 1100 };
 
