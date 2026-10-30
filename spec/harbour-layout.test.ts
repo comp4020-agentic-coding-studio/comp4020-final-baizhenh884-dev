@@ -15,7 +15,9 @@ import { EXTREMES, SENTENCES } from "./ship-sentences";
 // sentence on a parchment strip that shares the first screen with it (over or
 // under the scene on a desktop, as the prototype's panel does; with it on a
 // phone once the band is folded), never covering the live ship's hull at
-// rest; the kept sentence on its own strip, which may fall below.
+// rest; the kept sentence on its own strip and the notes (the rule, your
+// trace, Earlier form, the plate note) in their own block, either of which
+// may fall below.
 //
 // Every check stages its whole state with stageHarbour (spec/chrome.ts): the
 // words, the kept ship, the waiting row, the band, the trace and the ways
@@ -464,13 +466,13 @@ describe("the harbour on GET /", () => {
           const top = ([n, a, b]) => { const r = document.createRange(); r.setStart(n, a); r.setEnd(n, b); return r.getClientRects()[0].top; };
           return Math.abs(top(words.at(-1)) - top(words.at(-2))) > 2;
         };
-        const captions = [['the plate note', '.sentence-strip .plate-note'], ['the kept plate note', '.kept-strip .plate-note'], ['the instructions', '#how'],
+        const captions = [['the plate note', '.notes .plate-note'], ['the kept plate note', '.kept-strip .plate-note'], ['the instructions', '#how'],
           ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept note', '.kept-strip .kept-note'], ['the question', '.foot .question']]
           .map(([what, sel]) => ({ what, lone: document.querySelector(sel) ? lone(document.querySelector(sel)) : 'missing' }));
         const nav = document.querySelector('.foot .about');
         const links = [...nav.querySelectorAll('a')].map((a) => ({ text: a.textContent, lines: a.getClientRects().length, top: a.getBoundingClientRect().top }));
         const after = (sel) => { const el = document.querySelector(sel); return !el || !!(el.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING); };
-        return { captions, links, last: after('#how') && after('.sentence-strip .earlier') && after('.kept-strip .waiting') };
+        return { captions, links, last: after('#how') && after('.notes .earlier') && after('.kept-strip .waiting') };
       })()`, [size[0], size[1]])) as any;
       for (const c of m.captions) expect(c.lone, `${c.what} ends on a lone word`).toBe(false);
       expect(m.links.map((l: any) => l.text), "the foot's links").toEqual(["About Theseus", "How the planks are made"]);

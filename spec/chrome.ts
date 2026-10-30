@@ -257,15 +257,15 @@ export function stageHarbour(doc: Document, state: HarbourState): void {
     if (state.trace.items?.length) { const ul = doc.createElement("ul"); ul.className = "trace-standing"; for (const t of state.trace.items) { const li = doc.createElement("li"); li.textContent = t; ul.append(li); } sec.append(ul); }
     doc.querySelector("#how")!.after(sec);
   }
-  // the ways back: Earlier form under the sentence (rel=prev, the HTTP contract), Earlier ship under the kept sentence
-  const form = doc.querySelector('.sentence-strip a[rel="prev"]')?.closest("p");
+  // the ways back: Earlier form in the notes (rel=prev, the HTTP contract), Earlier ship under the kept sentence
+  const form = doc.querySelector('.notes a[rel="prev"]')?.closest("p");
   if (state.earlierForm == null) form?.remove();
   else if (form) form.querySelector("a")!.setAttribute("href", `?at=${state.earlierForm}`);
   else {
     const p = doc.createElement("p"); p.className = "earlier caps";
     const a = doc.createElement("a"); a.setAttribute("rel", "prev"); a.setAttribute("href", `?at=${state.earlierForm}`); a.textContent = "Earlier form";
     p.append(a);
-    (doc.querySelector('.sentence-strip section[aria-labelledby="trace-heading"]') ?? doc.querySelector("#how"))!.after(p);
+    (doc.querySelector('.notes section[aria-labelledby="trace-heading"]') ?? doc.querySelector("#how"))!.after(p);
   }
   const ship = doc.querySelector(".kept-strip a.earlier-ship")?.closest("p");
   if (state.earlierShip == null) ship?.remove();
