@@ -193,9 +193,24 @@ describe("the carry, step by step", () => {
       const planks = PALLET_SLOTS.map((p) => box([-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => p.clone().add(new THREE.Vector3(x * half, y * half * 0.6, z * half * 0.6)))))));
       // a toy scale, seen (the maker, 31 October: 1.5–2× the first figures, which stood 1.75 tall). At that size the
       // waiting crowd overlaps, the ones behind partly hidden (the maker's choice, 31 October: a full room reads as a
-      // dense crowd; only the quay's near end is clear of the hull, the rack and the frame)
+      // dense crowd; only the quay's near end is clear of the hull, the rack and the frame), except the first three
       expect(FIGURE_HEIGHT, "the shipwrights aren't 1.5–2× the first figures").toBeGreaterThanOrEqual(1.75 * 1.5);
       expect(FIGURE_HEIGHT).toBeLessThanOrEqual(1.75 * 2);
+      // the first three (the common case: a marker's two windows, a classmate) each keep a head in full view, apart
+      // from every other figure: no other figure's body or head covers any part of it. The rest fill in behind.
+      const H = FIGURE_HEIGHT;
+      const head = (p: THREE.Vector3) => box([p.clone().add(new THREE.Vector3(-H * 0.07, H * 0.82, 0)), p.clone().add(new THREE.Vector3(H * 0.07, H, 0))]);
+      const whole = (p: THREE.Vector3) => box([-1, 1].flatMap((x) => [0, H].map((y) => p.clone().add(new THREE.Vector3(x * H * 0.17, y, 0)))));
+      for (let i = 0; i < Math.min(3, spots.length); i++) {
+        const hd = head(spots[i]);
+        for (let j = 0; j < spots.length; j++) {
+          if (j === i) continue;
+          // only a figure nearer the camera can cover it; among the first three, heads stay apart either way
+          const o = j < 3 ? head(spots[j]) : null, b = whole(spots[j]);
+          if (o) expect(hd.x0 < o.x1 && hd.x1 > o.x0 && hd.y0 < o.y1 && hd.y1 > o.y0, `shipwrights ${i + 1} and ${j + 1}'s heads touch`).toBe(false);
+          if (spots[j].z > spots[i].z) expect(hd.x0 < b.x1 && hd.x1 > b.x0 && hd.y0 < b.y1 && hd.y1 > b.y0, `shipwright ${j + 1} covers shipwright ${i + 1}'s head`).toBe(false);
+        }
+      }
       for (const [i, s] of spots.entries()) {
         const f = box([-1, 1].flatMap((x) => [0, FIGURE_HEIGHT].map((y) => s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0)))));
         for (const [k, p] of planks.entries()) expect(f.x0 < p.x1 && f.x1 > p.x0 && f.y0 < p.y1 && f.y1 > p.y0, `shipwright ${i + 1} stands with the rack's plank ${k + 1}`).toBe(false);
