@@ -81,6 +81,9 @@ export function partHome(position: number, pose: Pose): THREE.Vector3 {
   return new THREE.Vector3(...PART_AT[position]).applyMatrix4(m);
 }
 
+// a waiting plank's size on the pallet: its largest dimension, in world units
+export const PALLET_PLANK = 0.8;
+
 // The pallet's slots, two rows of five, in place order: a waiting plank lies in the slot of its turn among the
 // planks waiting now.
 export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 1.7 + (k % 5) * 0.85, PALLET[1] + 0.5, PALLET[2] - 0.6 + Math.floor(k / 5) * 1.2));
@@ -93,4 +96,14 @@ export function palletSlot(position: number, next: readonly (string | null)[]): 
 // if it belongs to the next ship, to its slot on the pallet.
 export function flightTarget(moment: Moment, kept: KeptShip): THREE.Vector3 {
   return moment.kind === "wait" ? palletSlot(moment.position, kept.next) : partHome(moment.position, KEPT_POSE);
+}
+
+// A plank in flight, `k` (0..1) of the way through its flight: where its centre is and how it's scaled (1: the
+// size it stood on the live ship). It rises in an arc of `rise` as it crosses.
+export function flightAt(from: THREE.Vector3, to: THREE.Vector3, k: number, s1: number, toPallet: boolean): { position: THREE.Vector3; scale: number } {
+  const e = 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
+  const position = new THREE.Vector3().lerpVectors(from, to, e);
+  position.y += Math.sin(Math.PI * e) * 5.5;
+  const s0 = LIVE_POSE.scale;
+  return { position, scale: s0 + (s1 * s0 - s0) * (toPallet ? e : 0) };
 }

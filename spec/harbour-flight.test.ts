@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
-import { flightTarget, KEPT_POSE, LIVE_POSE, PALLET_SLOTS, partHome } from "../src/lib/ship/stage";
-import { leavesAt } from "../src/lib/ship/motion";
+import { buildShip } from "../src/lib/ship/build";
+import { flightAt, flightTarget, KEPT_POSE, LIVE_POSE, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed } from "../src/lib/ship/stage";
+import { arrivalAt, leavesAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
 // The plank's flight (docs/decisions/0005-the-ship.md): once the server has
@@ -66,6 +67,60 @@ describe("where a plank flies", () => {
   it("brings no flight from a snapshot: no moment, no target", () => {
     expect(classifyMoment(ship(), ship(), null as unknown as number)).toBeNull();
   });
+});
+
+// The flight as a visitor sees it, through the page's own camera at 1440×900 and 390×844 (the harbour's box
+// at each, as harbour-layout measures it): halfway through its flight, the plank is out over the water
+// between the two ships, no bigger than it stood on the live ship, and the gap it flies to is still an
+// outline. (Seen on 30 October: the copy flew at 1.69 times its size and was over the slipway by 300 ms.)
+const HARBOURS = [["1440×900", "desktop", 1440 / 590], ["390×844", "phone", 390 / 242]] as const;
+function onScreen(cam: THREE.PerspectiveCamera, p: THREE.Vector3) { const v = p.clone().project(cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; }
+function screenSize(cam: THREE.PerspectiveCamera, centre: THREE.Vector3, size: number, heightPx: number) {
+  const a = centre.clone().project(cam), b = centre.clone().add(new THREE.Vector3(0, size, 0)).project(cam);
+  return (Math.abs(b.y - a.y) / 2) * heightPx;
+}
+
+describe("the flight, at its midpoint", () => {
+  for (const [name, layout, aspect] of HARBOURS) {
+    for (const [what, position] of [["the hull", 1], ["the stern", 3]] as const) {
+      for (const dest of ["slipway", "pallet"] as const) {
+        it(`flies ${what} over the water, its own size, to the ${dest}, the gap still an outline (${name})`, () => {
+          const cam = new THREE.PerspectiveCamera();
+          place(cam, layout, aspect);
+          const ship = buildShip(["make", "anchor", "website", "that", "people", "would", "miss", "if", "it", "disappeared"]);
+          posed(ship.root, LIVE_POSE);
+          ship.root.updateMatrixWorld(true);
+          const part = new THREE.Box3().setFromObject(ship.groups[position]), from = part.getCenter(new THREE.Vector3());
+          const partSize = part.getSize(new THREE.Vector3()), largest = Math.max(partSize.x, partSize.y, partSize.z);
+          const to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0];
+          const s1 = dest === "pallet" ? PALLET_PLANK / largest / LIVE_POSE.scale : 1;
+          const mid = flightAt(from, to, 0.5, s1, dest === "pallet");
+          ship.dispose();
+          const a = onScreen(cam, from), b = onScreen(cam, to), m = onScreen(cam, mid.position);
+          // between the two ships: a good part of the way across, neither still on the live ship nor already there
+          const across = (m.x - a.x) / (b.x - a.x);
+          expect(across, `halfway through, the plank is ${(100 * across).toFixed(0)}% of the way across`).toBeGreaterThan(0.25);
+          expect(across).toBeLessThan(0.75);
+          expect(m.y, "halfway through, the plank isn't above the water").toBeLessThan(Math.max(a.y, b.y));
+          // its own size: never bigger than it stood on the live ship
+          expect(mid.scale, `halfway through, the plank is ${mid.scale.toFixed(2)} times its size on the ship`).toBeLessThanOrEqual(1 + 1e-6);
+          // the gap it flies to is still an outline: the kept part hasn't begun to show
+          expect(arrivalAt(leavesAt(false) * 0.5).opacity, "the kept part shows before its plank has arrived").toBe(0);
+        });
+      }
+    }
+  }
+
+  // A waiting plank on the pallet is a plank you can see, not a speck: at least 28px across at either size.
+  for (const [name, layout, aspect] of HARBOURS) {
+    it(`sets a waiting plank on the pallet large enough to see (${name})`, () => {
+      const cam = new THREE.PerspectiveCamera();
+      place(cam, layout, aspect);
+      const heightPx = layout === "desktop" ? 590 : 242;
+      const px = screenSize(cam, PALLET_SLOTS[0], PALLET_PLANK, heightPx);
+      expect(px, `a waiting plank is ${px.toFixed(0)}px tall`).toBeGreaterThanOrEqual(28);
+    });
+  }
 });
 
 // A second browser makes the change: a fresh visitor with its own cookie, from node, once the watched page

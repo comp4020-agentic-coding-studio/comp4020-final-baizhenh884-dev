@@ -14,7 +14,7 @@ import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
 import { arrivalAt, leavesAt, type Kind } from "./motion";
 import { buildHarbour, swell } from "./scene";
-import { flightTarget, home, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, type Layout } from "./stage";
+import { flightAt, flightTarget, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, type Layout } from "./stage";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -293,7 +293,7 @@ export class HarbourView {
       const wrap = new THREE.Group();
       g.position.sub(c);
       wrap.add(g);
-      wrap.scale.setScalar(0.8 / Math.max(size.x, size.y, size.z, 0.01));
+      wrap.scale.setScalar(PALLET_PLANK / Math.max(size.x, size.y, size.z, 0.01));
       wrap.position.copy(palletSlot(i, this.next));
       wrap.userData.position = i;
       wrap.userData.materials = g.userData.materials;
@@ -391,12 +391,10 @@ export class HarbourView {
       if (gaps !== this.stage.gaps.join() || this.stage.body.arrivals.length) this.ghost(now);
     }
     for (const fl of [...this.flights]) {
-      const k = Math.min(1, (now - fl.start) / fl.ms), e = 1 - Math.pow(1 - k, 3);
-      const p = new THREE.Vector3().lerpVectors(fl.from, fl.to, e);
-      p.y += Math.sin(Math.PI * e) * 5.5;
-      fl.group.position.copy(p);
-      fl.group.scale.setScalar(fl.s0 + (fl.s1 * fl.s0 - fl.s0) * (fl.to.y < 1.8 ? e : 0));
-      fl.group.rotation.y = fl.spin * Math.sin(Math.PI * e);
+      const k = Math.min(1, (now - fl.start) / fl.ms), f = flightAt(fl.from, fl.to, k, fl.s1, fl.to.y < 1.8);
+      fl.group.position.copy(f.position);
+      fl.group.scale.setScalar(f.scale);
+      fl.group.rotation.y = fl.spin * Math.sin(Math.PI * k);
       for (const m of (fl.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.emissive?.setHex(RED);
       if (k >= 1) {
         this.flights.splice(this.flights.indexOf(fl), 1);
