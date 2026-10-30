@@ -218,6 +218,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .sentence-strip .sentence .pos[data-row-desktop="2"]::before { top: 1px; }
       /* a label that fits on neither row: its word takes just the room the label needs */
       .sentence-strip .sentence .pos[data-row-desktop="room"] { min-width: calc(var(--tag-ch) * var(--tag-size) * 0.57 + 4px); }
+      /* except the last word: its label may run on past the full stop, where nothing follows, so the full stop stays
+         with the word (spec/sentence-wrap.test.ts) */
+      .sentence-strip .sentence .end > .pos.pos { min-width: 0; }
       /* the notation's slot under the sentence: at rest the invitation and the way to /ship/; a word in hand, the notation */
       .sentence-strip .slot { position: relative; margin-top: 0.35rem; min-height: 1.45em; }
       #part, .sentence-strip .invite-row { margin: 0; color: var(--brown-soft); }
