@@ -412,8 +412,8 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     const box = (await liveIn(new URL("/", baseUrl).href, `(() => { const r = document.querySelector('#harbour').getBoundingClientRect(); return [r.width, r.height]; })()`, [w, h], { steps: [READY] })) as [number, number];
     const cam = new THREE.PerspectiveCamera();
     place(cam, "desktop", box[0] / box[1]);
-    // the crowd's patch on screen: places 2 onwards (the first is this view's own), from their feet to their heads
-    const pts = crewSpots(CREW_MAX).slice(1).flatMap((s) => [0, 1.75].flatMap((y) => [-0.35, 0.35].map((x) => onScreen(cam, s.clone().add(new THREE.Vector3(x, y, 0))))));
+    // the patch the two more views' figures stand in: places 2 and 3 (the first is this view's own), feet to heads
+    const pts = crewSpots(3).slice(1).flatMap((s) => [0, FIGURE_HEIGHT].flatMap((y) => [-1, 1].map((x) => onScreen(cam, s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0))))));
     const area = { x0: Math.min(...pts.map((p) => p.x)), x1: Math.max(...pts.map((p) => p.x)), y0: Math.min(...pts.map((p) => p.y)), y1: Math.max(...pts.map((p) => p.y)) };
     let extra: AbortController[] = [];
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
