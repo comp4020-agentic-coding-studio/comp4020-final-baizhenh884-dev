@@ -59,8 +59,8 @@ describe("what GET / costs a phone", () => {
   // depend on how fast the machine is, not on the page).
   it("paints the sentence at first contentful paint on a phone with no script at all (390×844)", async () => {
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
+      // no timer here: with scripts off the page runs none, and a sleep in this expression never wakes (probed)
       await document.fonts.ready;
-      await new Promise((r) => setTimeout(r, 300));
       const fcp = performance.getEntriesByName('first-contentful-paint')[0];
       const sent = document.querySelector('.sentence-strip .sentence'), r = sent && sent.getBoundingClientRect();
       return { fcp: fcp ? fcp.startTime : null, top: r ? r.top : null, bottom: r ? r.bottom : null, words: sent ? sent.querySelectorAll('label').length : 0, vh: innerHeight };
