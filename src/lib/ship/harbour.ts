@@ -12,9 +12,10 @@ import type { KeptShip, Moment } from "../kept-moment";
 import { buildShip } from "./build";
 import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
-import { arrivalAt, leavesAt, newPartRed, plankColour, type Kind } from "./motion";
+import { arrivalAt, carryAt, carryEnd, landsAt, newPartRed, plankColour, type Kind } from "./motion";
+import { Crew, type Figure } from "./crew";
 import { buildHarbour, swell } from "./scene";
-import { flightAt, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, type Layout } from "./stage";
+import { ARMFUL, carryPath, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -33,9 +34,10 @@ function based(g: THREE.Group): void {
   for (const m of (g.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.userData.base ??= m.color.clone();
 }
 
-// A plank in flight: the old part, taken off the live ship whole, flying in an arc to where it's kept.
-// It lands at `ms`, then sits in place until `hold`, when the kept part it becomes has faded in under it.
-type Flight = { start: number; ms: number; hold: number; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; s1: number; spin: number; landed: boolean; yours: boolean; done(): void };
+// A plank on its way: the old part, taken off the live ship whole, tossed to the quay's edge, caught by a
+// shipwright and carried to where it's kept (motion.ts carryAt, stage.ts tossAt and carryPath). It's set down at
+// `lands` (its waiting word lands then), and released at `end`, when the kept part it becomes has faded in under it.
+type Flight = { start: number; lands: number; end: number; group: THREE.Group; from: THREE.Vector3; caught: THREE.Vector3; to: THREE.Vector3; s1: number; armful: number; spin: number; landed: boolean; yours: boolean; figure: Figure; stood: THREE.Vector3; done(): void };
 
 export type Scene = "now" | "earlier" | "kept";
 
@@ -49,6 +51,7 @@ export class HarbourView {
   private stage: KeptStage | null = null;
   private lone: LiveBody | null = null;
   private pallet = new THREE.Group();
+  private crew = new Crew();
   private flights: Flight[] = [];
   private lit: number | null = null;
   private traced: number | null = null;
@@ -79,7 +82,7 @@ export class HarbourView {
       s.add(this.live.root);
       this.stage = new KeptStage((g) => this.drawing(g), (g) => { weather(g); based(g); });
       posed(this.stage.body.root, KEPT_POSE);
-      s.add(this.stage.body.root, this.pallet);
+      s.add(this.stage.body.root, this.pallet, this.crew.root);
     } else {
       // an earlier form's ship on the water, or an earlier kept ship on its slipway: alone, never live
       this.lone = new LiveBody(scene === "kept" ? "kept" : "earlier", (g) => this.drawing(g), buildShip, (g) => { if (scene === "kept") weather(g); based(g); });
@@ -100,28 +103,40 @@ export class HarbourView {
     this.paint();
   }
 
-  // One position's word changed on the live ship. Its old plank leaves the ship, whole, and flies to where
-  // it's kept (`to`: the kept ship's gap, or a slot on the pallet), then `landed` runs. With reduced motion it
-  // doesn't fly: the parts swap, outlined in red for a moment.
-  change(position: number, words: readonly string[], kind: Kind, to: THREE.Vector3 | null, landed: () => void = () => {}, yours = false): void {
+  // One position's word changed on the live ship. Its old plank leaves the ship, whole, is tossed to the quay's
+  // edge, and a shipwright (yours, for your own change) carries it to where it's kept (`to`: the kept ship's gap,
+  // or a slot on the pallet), then `landed` runs. A carry still under way is finished at once first: its plank set
+  // down, its word landed. With reduced motion nothing is tossed or carried: the parts swap, outlined in red for a
+  // moment.
+  change(position: number, words: readonly string[], kind: Kind, to: THREE.Vector3 | null, landed: () => void = () => {}, yours = false, own = false): void {
     if (!this.live) return;
+    this.finishCarries();
     const old = this.live.groups[position];
-    // a copy of the old plank to fly: the body's own exchange keeps the old group to release when it ends
+    // a copy of the old plank to carry: the body's own exchange keeps the old group to release when it ends
     const plank = old && to && !this.reduced ? this.copy(old) : null;
     this.live.change(position, words, kind, performance.now());
     if (plank) {
       this.harbour.scene.add(plank.group);
       this.host.setAttribute("data-flying", String(position + 1));
-      // it lands as the kept ship begins to set it down (motion.ts), and as its waiting word lands in the row
-      const ms = leavesAt(false);
-      // to the slipway it stays where it landed until the kept part has faded in under it (motion.ts), so
-      // nothing blinks; to the pallet it hands over to the pallet's plank as it lands
-      let hold = ms;
-      if (to!.y >= 1.8) while (hold < ms + 2000 && arrivalAt(hold).opacity < 1) hold += 16;
-      this.flights.push({ start: performance.now(), ms, hold, group: plank.group, from: plank.from, to: to!, s1: plank.s1, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, yours, done: landed });
+      this.flights.push({ start: performance.now(), lands: landsAt(false), end: carryEnd(false), group: plank.group, from: plank.from, caught: catchPoint(position), to: to!, s1: plank.s1, armful: plank.armful, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, yours, ...this.carrier(own), done: landed });
     } else landed();
     this.paint();
   }
+
+  // the shipwright who carries a plank, and where it stood when it was called
+  private carrier(own: boolean): { figure: Figure; stood: THREE.Vector3 } {
+    const figure = this.crew.take(own);
+    return { figure, stood: figure.root.position.clone() };
+  }
+
+  // the shipwrights: one per open view (the stream's anonymous total), at most CREW_MAX drawn
+  crewSet(total: number): void {
+    this.crew.set(total);
+    this.host.setAttribute("data-crew", String(this.crew.count));
+    this.requestFrame();
+  }
+  // whether one of them is this visitor's (marked only on this page)
+  crewMine(on: boolean): void { this.crew.mine(on); this.requestFrame(); }
 
   // the kept ship as a fresh load shows it, its pallet included
   keptShow(kept: KeptShip): void {
@@ -220,12 +235,27 @@ export class HarbourView {
     this.stage?.body.dispose();
     this.lone?.dispose();
     this.clearPallet();
+    this.crew.dispose();
     this.harbour.dispose();
     this.renderer.dispose();
     this.canvas.remove();
   }
 
   // ---------------------------------------------------------------------------
+
+  // every carry still under way, set down at once: its word landed, its figure free (the kept ship has already
+  // finished setting its part down: keptApply, told first, finishes whatever it had under way)
+  private finishCarries(): void {
+    for (const fl of [...this.flights]) this.endFlight(fl);
+  }
+
+  private endFlight(fl: Flight): void {
+    if (!fl.landed) { fl.landed = true; fl.done(); }
+    this.flights.splice(this.flights.indexOf(fl), 1);
+    this.release(fl.group);
+    this.crew.give(fl.figure);
+    if (!this.flights.length) this.host.removeAttribute("data-flying");
+  }
 
   private homeTarget(): THREE.Vector3 { return new THREE.Vector3(...home(this.layout()).target); }
 
@@ -255,7 +285,7 @@ export class HarbourView {
   }
 
   // a copy of a standing part to fly, in world space; it owns its geometry and materials
-  private copy(g: THREE.Group): { group: THREE.Group; from: THREE.Vector3; s1: number } {
+  private copy(g: THREE.Group): { group: THREE.Group; from: THREE.Vector3; s1: number; armful: number } {
     g.updateMatrixWorld(true);
     const out = new THREE.Group(), mats = new Map<THREE.Material, THREE.Material>();
     g.traverse((o) => {
@@ -275,7 +305,9 @@ export class HarbourView {
     out.position.copy(c);
     out.userData.materials = [...mats.values()];
     // toward the pallet it shrinks to exactly the pallet plank it becomes
-    return { group: out, from: c.clone(), s1: Math.min(1, PALLET_PLANK / Math.max(size.x, size.y, size.z, 0.01)) };
+    // carried, it's an armful (stage.ts ARMFUL), never bigger than it stood
+    const largest = Math.max(size.x, size.y, size.z, 0.01);
+    return { group: out, from: c.clone(), s1: Math.min(1, PALLET_PLANK / largest), armful: Math.min(1, ARMFUL / largest) };
   }
 
   private release(g: THREE.Group): void {
@@ -400,31 +432,38 @@ export class HarbourView {
       if (gaps !== this.stage.gaps.join() || this.stage.body.arrivals.length) this.ghost(now);
     }
     for (const fl of [...this.flights]) {
-      const t = now - fl.start, k = Math.min(1, t / fl.ms), f = flightAt(fl.from, fl.to, k, fl.s1, fl.to.y < 1.8);
-      fl.group.position.copy(f.position);
-      fl.group.scale.setScalar(f.scale);
-      fl.group.rotation.y = fl.spin * Math.sin(Math.PI * k);
-      // the old part as it stood, bleaching to driftwood as it lands; yours glows (on your page only)
+      const t = now - fl.start, c = carryAt(t), toPallet = fl.to.y < 1.8;
+      // tossed out of the live ship to the quay's edge, caught, then carried: plank and shipwright together
+      const carry = carryPath(fl.caught, fl.to, c.carry), waiting = carryPath(fl.caught, fl.to, 0);
+      const at = c.phase === "toss" ? tossAt(fl.from, fl.caught, c.toss) : c.phase === "catch" ? fl.caught.clone().lerp(waiting.plank, (t - 700) / 200) : carry.plank;
+      fl.group.position.copy(at);
+      // caught, it's gathered into an armful; set in place it grows to what it becomes there (its own size on the
+      // kept ship, the pallet's plank on the rack); tossed, it keeps the size it stood
+      const kept = toPallet ? fl.s1 : 1, set = c.phase === "set" || c.phase === "done" ? c.set : c.carry > 0.82 ? (c.carry - 0.82) / 0.18 : 0;
+      const gather = c.phase === "toss" ? 0 : c.phase === "catch" ? (t - 700) / 200 : 1;
+      fl.group.scale.setScalar(set > 0 ? fl.armful + (kept - fl.armful) * set : 1 + (fl.armful - 1) * gather);
+      fl.group.rotation.y = fl.spin * Math.sin(Math.PI * Math.min(1, t / fl.end));
+      // the shipwright walks to the catch as the plank is tossed, takes it, then walks it over
+      const toss = c.phase === "toss" ? Math.min(1, c.toss * 1.25) : 1;
+      const fig = c.phase === "toss" ? fl.stood.clone().lerp(waiting.figure, toss * toss * (3 - 2 * toss)) : c.phase === "catch" ? waiting.figure : carry.figure;
+      const ahead = c.phase === "toss" ? waiting.figure.clone().sub(fl.stood) : carryPath(fl.caught, fl.to, Math.min(1, c.carry + 0.02)).figure.sub(carry.figure);
+      const facing = ahead.lengthSq() > 1e-6 ? Math.atan2(ahead.x, ahead.z) : -Math.PI / 2;
+      const walking = (c.phase === "toss" && toss < 1) || (c.phase === "carry" && c.carry < 0.82);
+      this.crew.pose(fl.figure, fig, facing, walking ? t / 90 : 0, c.phase !== "toss" || c.toss > 0.75);
+      // the old part as it stood, bleaching to driftwood as it's carried in; yours glows (on your page only)
       for (const m of (fl.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) {
-        m.color.copy(plankColour(m.userData.flightBase as THREE.Color, k));
+        m.color.copy(plankColour(m.userData.flightBase as THREE.Color, 0.6 + 0.4 * c.bleach));
         m.emissive?.setHex(fl.yours ? GLOW : 0);
       }
-      // landed: the waiting word, the pallet's plank, and the end of "in flight"
-      if (k >= 1 && !fl.landed) {
-        fl.landed = true;
-        if (this.flights.every((x) => x.landed)) this.host.removeAttribute("data-flying");
-        fl.done();
-      }
-      if (t >= fl.hold) {
-        this.flights.splice(this.flights.indexOf(fl), 1);
-        this.release(fl.group);
-      }
+      // set down: the waiting word, the pallet's plank
+      if (t >= fl.lands && !fl.landed) { fl.landed = true; fl.done(); }
+      if (t >= fl.end) this.endFlight(fl);
     }
     // on a phone the camera follows the plank there and back (a desktop keeps its view, or the visitor's orbit)
     const followed = this.layout() === "phone" && !this.reduced ? this.flights[0] : undefined;
     if (followed) {
       const w = this.host.clientWidth, h = this.host.clientHeight;
-      const v = followView("phone", followed.from, followed.to, Math.min(1, (now - followed.start) / followed.hold));
+      const v = followView("phone", followed.from, followed.to, Math.min(1, (now - followed.start) / followed.end));
       place(this.camera, "phone", w / h);
       this.camera.position.set(...v.position);
       this.camera.lookAt(...v.target);
