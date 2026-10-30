@@ -206,7 +206,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .sentence-strip .sentence input:focus-visible { outline-color: var(--brown); }
       /* each word's place and part, "01 · Ram", small above it: navigation, drawn, never read (spec/numbering.test.ts) */
       .sentence-strip .sentence { counter-reset: word; }
-      .sentence-strip .sentence .pos { counter-increment: word; padding-top: 13px; padding-bottom: 0.1em; vertical-align: baseline; }
+      /* a word is at least as wide as its index ("02 · Hull", --tag characters of the 9.5px mono, ~0.66em each, and a
+         gap), so two short words' indices never run into each other (spec/numbering.test.ts) */
+      .sentence-strip .sentence .pos { counter-increment: word; padding-top: 13px; padding-bottom: 0.1em; vertical-align: baseline; min-width: calc(var(--tag, 0) * 9.5px * 0.66 + 10px); }
       .sentence-strip .sentence .pos::before {
         content: counter(word, decimal-leading-zero) " · " attr(data-part) / ""; position: absolute; left: 1px; top: 1px;
         font: 500 9.5px/1 var(--mono); font-style: normal; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brown-soft); white-space: nowrap; pointer-events: none;
@@ -365,6 +367,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .sentence-strip .sentence { font-size: 30px; line-height: 1.04; }
         .sentence-strip .sentence .pos { padding-top: 11px; }
         .sentence-strip .sentence .pos::before { font-size: 8.5px; }
+        .sentence-strip .sentence .pos { min-width: calc(var(--tag, 0) * 8.5px * 0.66 + 8px); }
         .sentence-strip .invite-ship { display: none; }
         .part-tag { display: none !important; }
         #home { display: none !important; }
