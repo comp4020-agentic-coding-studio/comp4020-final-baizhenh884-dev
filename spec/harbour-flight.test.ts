@@ -119,7 +119,7 @@ describe("the carry, step by step", () => {
   }
 
   for (const [name, layout, w, h] of HARBOURS) {
-    it(`keeps every waiting shipwright on the quay, in the frame and clear of the live hull (${name})`, () => {
+    it(`keeps every waiting shipwright on the quay, in the frame, clear of the live hull and the rack (${name})`, () => {
       const cam = new THREE.PerspectiveCamera();
       place(cam, layout, w / h);
       expect(CREW_MAX).toBe(8);
@@ -141,6 +141,15 @@ describe("the carry, step by step", () => {
         expect(overHull, `shipwright ${i + 1} stands in front of the live hull`).toBe(false);
       }
       for (let a = 0; a < spots.length; a++) for (let b = a + 1; b < spots.length; b++) expect(spots[a].distanceTo(spots[b]), "two shipwrights stand in one place").toBeGreaterThan(0.6);
+      // never mixed in with the rack's planks: on screen, no waiting figure (its whole height) overlaps a slot's
+      // plank (seen in the first frames, 31 October: a figure behind the rack read as part of its plank)
+      const box = (pts: THREE.Vector3[]) => { const q = pts.map((p) => onScreen(cam, p)); return { x0: Math.min(...q.map((v) => v.x)), x1: Math.max(...q.map((v) => v.x)), y0: Math.min(...q.map((v) => v.y)), y1: Math.max(...q.map((v) => v.y)) }; };
+      const half = PALLET_PLANK / 2;
+      const planks = PALLET_SLOTS.map((p) => box([-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => p.clone().add(new THREE.Vector3(x * half, y * half * 0.6, z * half * 0.6)))))));
+      for (const [i, s] of spots.entries()) {
+        const f = box([-1, 1].flatMap((x) => [0, 1.75].map((y) => s.clone().add(new THREE.Vector3(x * 0.3, y, 0)))));
+        for (const [k, p] of planks.entries()) expect(f.x0 < p.x1 && f.x1 > p.x0 && f.y0 < p.y1 && f.y1 > p.y0, `shipwright ${i + 1} stands with the rack's plank ${k + 1}`).toBe(false);
+      }
     });
   }
 
