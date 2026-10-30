@@ -74,7 +74,9 @@ const SNAPSHOT_KEYS = ["keptShip", "positions", "trace"];
 // a change event carries the kept ship too (it's global, not per-visitor, so
 // every open stream needs it on every change — no follow-up snapshot)
 const CHANGE_KEYS = ["keptShip", "position", "version", "word"];
-const KEPT_SHIP_KEYS = ["gaps", "next", "words"];
+// `original`: whether the ship shown is ship 1 (the last plank's wording, the maker's decision of 30 October), a
+// flag, never the ship's number
+const KEPT_SHIP_KEYS = ["gaps", "next", "original", "words"];
 // keysOf sorts, so these are alphabetical, not declaration order
 const TRACE_KEYS = settleModeReady ? ["latest", "otherReplaced", "otherStanding"] : ["now", "position", "standing", "word"];
 const HOLDING_LATEST_KEYS = ["position", "settled", "settlesInMs", "standing", "word"];
@@ -291,7 +293,7 @@ const keysOf = (value: unknown) => Object.keys(value as object).sort();
 
 function asKeptShip(data: unknown): KeptShip {
   expect(data, "keptShip isn't a JSON object").toBeTypeOf("object");
-  expect(keysOf(data), "keptShip isn't exactly { words, gaps, next }").toEqual(KEPT_SHIP_KEYS);
+  expect(keysOf(data), "keptShip isn't exactly { words, gaps, next, original }").toEqual(KEPT_SHIP_KEYS);
   const { words, gaps, next } = data as { words: unknown; gaps: unknown; next: unknown };
   expect(Array.isArray(words) && words.length === 10, "keptShip.words isn't ten words").toBe(true);
   expect(Array.isArray(gaps) && gaps.length === 10, "keptShip.gaps isn't ten booleans").toBe(true);
@@ -300,6 +302,7 @@ function asKeptShip(data: unknown): KeptShip {
   // the next house's waiting words (decided 29 October): a word or null at each place, derived, never stored
   expect(Array.isArray(next) && next.length === 10, "keptShip.next isn't ten places").toBe(true);
   for (const w of next as unknown[]) expect(w === null || typeof w === "string", "a waiting word isn't a string or null").toBe(true);
+  expect(typeof (data as { original: unknown }).original, "keptShip.original isn't a true/false: it must never carry the ship's number").toBe("boolean");
   return { words: words as string[], gaps: gaps as boolean[], next: next as (string | null)[] };
 }
 
