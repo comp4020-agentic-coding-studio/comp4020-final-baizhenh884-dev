@@ -106,14 +106,14 @@ describe("the ship's exchange motion", () => {
   // The plank that flies is the old part as it stood: its own colour until it nears the slipway, then it bleaches
   // to the kept ship's driftwood as it lands; never red unless the part itself was.
   it("flies the old plank in its own colour and bleaches it to driftwood as it lands", () => {
-    const red = new THREE.Color(0xc3331c);
     for (const hex of [0x23201d, 0x8e2f22, 0x2f5f8c, 0xefe6d0, 0x8c6340]) {
       const base = new THREE.Color(hex), weathered = base.clone().lerp(DRIFT, 0.5);
       for (const k of [0, 0.25, 0.5, 0.6]) expect(plankColour(base, k).getHex(), `mid-flight (${k}) the plank isn't its own colour`).toBe(base.getHex());
       expect(plankColour(base, 1).getHex(), "the plank doesn't land as driftwood").toBe(weathered.getHex());
+      // between the two, only ever its own colour bleaching: on the straight way from it to driftwood, no red mixed in
       for (let k = 0; k <= 1; k += 0.05) {
         const c = plankColour(base, k), d = (a: THREE.Color, b: THREE.Color) => Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
-        expect(d(c, red) >= Math.min(d(base, red), d(weathered, red)) - 1e-6, `the plank turns toward red at ${k.toFixed(2)}`).toBe(true);
+        expect(Math.abs(d(base, c) + d(c, weathered) - d(base, weathered)), `the plank leaves its way to driftwood at ${k.toFixed(2)}`).toBeLessThan(1e-6);
       }
     }
   });
