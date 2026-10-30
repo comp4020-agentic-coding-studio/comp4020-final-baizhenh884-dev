@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { arrivalAt, DRIFT, duration, frameAt, leavesAt, newPartRed, plankColour, RED_MS, type Kind } from "../src/lib/ship/motion";
+import { arrivalAt, carryAt, carryEnd, DRIFT, duration, frameAt, landsAt, newPartRed, plankColour, RED_MS, type Kind } from "../src/lib/ship/motion";
 
 // How a ship's part is exchanged, as numbers over time (src/lib/ship/motion.ts,
 // moved from the house unchanged). Pure, so it runs the same against any
@@ -118,6 +118,58 @@ describe("the ship's exchange motion", () => {
     }
   });
 
+  // The carry (decision 0005, amended 31 October): the old plank is tossed in a short arc to the quay's edge, a
+  // shipwright catches it and carries it to the slipway or the rack, and sets it down, about 3 s in all. The kept
+  // part shows only once the plank is set down, and the waiting word lands with it.
+  describe("the carry", () => {
+    const end = carryEnd(false);
+    const steps = () => { const out = []; for (let t = 0; t <= end + 200; t += 10) out.push({ t, ...carryAt(t) }); return out; };
+
+    it("runs toss, catch, carry, set down, in that order, about 3 s in all", () => {
+      expect(end).toBeGreaterThanOrEqual(2600);
+      expect(end).toBeLessThanOrEqual(3400);
+      const order = ["toss", "catch", "carry", "set", "done"];
+      const f = steps();
+      for (let i = 1; i < f.length; i++) expect(order.indexOf(f[i].phase), `the carry went back a phase at ${f[i].t}ms`).toBeGreaterThanOrEqual(order.indexOf(f[i - 1].phase));
+      for (const p of order) expect(f.some((x) => x.phase === p), `the carry never had its ${p}`).toBe(true);
+      expect(carryAt(end).phase).toBe("done");
+      // the toss is short: caught well within the first second
+      expect(f.find((x) => x.phase === "catch")!.t).toBeLessThan(1000);
+    });
+
+    it("moves each stretch forward only, and each is complete before the next begins", () => {
+      const f = steps();
+      for (const key of ["toss", "carry", "set"] as const) for (let i = 1; i < f.length; i++) expect(f[i][key], `${key} went back at ${f[i].t}ms`).toBeGreaterThanOrEqual(f[i - 1][key] - 1e-9);
+      for (const x of f) {
+        if (x.carry > 0) expect(x.toss, `carried at ${x.t}ms before it was caught`).toBe(1);
+        if (x.set > 0) expect(x.carry, `set down at ${x.t}ms before it was carried there`).toBe(1);
+      }
+    });
+
+    it("keeps the plank its own colour until the carry's last stretch, then bleaches it, never red", () => {
+      for (const x of steps()) {
+        if (x.phase === "toss" || x.phase === "catch" || x.carry < 0.5) expect(x.bleach, `the plank bleaches at ${x.t}ms, before the carry's last stretch`).toBe(0);
+      }
+      expect(carryAt(end).bleach).toBe(1);
+      // the colour itself is plankColour's, pinned above: its own colour on the way to driftwood, no red mixed in
+      const base = new THREE.Color(0x23201d);
+      expect(plankColour(base, carryAt(800).bleach).getHex(), "the caught plank isn't its own colour").toBe(base.getHex());
+    });
+
+    it("shows the kept part only once the plank is set down, and lands the waiting word with it", () => {
+      for (const x of steps()) if (x.phase !== "set" && x.phase !== "done") expect(arrivalAt(x.t).opacity, `the kept part shows at ${x.t}ms, before its plank is set down`).toBe(0);
+      expect(arrivalAt(end).opacity).toBe(1);
+      expect(carryAt(landsAt(false)).phase, "the waiting word lands before its plank is set down").toMatch(/set|done/);
+      expect(carryAt(landsAt(false) - 50).phase).toBe("carry");
+      expect(landsAt(true)).toBe(0);
+    });
+
+    it("with reduced motion nothing is tossed or carried: it's done at once", () => {
+      expect(carryEnd(true)).toBe(0);
+      expect(carryAt(0, true)).toMatchObject({ phase: "done", toss: 1, carry: 1, set: 1 });
+    });
+  });
+
   it("cross is loud: it runs longer than any ordinary exchange", () => {
     expect(duration("cross", false)).toBeGreaterThan(duration("remote", false));
   });
@@ -131,11 +183,5 @@ describe("the ship's exchange motion", () => {
     expect(duration("own", false)).toBeLessThan(duration("remote", false));
   });
 
-  // the waiting word lands with its plank (#15): when the plank has gone its whole way, and at once with reduced motion
-  it("cross: a waiting word may land once the plank has left, never before, and at once with reduced motion", () => {
-    const at = leavesAt(false);
-    expect(frameAt("cross", at - 50).travel).toBeLessThan(1);
-    expect(frameAt("cross", at).travel).toBeGreaterThanOrEqual(0.999);
-    expect(leavesAt(true)).toBe(0);
-  });
+  // the waiting word lands with its plank (#15): now when it's set down at the end of its carry ("the carry", above)
 });

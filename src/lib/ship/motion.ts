@@ -119,3 +119,9 @@ export const newPartRed = (ms: number, reduced: boolean): number =>
 import { Color } from "three";
 export const DRIFT = new Color(0xcbb894);
 export const plankColour = (base: Color, k: number): Color => base.clone().lerp(DRIFT, 0.5 * ease(clamp((k - 0.6) / 0.4)));
+
+// The carry (docs/decisions/0005, amended 31 October): stubs until it's built, so its checks fail for their reason.
+export type Carry = { phase: "toss" | "catch" | "carry" | "set" | "done"; toss: number; carry: number; set: number; bleach: number };
+export const carryEnd = (_reduced: boolean): number => -1;
+export const carryAt = (_ms: number, _reduced = false): Carry => ({ phase: "toss", toss: 0, carry: 0, set: 0, bleach: 0 });
+export const landsAt = (_reduced: boolean): number => -1;
