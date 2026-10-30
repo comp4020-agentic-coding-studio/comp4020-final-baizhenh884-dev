@@ -18,7 +18,7 @@ const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbv
 // (one such word left in the shared sentence by another spec once found the clash at 1280)
 const LOW = ["eligmvnuioene", "gypsy", "jumpy", "agapggypqyjgp", "pygmy", "yoga", "gappy", "puppy", "gyppy", "spy"];
 
-type Index = { content: string; font: string; contrast: number; top: number; bottom: number; left: number; ownTop: number; overlaps: string[] };
+type Index = { content: string; font: string; contrast: number; top: number; bottom: number; left: number; right: number; ownTop: number; overlaps: string[] };
 
 describe("the numbering", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
@@ -65,7 +65,7 @@ describe("the numbering", () => {
               .map(([w]) => w.textContent.trim() || 'gap');
             // its own word's letters (a gap: its drawn line)
             const own = ink(el.querySelector('label') || el);
-            return { content: s.content, font: s.fontFamily, contrast: Math.min(ratio(fg, flat), ratio(fg, line)), top, bottom: box.bottom, left, ownTop: own.top, overlaps };
+            return { content: s.content, font: s.fontFamily, contrast: Math.min(ratio(fg, flat), ratio(fg, line)), top, bottom: box.bottom, left, right: box.right, ownTop: own.top, overlaps };
           };
           const live = [...document.querySelectorAll('.sentence-strip .sentence .pos')];
           const liveLabels = live.map((p) => p.querySelector('label'));
@@ -80,6 +80,12 @@ describe("the numbering", () => {
         });
         for (const [what, list] of [["live word", m.live], ["kept word or gap", m.kept]] as const) {
           expect(list, `not ten ${what}s`).toHaveLength(10);
+          // no two indices run into each other: "02 · Hull" and "03 · Prow" over two short words stay apart (seen in the
+          // first harbour screenshots, where short words let the part names overlap)
+          for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+            const p = list[a], q = list[b], apart = p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top;
+            expect(apart, `${what} ${a + 1}'s index runs into ${b + 1}'s`).toBe(true);
+          }
           for (const [i, x] of list.entries()) {
             const at = `${what} ${i + 1}`;
             // the number, 01 to 10 in order, from the sentence's own counter; its alternative text empty, so it's never read
