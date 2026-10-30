@@ -59,12 +59,14 @@ describe("what GET / costs a phone", () => {
   // depend on how fast the machine is, not on the page).
   it("paints the sentence at first contentful paint on a phone with no script at all (390×844)", async () => {
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
-      // no timer here: with scripts off the page runs none, and a sleep in this expression never wakes (probed)
+      // no timer here: with scripts off the page runs none, and a sleep in this expression never wakes (probed);
+      // the harness waits in node instead (settleMs), since the paint can be recorded just after the load
+      // (once, on main's CI run of e898ba0, no paint had been recorded yet when this ran)
       await document.fonts.ready;
       const fcp = performance.getEntriesByName('first-contentful-paint')[0];
       const sent = document.querySelector('.sentence-strip .sentence'), r = sent && sent.getBoundingClientRect();
       return { fcp: fcp ? fcp.startTime : null, top: r ? r.top : null, bottom: r ? r.bottom : null, words: sent ? sent.querySelectorAll('label').length : 0, vh: innerHeight };
-    })()`, [390, 844], { noScript: true })) as { fcp: number | null; top: number | null; bottom: number | null; words: number; vh: number };
+    })()`, [390, 844], { noScript: true, settleMs: 1500 })) as { fcp: number | null; top: number | null; bottom: number | null; words: number; vh: number };
     expect(m.fcp, "Chrome recorded no first contentful paint without a script").not.toBeNull();
     expect(m.words, "the sentence's words aren't there").toBe(10);
     expect(m.top!, "the sentence isn't on the phone's first screen").toBeLessThan(m.vh);
