@@ -33,7 +33,8 @@ const positionsNow = () => currentPositions().map(({ position, word, version }) 
 // the ship number is an internal derivation detail, never exposed: no
 // numeric "ship id" is part of the product contract, only which words are
 // kept vs. gaps
-const keptShipNow = () => { const { words, gaps, next } = keptShipAt(); return { words, gaps, next }; };
+// `original` says whether the ship shown is ship 1 (the last plank's wording), a flag: never the ship's number
+const keptShipNow = () => { const { ship, words, gaps, next } = keptShipAt(); return { words, gaps, next, original: ship === 1 }; };
 
 // settlesInMs is recomputed from the current time on every read, so it never
 // equals a prior read even when nothing a visitor would notice has changed:

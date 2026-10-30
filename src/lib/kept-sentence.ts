@@ -82,5 +82,11 @@ export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): 
   };
 }
 
-// stub: slice 3b's spec lands first (spec/kept-ship.test.ts)
-export const lastPlank = (_k: { words: string[]; gaps: boolean[]; original?: boolean }): string | null => null;
+// The last plank (the maker, 30 October): when the ship shown has one gap left, the word still standing there,
+// named so a room can rally for it. Only ship 1's planks are originals. Never a count. Null otherwise.
+export function lastPlank(k: { words: string[]; gaps: boolean[]; original?: boolean }): string | null {
+  const gaps = k.gaps.flatMap((g, i) => (g ? [i] : []));
+  if (gaps.length !== 1) return null;
+  const word = k.words[gaps[0]];
+  return k.original ? `One original plank still stands: ${word}` : `One plank still stands before the ship of old planks is whole: ${word}`;
+}
