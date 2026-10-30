@@ -300,28 +300,30 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     }
     const { waiting, crossing } = await moments();
     expect(waiting !== null && waiting >= 0 && crossing !== null && crossing >= 0 && waiting !== crossing, "no waiting and crossing pair to stage").toBe(true);
-    const a = fresh("firstcarry"), b = fresh("secondcarry");
+    const a = fresh("earlycarry"), b = fresh("nextcarry");
     const ok = [false, false];
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
       const harbour = document.querySelector('#harbour');
       const label = (p) => document.querySelectorAll('.sentence-strip .sentence label')[p].textContent.trim();
       const row = () => [...document.querySelectorAll('.kept-strip .waiting .ws .w')].map((w) => w.textContent.trim());
+      // the word the first change replaces: it's the one that waits for the next ship
+      const old = label(${waiting});
       for (let i = 0; i < 500 && label(${waiting}) !== ${JSON.stringify(a)}; i++) await new Promise((r) => setTimeout(r, 20));
       const during = { flying: harbour.getAttribute('data-flying'), row: row() };
       for (let i = 0; i < 500 && label(${crossing}) !== ${JSON.stringify(b)}; i++) await new Promise((r) => setTimeout(r, 20));
       await new Promise((r) => setTimeout(r, 150));
       const after = { flying: harbour.getAttribute('data-flying'), row: row() };
       await new Promise((r) => setTimeout(r, 4200));
-      return { during, after, end: harbour.getAttribute('data-flying') };
+      return { old, during, after, end: harbour.getAttribute('data-flying') };
     })()`, [1440, 900], { steps: [READY], then: async () => {
       ok[0] = await secondVisitor(waiting!, a);
       await new Promise((r) => setTimeout(r, 600));
       ok[1] = await secondVisitor(crossing!, b);
-    } })) as { during: { flying: string | null; row: string[] }; after: { flying: string | null; row: string[] }; end: string | null };
+    } })) as { old: string; during: { flying: string | null; row: string[] }; after: { flying: string | null; row: string[] }; end: string | null };
     expect(ok, "a change was refused").toEqual([true, true]);
     expect(m.during.flying, "the first plank was never carried").toBe(String(waiting! + 1));
-    expect(m.during.row, "the first word landed before its plank was set down").not.toContain(a);
-    expect(m.after.row, "the second change didn't finish the first carry: its word isn't in the row").toContain(a);
+    expect(m.during.row, "the first word landed before its plank was set down").not.toContain(m.old);
+    expect(m.after.row, "the second change didn't finish the first carry: its word isn't in the row").toContain(m.old);
     expect(m.after.flying, "the second plank isn't on its way").toBe(String(crossing! + 1));
     expect(m.end, "a plank was still on its way long after it should have been set down").toBeNull();
   }, 120_000);
