@@ -44,7 +44,7 @@ describe("the part notation", () => {
     expect(notation({ position: 7, word: "whether", was: "if" }, "phone")).toBe("08 · Oars · 2 oars a side → 7 oars a side");
     expect(notation({ position: 1, word: "night", was: "anchor" }, "desktop")).toBe("02 · Hull · paint “N”, unchanged · starts with “n”");
     expect(notation({ position: 0, word: "potato" })).toBe("01 · Ram · trident");
-    expect(notation({ position: 8, word: "it" })).toBe("09 · Steering oar · depth 0");
+    expect(notation({ position: 8, word: "it" })).toBe("09 · Rudder · depth 0");
   });
 
   // While a replacement is typed: the part (its number alone on a phone), the word being replaced, struck,

@@ -244,7 +244,7 @@ describe("the harbour on GET /", () => {
           return { tag: b.content, word: l.textContent, under, above: parseFloat(b.top) < 0 || br.top < lr.top };
         });
       })()`, [size[0], size[1]])) as { tag: string; word: string; under: string[]; above: boolean }[];
-      const parts = ["Ram", "Hull", "Prow", "Stern", "Shields", "Mast", "Sail", "Oars", "Steering oar", "Pennant"];
+      const parts = ["Ram", "Hull", "Prow", "Stern", "Shields", "Mast", "Sail", "Oars", "Rudder", "Pennant"];
       m.forEach((p, i) => {
         // the number from the sentence's own counter (01 to 10, spec/numbering.test.ts), the part's name after it; Chrome reports attr() resolved
         expect(p.tag, `word ${i + 1} doesn't carry its number and part`).toMatch(new RegExp(`^counter\\(\\w+, decimal-leading-zero\\) " · ${parts[i]}" / ""$`));
