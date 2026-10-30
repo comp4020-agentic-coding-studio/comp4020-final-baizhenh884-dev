@@ -24,11 +24,12 @@ const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
 const localOnly = (name: string, fn: () => Promise<void>, timeout?: number) => it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn, timeout);
 
-const ship = (k: Partial<KeptShip> = {}): KeptShip => ({ words: Array(10).fill("w"), gaps: Array(10).fill(false).map((_, i) => i === 8), next: Array(10).fill(null), ...k });
+// the ship shown has two gaps (places 4 and 9), so replacing one crosses without completing it
+const ship = (k: Partial<KeptShip> = {}): KeptShip => ({ words: Array(10).fill("w"), gaps: Array(10).fill(false).map((_, i) => i === 3 || i === 8), next: Array(10).fill(null), ...k });
 
 describe("where a plank flies", () => {
   it("flies a plank that crosses into the ship shown to its own gap on the kept ship", () => {
-    const before = ship(), after = ship({ gaps: Array(10).fill(false) });
+    const before = ship(), after = ship({ gaps: Array(10).fill(false).map((_, i) => i === 3) });
     const moment = classifyMoment(before, after, 8)!;
     expect(moment.kind).toBe("cross");
     const to = flightTarget(moment, after);
@@ -37,12 +38,13 @@ describe("where a plank flies", () => {
   });
 
   it("flies a plank for the next ship to a slot on the pallet, never to the kept ship", () => {
-    const before = ship(), after = ship({ next: Array(10).fill(null).map((_, i) => (i === 3 ? "was" : null)) });
-    const moment = classifyMoment(before, after, 3)!;
+    // place 3 is already kept in the ship shown: its next replacement belongs to the next ship
+    const before = ship(), after = ship({ next: Array(10).fill(null).map((_, i) => (i === 2 ? "was" : null)) });
+    const moment = classifyMoment(before, after, 2)!;
     expect(moment.kind).toBe("wait");
     const to = flightTarget(moment, after);
     expect(PALLET_SLOTS.some((s) => s.distanceTo(to) < 1e-6), "the plank doesn't fly to a pallet slot").toBe(true);
-    expect(to.distanceTo(partHome(3, KEPT_POSE)), "the plank flies to the kept ship").toBeGreaterThan(1);
+    expect(to.distanceTo(partHome(2, KEPT_POSE)), "the plank flies to the kept ship").toBeGreaterThan(1);
   });
 
   it("gives each waiting plank its own slot on the pallet, in place order, and no two the same", () => {

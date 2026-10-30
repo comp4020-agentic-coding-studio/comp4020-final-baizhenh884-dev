@@ -53,7 +53,10 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
   // profile, so a measurement can never reach another Chrome (one left over
   // on a guessed port used to take a launch's page and hang it).
   const profile = join(dir, "profile");
-  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+  // WebGL as a visitor's browser has it: headless Chrome with no GPU offers none unless its software renderer
+  // is allowed (probed: no context without the flag, the harbour drawn with it). A check that refuses WebGL
+  // passes its own flags, which come after and win.
+  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--enable-unsafe-swiftshader", ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
   let socket: WebSocket | undefined;
   try {
     let port = 0;
