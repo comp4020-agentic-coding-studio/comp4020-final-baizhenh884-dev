@@ -71,7 +71,7 @@ describe("where a plank flies", () => {
 // page is watching, never on a guessed delay.
 const SECOND_VISITOR = `async (position, word) => {
   const html = await (await fetch('/', { credentials: 'omit' })).text();
-  const v = html.match(new RegExp('name="position" value="' + position + '"><input type="hidden" name="version" value="(\\d+)"'));
+  const v = html.match(new RegExp('name="position" value="' + position + '"><input type="hidden" name="version" value="([0-9]+)"'));
   const res = await fetch('/replace', { method: 'POST', credentials: 'omit', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ position: String(position), version: v[1], word }) });
   return res.type === 'opaqueredirect' || res.status === 303 || res.status === 0;
 }`;
