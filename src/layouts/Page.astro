@@ -209,6 +209,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       /* a word is at least as wide as its index ("02 · Hull", --tag characters of the 9.5px mono, 0.61em each, and a
          gap), so two short words' indices never run into each other (spec/numbering.test.ts) */
       .sentence-strip .sentence .pos { counter-increment: word; padding-top: 13px; padding-bottom: 0.1em; vertical-align: baseline; min-width: calc(var(--tag, 0) * 9.5px * 0.61 + 8px); }
+      /* the last word keeps only its letters' width: its index may run on past the full stop, where nothing follows,
+         so the full stop stays with the word (spec/sentence-wrap.test.ts) */
+      .sentence-strip .sentence .end > .pos { min-width: 0; }
       .sentence-strip .sentence .pos::before {
         content: counter(word, decimal-leading-zero) " · " attr(data-part) / ""; position: absolute; left: 1px; top: 1px;
         font: 500 9.5px/1 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--brown-soft); white-space: nowrap; pointer-events: none;
