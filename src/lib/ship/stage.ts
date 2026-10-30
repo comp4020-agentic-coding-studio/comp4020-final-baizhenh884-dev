@@ -192,3 +192,6 @@ const CARRIED_MIN_WORLD = 1.25;
 export const carriedScale = (largest: number): number => Math.min(1, Math.max(0.5, CARRIED_MIN_WORLD / Math.max(largest, 0.01)));
 // the kept ship's cradle (scene.ts draws it from these)
 export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));
+
+// the carried plank, held overhead (the maker, 31 October): a stub until built, so its check measures where the page draws it
+export const heldAt = (at: THREE.Vector3, _height: number, _scale: number): THREE.Vector3 => at.clone();

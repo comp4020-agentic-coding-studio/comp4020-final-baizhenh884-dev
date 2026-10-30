@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
-import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
+import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, heldAt, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
 import { arrivalAt, carryAt, landsAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
@@ -144,7 +144,8 @@ describe("the carry, step by step", () => {
         blockers.updateMatrixWorld(true);
         const to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0], ray = new THREE.Raycaster();
         for (let c = 0.2; c <= 0.8 + 1e-9; c += 0.1) {
-          const at = carryPath(catchPoint(position), to, c).plank;
+          // where the page draws it: held overhead, its underside on the hands
+          const at = heldAt(carryPath(catchPoint(position), to, c).plank, size.y, k);
           // the part's own box, carried: scaled about its centre and moved there
           const corners = [0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((l) => new THREE.Vector3(i ? box0.max.x : box0.min.x, j ? box0.max.y : box0.min.y, l ? box0.max.z : box0.min.z).sub(centre0).multiplyScalar(k).add(at))));
           const q = corners.map((p) => onScreen(cam, p));
