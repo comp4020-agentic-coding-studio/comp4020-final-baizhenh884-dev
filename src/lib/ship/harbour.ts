@@ -34,7 +34,8 @@ function based(g: THREE.Group): void {
 }
 
 // A plank in flight: the old part, taken off the live ship whole, flying in an arc to where it's kept.
-type Flight = { start: number; ms: number; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; s0: number; s1: number; spin: number; done(): void };
+// It lands at `ms`, then sits in place until `hold`, when the kept part it becomes has faded in under it.
+type Flight = { start: number; ms: number; hold: number; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; s1: number; spin: number; landed: boolean; done(): void };
 
 export type Scene = "now" | "earlier" | "kept";
 
@@ -112,7 +113,11 @@ export class HarbourView {
       this.host.setAttribute("data-flying", String(position + 1));
       // it lands as the kept ship begins to set it down (motion.ts), and as its waiting word lands in the row
       const ms = leavesAt(false);
-      this.flights.push({ start: performance.now(), ms, group: plank.group, from: plank.from, to: to!, s0: LIVE_POSE.scale, s1: plank.s1, spin: (position % 2 ? 1 : -1) * 0.6, done: landed });
+      // to the slipway it stays where it landed until the kept part has faded in under it (motion.ts), so
+      // nothing blinks; to the pallet it hands over to the pallet's plank as it lands
+      let hold = ms;
+      if (to!.y >= 1.8) while (hold < ms + 2000 && arrivalAt(hold).opacity < 1) hold += 16;
+      this.flights.push({ start: performance.now(), ms, hold, group: plank.group, from: plank.from, to: to!, s1: plank.s1, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, done: landed });
     } else landed();
     this.paint();
   }
@@ -268,7 +273,8 @@ export class HarbourView {
     const size = new THREE.Box3().setFromObject(out).getSize(new THREE.Vector3());
     out.position.copy(c);
     out.userData.materials = [...mats.values()];
-    return { group: out, from: c.clone(), s1: Math.min(1, 1.2 / Math.max(size.x, size.y, size.z, 0.01)) };
+    // toward the pallet it shrinks to exactly the pallet plank it becomes
+    return { group: out, from: c.clone(), s1: Math.min(1, PALLET_PLANK / Math.max(size.x, size.y, size.z, 0.01)) };
   }
 
   private release(g: THREE.Group): void {
@@ -391,16 +397,20 @@ export class HarbourView {
       if (gaps !== this.stage.gaps.join() || this.stage.body.arrivals.length) this.ghost(now);
     }
     for (const fl of [...this.flights]) {
-      const k = Math.min(1, (now - fl.start) / fl.ms), f = flightAt(fl.from, fl.to, k, fl.s1, fl.to.y < 1.8);
+      const t = now - fl.start, k = Math.min(1, t / fl.ms), f = flightAt(fl.from, fl.to, k, fl.s1, fl.to.y < 1.8);
       fl.group.position.copy(f.position);
       fl.group.scale.setScalar(f.scale);
       fl.group.rotation.y = fl.spin * Math.sin(Math.PI * k);
       for (const m of (fl.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.emissive?.setHex(RED);
-      if (k >= 1) {
+      // landed: the waiting word, the pallet's plank, and the end of "in flight"
+      if (k >= 1 && !fl.landed) {
+        fl.landed = true;
+        if (this.flights.every((x) => x.landed)) this.host.removeAttribute("data-flying");
+        fl.done();
+      }
+      if (t >= fl.hold) {
         this.flights.splice(this.flights.indexOf(fl), 1);
         this.release(fl.group);
-        if (!this.flights.length) this.host.removeAttribute("data-flying");
-        fl.done();
       }
     }
     // the end of a motion: everything back to neutral

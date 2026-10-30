@@ -14,8 +14,8 @@ export type Pose = { position: [number, number, number]; rotationY: number; scal
 
 // the live ship on the water; the kept ship on its slipway, on the quay to the right; the pallet beside it
 export const LIVE_POSE: Pose = { position: [-4.2, 0, 4.2], rotationY: -0.22, scale: 1.3 };
-export const KEPT_POSE: Pose = { position: [10.4, 2.05, -3.1], rotationY: -0.06, scale: 1.3 };
-export const PALLET: [number, number, number] = [14.6, 1.12, 1.6];
+export const KEPT_POSE: Pose = { position: [7.4, 2.05, -3.4], rotationY: -0.06, scale: 1.3 };
+export const PALLET: [number, number, number] = [10.6, 1.12, 2.2];
 
 // a desktop drag turns the view about its target, never pans, within these
 export const ORBIT = { minDistance: 14, maxDistance: 60, minPolar: 0.55, maxPolar: 1.32 };
@@ -24,11 +24,11 @@ type View = { position: [number, number, number]; target: [number, number, numbe
 // Both ships and the pallet, seen from the harbour mouth. On a desktop the sentence strip lies over the
 // scene's lower left, so the ships stand in its upper two thirds; on a phone the strip is above the scene.
 const VIEWS: Record<Layout, View> = {
-  desktop: { position: [4.8, 12, 39], target: [4.8, 2.0, 0.4], fov: 34 },
-  phone: { position: [5, 17, 38], target: [5, 0.8, 0], fov: 36 },
+  desktop: { position: [2.6, 5.5, 31], target: [2.6, 1.0, 0.4], fov: 38 },
+  phone: { position: [2.6, 7.5, 26], target: [2.6, 1.4, 0.6], fov: 42 },
 };
 // the width of the harbour that must stay in view at any aspect: from the live ship's stern to past the pallet
-const SPAN: Record<Layout, [number, number]> = { desktop: [-12.5, 19.2], phone: [-10.6, 18.6] };
+const SPAN: Record<Layout, [number, number]> = { desktop: [-10.6, 16.0], phone: [-10.2, 15.6] };
 
 export const home = (layout: Layout): View => VIEWS[layout];
 
@@ -82,11 +82,11 @@ export function partHome(position: number, pose: Pose): THREE.Vector3 {
 }
 
 // a waiting plank's size on the pallet: its largest dimension, in world units
-export const PALLET_PLANK = 0.8;
+export const PALLET_PLANK = 1.9;
 
 // The pallet's slots, two rows of five, in place order: a waiting plank lies in the slot of its turn among the
 // planks waiting now.
-export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 1.7 + (k % 5) * 0.85, PALLET[1] + 0.5, PALLET[2] - 0.6 + Math.floor(k / 5) * 1.2));
+export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 4 + (k % 5) * 2, PALLET[1] + 1.05, PALLET[2] - 1 + Math.floor(k / 5) * 2));
 export function palletSlot(position: number, next: readonly (string | null)[]): THREE.Vector3 {
   const n = next.slice(0, position + 1).filter((w) => w !== null).length - 1;
   return PALLET_SLOTS[Math.max(0, Math.min(PALLET_SLOTS.length - 1, n))].clone();
@@ -98,12 +98,13 @@ export function flightTarget(moment: Moment, kept: KeptShip): THREE.Vector3 {
   return moment.kind === "wait" ? palletSlot(moment.position, kept.next) : partHome(moment.position, KEPT_POSE);
 }
 
-// A plank in flight, `k` (0..1) of the way through its flight: where its centre is and how it's scaled (1: the
-// size it stood on the live ship). It rises in an arc of `rise` as it crosses.
+// A plank in flight, `k` (0..1) of the way through its flight: where its centre is and how it's scaled, as a
+// share of the size it stood on the live ship (the flying copy is built at that size). It lifts off slowly,
+// crosses the water in an arc and sets down slowly (smoothstep), so it's seen leaving, crossing and landing;
+// toward the pallet it shrinks to `s1`, toward the kept ship it keeps its size.
 export function flightAt(from: THREE.Vector3, to: THREE.Vector3, k: number, s1: number, toPallet: boolean): { position: THREE.Vector3; scale: number } {
-  const e = 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
+  const t = Math.min(1, Math.max(0, k)), e = t * t * (3 - 2 * t);
   const position = new THREE.Vector3().lerpVectors(from, to, e);
-  position.y += Math.sin(Math.PI * e) * 5.5;
-  const s0 = LIVE_POSE.scale;
-  return { position, scale: s0 + (s1 * s0 - s0) * (toPallet ? e : 0) };
+  position.y += Math.sin(Math.PI * e) * 4.5;
+  return { position, scale: toPallet ? 1 + (s1 - 1) * e : 1 };
 }
