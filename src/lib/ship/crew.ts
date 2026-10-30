@@ -7,7 +7,7 @@
 // told and decides nothing.
 
 import * as THREE from "three";
-import { crewSpots, PASSER } from "./stage";
+import { crewSpots, FIGURE_HEIGHT, PASSER } from "./stage";
 
 const TUNIC = 0xe9dfc8, SKIN = 0xb98a62, BELT = 0x6b4a2e, MINE = 0xf2c46b;
 
@@ -32,7 +32,7 @@ export class Crew {
       belt: own(new THREE.CylinderGeometry(0.235, 0.235, 0.07, 7)),
     };
     // your figure's mark: a soft glow on the deck at its feet, your page only
-    this.mark = new THREE.Mesh(own(new THREE.CircleGeometry(0.5, 20)), own(new THREE.MeshBasicMaterial({ color: MINE, transparent: true, opacity: 0.55, depthWrite: false })));
+    this.mark = new THREE.Mesh(own(new THREE.CircleGeometry(0.5 * FIGURE_HEIGHT / 1.75, 20)), own(new THREE.MeshBasicMaterial({ color: MINE, transparent: true, opacity: 0.55, depthWrite: false })));
     this.mark.rotation.x = -Math.PI / 2;
     this.mark.visible = false;
     this.root.add(this.mark);
@@ -76,8 +76,9 @@ export class Crew {
     const swing = Math.sin(phase) * 0.55;
     f.legs[0].rotation.x = swing;
     f.legs[1].rotation.x = -swing;
-    f.arms[0].rotation.x = holding ? -2.6 : -swing * 0.7;
-    f.arms[1].rotation.x = holding ? -2.6 : swing * 0.7;
+    // holding a plank above the head: both arms straight up
+    f.arms[0].rotation.x = holding ? -Math.PI : -swing * 0.7;
+    f.arms[1].rotation.x = holding ? -Math.PI : swing * 0.7;
     if (f === this.figures[0] && this.mark.visible) this.mark.position.set(at.x, at.y + 0.02, at.z);
   }
 
@@ -123,6 +124,8 @@ export class Crew {
     mesh(this.geo.head, this.mats.skin, 0, 1.5, 0);
     const legs: [THREE.Object3D, THREE.Object3D] = [limb(-0.1, 0.58, this.mats.skin), limb(0.1, 0.58, this.mats.skin)];
     const arms: [THREE.Object3D, THREE.Object3D] = [limb(-0.27, 1.25, this.mats.skin), limb(0.27, 1.25, this.mats.skin)];
+    // built 1.75 tall, drawn at the toy scale (stage.ts FIGURE_HEIGHT)
+    root.scale.setScalar(FIGURE_HEIGHT / 1.75);
     this.root.add(root);
     return { root, legs, arms, busy: false, passer };
   }
