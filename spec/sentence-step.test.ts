@@ -49,3 +49,51 @@ describe("the live sentence's size step", () => {
     expect(sizeStep(Array(10).fill("incomprehensibilities"))).toBe(SIZE_STEPS.length - 1);
   });
 });
+
+// Which word's "01·Ram" rises to a second row (the maker, 30 October): a label wider than its word and the space
+// after it would push the next word away, so it rises to the upper row; a label that fits stays down. Raised
+// labels side by side may only rise together if the first ends before the second begins; where a label fits on
+// neither row (two very short words in a row), its word is given just the room its label needs ("room"), so no
+// two labels ever meet. One pure function of the words, the server's and the live client's alike. Whether the
+// result reads cleanly, with normal spacing and no label touching another, is measured in Chrome
+// (spec/harbour-layout.test.ts, spec/numbering.test.ts).
+import { labelRows } from "../src/lib/sentence-step";
+
+describe("which labels rise to a second row", () => {
+  const maker = "Make a website that people would miss if it disappeared".split(" ");
+  it("gives each word a row (1, 2, or 1 with room for its label), the same every time for the same words", () => {
+    for (const layout of ["desktop", "phone"] as const) for (const words of [maker, ...SENTENCES.slice(0, 100)]) {
+      const r = labelRows(words, layout);
+      expect(r).toHaveLength(10);
+      expect(r.every((x) => x === 1 || x === 2 || x === "room")).toBe(true);
+      expect(labelRows([...words], layout)).toEqual(r);
+    }
+  });
+
+  it("keeps every label down over long words", () => {
+    expect(labelRows(Array(10).fill("wordmvadgycfe"), "desktop")).toEqual(Array(10).fill(1));
+  });
+
+  it("raises a label over a word too short for it", () => {
+    const words = ["harbour", "a", "ceremony", "this", "students", "will", "wonder", "whether", "it", "sail"];
+    for (const layout of ["desktop", "phone"] as const) {
+      const r = labelRows(words, layout);
+      expect(r[1], `"a" under 02·Hull doesn't rise (${layout})`).toBe(2);
+      expect(r[8], `"it" under 09·Rudder doesn't rise (${layout})`).toBe(2);
+    }
+  });
+
+  // two short words in a row ("if it" under 08·Oars and 09·Rudder, as on the page; "a it"): a label too wide for
+  // its word is never left down over it (seen in Chrome: "09·Rudder" over "it" ran into "10·Pennant"), and two
+  // raised labels side by side never both rise; the second gets room instead
+  it("never leaves a label down over a word too short for it, nor two raised side by side", () => {
+    for (const layout of ["desktop", "phone"] as const) {
+      const r = labelRows(maker, layout);
+      expect(r[8], `"it" under 09·Rudder is left down (${layout})`).not.toBe(1);
+      expect([r[7], r[8]], `"if it" both rise (${layout})`).not.toEqual([2, 2]);
+      const t = labelRows(["harbour", "a", "it", "ceremony", "students", "will", "wonder", "whether", "shore", "sail"], layout);
+      expect(t[2], `"it" after "a" is left down (${layout})`).not.toBe(1);
+      expect([t[1], t[2]], `"a it" both rise (${layout})`).not.toEqual([2, 2]);
+    }
+  });
+});

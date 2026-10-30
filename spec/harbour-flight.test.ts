@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
-import { flightAt, flightTarget, KEPT_POSE, LIVE_POSE, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed } from "../src/lib/ship/stage";
+import { followView, flightAt, flightTarget, home, KEPT_POSE, LIVE_POSE, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed } from "../src/lib/ship/stage";
 import { arrivalAt, leavesAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
@@ -120,6 +120,60 @@ describe("the flight, at its midpoint", () => {
       place(cam, layout, w / h);
       const px = screenSize(cam, PALLET_SLOTS[0], PALLET_PLANK, h);
       expect(px, `a waiting plank is ${px.toFixed(0)}px tall`).toBeGreaterThanOrEqual(28);
+    });
+  }
+});
+
+// The pallet stands where it's seen whole (the maker, 30 October: it sat behind the slipway's edge): from the
+// fixed view at 1440 and 390, every slot's plank is inside the harbour's frame, and nothing of the kept ship (its
+// real geometry, at its tallest) stands between the camera and any part of the plank: rays from the camera to the
+// plank's centre and corners reach the plank before they meet the kept ship.
+describe("the pallet, in view", () => {
+  for (const [name, layout, w, h] of HARBOURS) {
+    it(`shows every waiting plank whole, in the frame and clear of the kept ship (${name})`, () => {
+      const cam = new THREE.PerspectiveCamera();
+      place(cam, layout, w / h);
+      const tall = buildShip(Array(10).fill("bookkeeper"));
+      posed(tall.root, KEPT_POSE);
+      tall.root.updateMatrixWorld(true);
+      const ray = new THREE.Raycaster();
+      for (const [i, slot] of PALLET_SLOTS.entries()) {
+        const half = PALLET_PLANK / 2;
+        const points = [slot.clone(), ...[-1, 1].flatMap((x) => [-1, 1].map((y) => slot.clone().add(new THREE.Vector3(x * half, y * half * 0.6, half))))];
+        for (const p of points) {
+          const v = p.clone().project(cam);
+          expect(Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1, `slot ${i + 1}'s plank runs out of the frame`).toBe(true);
+          const dir = p.clone().sub(cam.position), dist = dir.length();
+          ray.set(cam.position, dir.normalize());
+          const hit = ray.intersectObject(tall.root, true).find((x) => (x.object as THREE.Mesh).isMesh);
+          expect(hit && hit.distance < dist - 0.05, `the kept ship stands in front of slot ${i + 1}'s plank`).toBeFalsy();
+        }
+      }
+      tall.dispose();
+    });
+  }
+});
+
+// On a phone the camera follows the plank (decision 0005): it starts and ends at the fixed view, and halfway
+// through the flight both the plank and where it lands are in frame. A desktop never moves the camera for a flight.
+describe("the phone's camera, following a plank", () => {
+  for (const dest of ["slipway", "pallet"] as const) {
+    it(`frames the plank and where it lands, and comes back (390×844, to the ${dest})`, () => {
+      const [, layout, w, h] = HARBOURS[1];
+      const from = partHome(1, LIVE_POSE), to = dest === "slipway" ? partHome(1, KEPT_POSE) : PALLET_SLOTS[0];
+      const fixed = home(layout);
+      for (const k of [0, 1]) {
+        const v = followView(layout, from, to, k);
+        expect(v.position, `the camera isn't at its fixed view at ${k}`).toEqual(fixed.position);
+        expect(v.target).toEqual(fixed.target);
+      }
+      const v = followView(layout, from, to, 0.5), cam = new THREE.PerspectiveCamera(v.fov, w / h, 0.1, 400);
+      cam.position.set(...v.position); cam.lookAt(...v.target); cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
+      const inFrame = (p: THREE.Vector3) => { const q = p.clone().project(cam); return Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1 && q.z < 1; };
+      expect(inFrame(flightAt(from, to, 0.5, 1, false).position), "halfway, the plank is out of frame").toBe(true);
+      expect(inFrame(to), "halfway, where it lands is out of frame").toBe(true);
+      // and it really moved: the follow isn't the fixed view
+      expect(new THREE.Vector3(...v.position).distanceTo(new THREE.Vector3(...fixed.position)), "the camera didn't follow").toBeGreaterThan(1);
     });
   }
 });

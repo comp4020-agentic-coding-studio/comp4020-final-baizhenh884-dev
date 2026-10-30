@@ -15,7 +15,7 @@ export type Pose = { position: [number, number, number]; rotationY: number; scal
 // the live ship on the water; the kept ship on its slipway, on the quay to the right; the pallet beside it
 export const LIVE_POSE: Pose = { position: [-4.2, 0, 4.2], rotationY: -0.22, scale: 1.3 };
 export const KEPT_POSE: Pose = { position: [7.4, 2.05, -3.4], rotationY: -0.06, scale: 1.3 };
-export const PALLET: [number, number, number] = [10.6, 1.12, 2.2];
+export const PALLET: [number, number, number] = [8.0, 1.12, 3.8];
 
 // a desktop drag turns the view about its target, never pans, within these
 export const ORBIT = { minDistance: 14, maxDistance: 60, minPolar: 0.55, maxPolar: 1.32 };
@@ -86,7 +86,7 @@ export const PALLET_PLANK = 1.9;
 
 // The pallet's slots, two rows of five, in place order: a waiting plank lies in the slot of its turn among the
 // planks waiting now.
-export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 4 + (k % 5) * 2, PALLET[1] + 1.05, PALLET[2] - 1 + Math.floor(k / 5) * 2));
+export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 4 + (k % 5) * 2, PALLET[1] + 1.4, PALLET[2] - 1 + Math.floor(k / 5) * 2));
 export function palletSlot(position: number, next: readonly (string | null)[]): THREE.Vector3 {
   const n = next.slice(0, position + 1).filter((w) => w !== null).length - 1;
   return PALLET_SLOTS[Math.max(0, Math.min(PALLET_SLOTS.length - 1, n))].clone();
@@ -107,4 +107,21 @@ export function flightAt(from: THREE.Vector3, to: THREE.Vector3, k: number, s1: 
   const position = new THREE.Vector3().lerpVectors(from, to, e);
   position.y += Math.sin(Math.PI * e) * 4.5;
   return { position, scale: toPallet ? 1 + (s1 - 1) * e : 1 };
+}
+
+// On a phone the camera follows a flying plank (decision 0005): `k` (0..1) through the flight, it leaves the fixed
+// view, comes toward the middle of the plank's way and where it lands, nearer by up to `NEAR`, and returns, so the
+// fixed view is where it starts and ends. Halfway it frames the plank and its landing (spec/harbour-flight.test.ts).
+const NEAR = 0.45;
+export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector3, k: number): View {
+  const h = home(layout), w = Math.sin(Math.PI * Math.min(1, Math.max(0, k)));
+  if (w < 1e-9) return { ...h, position: [...h.position], target: [...h.target] };
+  const pos = new THREE.Vector3(...h.position), tgt = new THREE.Vector3(...h.target);
+  // where to look: between the plank's way and where it lands, a little above, toward the landing
+  const focus = new THREE.Vector3().lerpVectors(from, to, 0.7).add(new THREE.Vector3(0, 1.2, 0));
+  const target = tgt.clone().lerp(focus, w);
+  // the camera keeps its own direction to the target, nearer
+  const offset = pos.clone().sub(tgt).multiplyScalar(1 - NEAR * w);
+  const position = target.clone().add(offset);
+  return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
 }

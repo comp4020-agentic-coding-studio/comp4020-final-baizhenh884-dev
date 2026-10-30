@@ -6,7 +6,8 @@
 // is classified, never a snapshot, so a reload or reconnect never replays a
 // moment. Pure, so spec/kept-moment.test.ts runs it without a page.
 
-export type KeptShip = { words: string[]; gaps: boolean[]; next: (string | null)[] };
+// `original`: whether this is ship 1, whose planks are the maker's originals (a flag, never the ship's number)
+export type KeptShip = { words: string[]; gaps: boolean[]; next: (string | null)[]; original?: boolean };
 export type MomentKind = "cross" | "first" | "later" | "wait";
 export type Moment = { position: number; kind: MomentKind };
 

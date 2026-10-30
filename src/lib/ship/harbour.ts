@@ -12,9 +12,9 @@ import type { KeptShip, Moment } from "../kept-moment";
 import { buildShip } from "./build";
 import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
-import { arrivalAt, leavesAt, type Kind } from "./motion";
+import { arrivalAt, leavesAt, newPartRed, plankColour, type Kind } from "./motion";
 import { buildHarbour, swell } from "./scene";
-import { flightAt, flightTarget, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, type Layout } from "./stage";
+import { flightAt, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, type Layout } from "./stage";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -35,7 +35,7 @@ function based(g: THREE.Group): void {
 
 // A plank in flight: the old part, taken off the live ship whole, flying in an arc to where it's kept.
 // It lands at `ms`, then sits in place until `hold`, when the kept part it becomes has faded in under it.
-type Flight = { start: number; ms: number; hold: number; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; s1: number; spin: number; landed: boolean; done(): void };
+type Flight = { start: number; ms: number; hold: number; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; s1: number; spin: number; landed: boolean; yours: boolean; done(): void };
 
 export type Scene = "now" | "earlier" | "kept";
 
@@ -57,6 +57,7 @@ export class HarbourView {
   private observer: ResizeObserver;
   private clock = performance.now();
   private moved = false;
+  private following = false;
   private next: (string | null)[] = Array(10).fill(null);
   // a waiting plank still in flight to the pallet isn't drawn there yet
   private landing = new Set<number>();
@@ -102,7 +103,7 @@ export class HarbourView {
   // One position's word changed on the live ship. Its old plank leaves the ship, whole, and flies to where
   // it's kept (`to`: the kept ship's gap, or a slot on the pallet), then `landed` runs. With reduced motion it
   // doesn't fly: the parts swap, outlined in red for a moment.
-  change(position: number, words: readonly string[], kind: Kind, to: THREE.Vector3 | null, landed: () => void = () => {}): void {
+  change(position: number, words: readonly string[], kind: Kind, to: THREE.Vector3 | null, landed: () => void = () => {}, yours = false): void {
     if (!this.live) return;
     const old = this.live.groups[position];
     // a copy of the old plank to fly: the body's own exchange keeps the old group to release when it ends
@@ -117,7 +118,7 @@ export class HarbourView {
       // nothing blinks; to the pallet it hands over to the pallet's plank as it lands
       let hold = ms;
       if (to!.y >= 1.8) while (hold < ms + 2000 && arrivalAt(hold).opacity < 1) hold += 16;
-      this.flights.push({ start: performance.now(), ms, hold, group: plank.group, from: plank.from, to: to!, s1: plank.s1, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, done: landed });
+      this.flights.push({ start: performance.now(), ms, hold, group: plank.group, from: plank.from, to: to!, s1: plank.s1, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, yours, done: landed });
     } else landed();
     this.paint();
   }
@@ -261,7 +262,7 @@ export class HarbourView {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const src = mesh.material as THREE.MeshStandardMaterial;
-      if (!mats.has(src)) mats.set(src, src.clone());
+      if (!mats.has(src)) { const c = src.clone(); c.emissive?.setHex(0); c.userData.flightBase = src.color.clone(); mats.set(src, c); }
       const m = new THREE.Mesh(mesh.geometry.clone(), mats.get(src)!);
       m.applyMatrix4(mesh.matrixWorld);
       m.castShadow = true;
@@ -382,18 +383,20 @@ export class HarbourView {
     // the live ship's exchange: the new part set down red, then neutral; the old one's drawing fades
     if (this.live) for (const { exchange: x, frame: f } of this.live.step(now, this.reduced)) {
       x.outgoing.visible = false; // the plank itself flies (a copy); with reduced motion it's simply gone
-      const tm = x.trace.userData.material as THREE.LineBasicMaterial;
-      tm.opacity = this.reduced ? 0 : 0.9 * f.trace * (1 - f.travel * 0.6);
+      // the old part's drawing isn't shown: the plank itself flies, in its own colours
+      (x.trace.userData.material as THREE.LineBasicMaterial).opacity = 0;
       x.incoming.position.y = 1.1 * f.drop;
-      const red = this.reduced ? f.incomingRed : Math.max(f.incomingRed, f.traceRed * f.trace * 0.6);
-      for (const m of (x.incoming.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.emissive?.setHex(red > 0.05 ? RED : x.position === this.lit ? GLOW : 0);
+      // the new part, red for about a second as it's set down (motion.ts), then as the rest
+      const red = newPartRed(now - x.start, this.reduced);
+      for (const m of (x.incoming.userData.materials as THREE.MeshStandardMaterial[]) ?? []) {
+        if (red > 0.02) m.emissive?.setHex(RED).multiplyScalar(red);
+        else m.emissive?.setHex(x.position === this.lit ? GLOW : 0);
+      }
     }
     if (this.stage) {
       const gaps = this.stage.gaps.join();
       this.stage.step(now, this.reduced);
-      for (const { arrival: a, frame: f } of this.stage.body.arriving(now, this.reduced)) {
-        for (const m of (a.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.emissive?.setHex(f.red > 0.05 ? RED : 0);
-      }
+      // the kept part arriving is the old plank itself: never red
       if (gaps !== this.stage.gaps.join() || this.stage.body.arrivals.length) this.ghost(now);
     }
     for (const fl of [...this.flights]) {
@@ -401,7 +404,11 @@ export class HarbourView {
       fl.group.position.copy(f.position);
       fl.group.scale.setScalar(f.scale);
       fl.group.rotation.y = fl.spin * Math.sin(Math.PI * k);
-      for (const m of (fl.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) m.emissive?.setHex(RED);
+      // the old part as it stood, bleaching to driftwood as it lands; yours glows (on your page only)
+      for (const m of (fl.group.userData.materials as THREE.MeshStandardMaterial[]) ?? []) {
+        m.color.copy(plankColour(m.userData.flightBase as THREE.Color, k));
+        m.emissive?.setHex(fl.yours ? GLOW : 0);
+      }
       // landed: the waiting word, the pallet's plank, and the end of "in flight"
       if (k >= 1 && !fl.landed) {
         fl.landed = true;
@@ -413,6 +420,17 @@ export class HarbourView {
         this.release(fl.group);
       }
     }
+    // on a phone the camera follows the plank there and back (a desktop keeps its view, or the visitor's orbit)
+    const followed = this.layout() === "phone" && !this.reduced ? this.flights[0] : undefined;
+    if (followed) {
+      const w = this.host.clientWidth, h = this.host.clientHeight;
+      const v = followView("phone", followed.from, followed.to, Math.min(1, (now - followed.start) / followed.hold));
+      place(this.camera, "phone", w / h);
+      this.camera.position.set(...v.position);
+      this.camera.lookAt(...v.target);
+      this.camera.updateMatrixWorld(true);
+      this.following = true;
+    } else if (this.following) { this.following = false; this.resize(); }
     // the end of a motion: everything back to neutral
     if (animating && !((this.live?.animating ?? false) || (this.stage?.animating ?? false) || this.flights.length)) this.paint();
     this.controls?.update();

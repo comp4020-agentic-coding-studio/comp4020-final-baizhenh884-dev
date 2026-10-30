@@ -75,8 +75,9 @@ describe("the numbering", () => {
         // each live word's index names its part too, from the rule table's names
         m.live.forEach((x, i) => {
           expect(x.part, `live word ${i + 1} doesn't name its part`).toBe(PARTS[i][0].toUpperCase() + PARTS[i].slice(1));
-          // Chrome reports attr() resolved: counter(word, decimal-leading-zero) " · Ram" / ""
-          expect(x.content, `live word ${i + 1}'s index doesn't add its part`).toBe(`counter(word, decimal-leading-zero) " · ${x.part}" / ""`);
+          // "01·Ram": no spaces around the dot (the maker, 30 October), so a label rarely outgrows its word; Chrome
+          // reports attr() resolved: counter(word, decimal-leading-zero) "·Ram" / ""
+          expect(x.content, `live word ${i + 1}'s index doesn't add its part`).toBe(`counter(word, decimal-leading-zero) "·${x.part}" / ""`);
         });
         for (const [what, list] of [["live word", m.live], ["kept word or gap", m.kept]] as const) {
           expect(list, `not ten ${what}s`).toHaveLength(10);
@@ -89,7 +90,7 @@ describe("the numbering", () => {
           for (const [i, x] of list.entries()) {
             const at = `${what} ${i + 1}`;
             // the number, 01 to 10 in order, from the sentence's own counter; its alternative text empty, so it's never read
-            expect(x.content, `${at} has no index`).toMatch(/^counter\(\w+, decimal-leading-zero\)( " · [^"]+")? \/ ""$/);
+            expect(x.content, `${at} has no index`).toMatch(/^counter\(\w+, decimal-leading-zero\)( "·[^"]+")? \/ ""$/);
             expect(x.font, `${at}'s index isn't in Plex Mono`).toMatch(/IBM Plex Mono/);
             expect(x.contrast, `${at}'s index is too faint on its grid`).toBeGreaterThanOrEqual(4.5);
             // over its own word: wholly above its letters (or a gap's line)
