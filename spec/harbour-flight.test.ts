@@ -125,8 +125,9 @@ describe("the flight, at its midpoint", () => {
 });
 
 // The pallet stands where it's seen whole (the maker, 30 October: it sat behind the slipway's edge): from the
-// fixed view at 1440 and 390, every slot's plank is inside the harbour's frame and clear of the kept ship at its
-// tallest, so no part of the kept ship or its mast stands in front of a waiting plank.
+// fixed view at 1440 and 390, every slot's plank is inside the harbour's frame, and nothing of the kept ship (its
+// real geometry, at its tallest) stands between the camera and any part of the plank: rays from the camera to the
+// plank's centre and corners reach the plank before they meet the kept ship.
 describe("the pallet, in view", () => {
   for (const [name, layout, w, h] of HARBOURS) {
     it(`shows every waiting plank whole, in the frame and clear of the kept ship (${name})`, () => {
@@ -135,26 +136,20 @@ describe("the pallet, in view", () => {
       const tall = buildShip(Array(10).fill("bookkeeper"));
       posed(tall.root, KEPT_POSE);
       tall.root.updateMatrixWorld(true);
-      const kept = new THREE.Box3().setFromObject(tall.root);
-      tall.dispose();
-      const screenBox = (b: THREE.Box3) => {
-        const r = { l: Infinity, t: Infinity, r: -Infinity, b: -Infinity }, v = new THREE.Vector3();
-        for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
-          v.set(x, y, z).project(cam);
-          const sx = ((v.x + 1) / 2) * w, sy = ((1 - v.y) / 2) * h;
-          r.l = Math.min(r.l, sx); r.r = Math.max(r.r, sx); r.t = Math.min(r.t, sy); r.b = Math.max(r.b, sy);
-        }
-        return r;
-      };
-      const k = screenBox(kept);
-      // the kept ship's own frame stands behind any plank that overlaps it only if the plank is nearer the camera
-      const camDist = (p: THREE.Vector3) => p.distanceTo(cam.position);
+      const ray = new THREE.Raycaster();
       for (const [i, slot] of PALLET_SLOTS.entries()) {
-        const half = PALLET_PLANK / 2, b = new THREE.Box3(slot.clone().subScalar(half), slot.clone().addScalar(half)), p = screenBox(b);
-        expect(p.l >= 0 && p.r <= w && p.t >= 0 && p.b <= h, `slot ${i + 1}'s plank runs out of the frame`).toBe(true);
-        const overlaps = p.l < k.r && k.l < p.r && p.t < k.b && k.t < p.b;
-        if (overlaps) expect(camDist(slot), `slot ${i + 1}'s plank stands behind the kept ship`).toBeLessThan(camDist(kept.getCenter(new THREE.Vector3())) - kept.getSize(new THREE.Vector3()).z / 2);
+        const half = PALLET_PLANK / 2;
+        const points = [slot.clone(), ...[-1, 1].flatMap((x) => [-1, 1].map((y) => slot.clone().add(new THREE.Vector3(x * half, y * half * 0.6, half))))];
+        for (const p of points) {
+          const v = p.clone().project(cam);
+          expect(Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1, `slot ${i + 1}'s plank runs out of the frame`).toBe(true);
+          const dir = p.clone().sub(cam.position), dist = dir.length();
+          ray.set(cam.position, dir.normalize());
+          const hit = ray.intersectObject(tall.root, true).find((x) => (x.object as THREE.Mesh).isMesh);
+          expect(hit && hit.distance < dist - 0.05, `the kept ship stands in front of slot ${i + 1}'s plank`).toBeFalsy();
+        }
       }
+      tall.dispose();
     });
   }
 });
