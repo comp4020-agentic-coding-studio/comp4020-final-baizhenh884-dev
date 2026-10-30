@@ -39,6 +39,8 @@ type Slot = { position: number; pos: HTMLElement; label: HTMLLabelElement; input
 export type CurrentHarbour = {
   // another visitor's change, from the live stream, with the moment it brought (null: no flight)
   latest(change: { position: number; word: string }, flight: { moment: Moment; kept: KeptShip } | null): void;
+  // this visitor's own standing word, at `position`, was just replaced by someone else: its plank is yours
+  yours(position: number): void;
   // a draft at `position` holds back a newer word (`now`), or no longer does (null)
   held(position: number, now: string | null): void;
   // the kept ship as a fresh load (or a reconnect) shows it
@@ -97,9 +99,24 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
   // The old plank flies to where it's kept. The kept ship is told at once, so it sets the plank down in its gap
   // as it lands (its gap stays an outline until then); a plank for the next ship is drawn on the pallet only
   // once it has landed.
-  function fly(position: number, moment: Moment, k: KeptShip, kind: Kind): void {
+  function fly(position: number, moment: Moment, k: KeptShip, kind: Kind, yours = false): void {
     view!.keptApply(k, moment);
-    view!.change(position, words, kind, view!.target(moment, k), () => view!.landed(position));
+    view!.change(position, words, kind, view!.target(moment, k), () => view!.landed(position), yours);
+  }
+  // Your plank (decision 0005), on your page only: it glows as it flies, and one line says where it went, in the
+  // notation's slot (unless a word is in hand) and the polite live region, then goes
+  const YOURS = "Your plank was carried to the slipway. It's kept.";
+  const yoursRegion = doc.getElementById("yours");
+  let yoursAt: number | null = null, yoursTimer = 0;
+  function sayYours(): void {
+    if (yoursRegion) yoursRegion.textContent = YOURS;
+    if (part && selected === null) {
+      part.hidden = false;
+      part.textContent = YOURS;
+      part.classList.add("yours");
+      clearTimeout(yoursTimer);
+      yoursTimer = window.setTimeout(() => { if (part.classList.contains("yours") && selected === null) { part.classList.remove("yours"); annotate(null); } }, 4000);
+    }
   }
 
   // ---- the sentence's word leaves and the new one arrives with its plank ----
@@ -127,6 +144,7 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
   const form = () => (phone() ? "phone" : "desktop");
   const annotate = (position: number | null, was?: string) => {
     if (!part) return;
+    part.classList.remove("yours");
     part.hidden = position === null;
     part.textContent = position === null ? "" : notation({ position, word: words[position], was }, form());
   };
@@ -215,10 +233,14 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
       if (old === word) return;
       words[position] = word;
       const kind: Kind = flight ? "cross" : "remote";
-      if (flight) fly(position, flight.moment, flight.kept, kind);
+      const mine = yoursAt === position;
+      yoursAt = null;
+      if (flight) fly(position, flight.moment, flight.kept, kind, mine);
       else view.change(position, words, kind, null);
+      if (mine) sayYours();
       queueMicrotask(() => { if (slots[position].label.textContent!.trim() === word) arrive(slots[position], old, "remote"); });
     },
+    yours(position) { yoursAt = position; },
     held(position, now) {
       if (now === null) heldBack.delete(position);
       else heldBack.set(position, now);

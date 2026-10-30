@@ -4,6 +4,7 @@ import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
 import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
 import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
+import { lastPlank } from "../lib/kept-sentence";
 import { labelRows, sizeStep } from "../lib/sentence-step";
 import { ensureVisitor } from "../lib/visitor";
 
@@ -153,6 +154,8 @@ const how =
             <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
             {/* what the part notation predicts while a word is typed, said once typing pauses (the notation is aria-hidden) */}
             <p class="sr-only" id="foreseen" aria-live="polite" aria-atomic="true"></p>
+            {/* your plank, said once when another visitor replaces your standing word (src/lib/ship/page.ts) */}
+            <p class="sr-only" id="yours" aria-live="polite" aria-atomic="true"></p>
             {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
             <div class="sentence" data-step={sizeStep(current.map((p) => p.word))} data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
               {current.slice(0, -1).map((p) => (
@@ -178,7 +181,7 @@ const how =
           </div>
         </div>
         </div>
-        <div id="kept" class="kept-strip strip">
+        <div id="kept" class="kept-strip strip" data-original={kept.ship === 1 ? "true" : "false"}>
           <div class="head-row">
             <p class="caps strip-label kept-label">The ship of old planks</p>
             <a class="caps to-sentence" href="#sentence">Back to the sentence ↑</a>
@@ -193,6 +196,8 @@ const how =
           </p>
           {/* what the kept sentence is (28 October playtest: it was read as a quiz, or as the original) */}
           <p class="kept-note">Replaced words, back in their places. Faint words still stand.</p>
+          {/* the last plank (the maker, 30 October): one gap left, named; ship 1's planks are originals (src/lib/kept-sentence.ts) */}
+          <p class="last-plank" hidden={lastPlank({ ...kept, original: kept.ship === 1 }) === null}>{lastPlank({ ...kept, original: kept.ship === 1 }) ?? ""}</p>
           {/* the next ship's words (decided 29 October): a replaced word that belongs to the next ship waits here,
               in place order with its place, read after the kept sentence; hidden when nothing waits
               (src/lib/kept-sentence.ts renderWaiting redraws it the same way) */}
@@ -263,7 +268,7 @@ const how =
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
           import { classifyMoment } from "../lib/kept-moment";
-          import { renderKeptSentence, waitingRow as waitingRowOf } from "../lib/kept-sentence";
+          import { lastPlank, renderKeptSentence, waitingRow as waitingRowOf } from "../lib/kept-sentence";
           import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
           import { BEAT_MS } from "../lib/ship/kept-stage";
           import { duration, leavesAt } from "../lib/ship/motion";
@@ -280,7 +285,9 @@ const how =
           const liveWords = [...document.querySelectorAll<HTMLElement>('.sentence-strip .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
           const next: (string | null)[] = Array(10).fill(null);
           for (const w of document.querySelectorAll<HTMLElement>(".kept-strip .waiting .ws .w")) next[Number(w.dataset.n) - 1] = w.textContent!.trim();
-          let keptNow: KeptShip = { words: keptSpans.map((s, i) => (s.classList.contains("gap") ? liveWords[i] : s.textContent!.trim())), gaps: keptSpans.map((s) => s.classList.contains("gap")), next };
+          const keptStrip = document.querySelector<HTMLElement>(".kept-strip");
+          let keptNow: KeptShip = { words: keptSpans.map((s, i) => (s.classList.contains("gap") ? liveWords[i] : s.textContent!.trim())), gaps: keptSpans.map((s) => s.classList.contains("gap")), next, original: keptStrip?.dataset.original === "true" };
+          const lastLine = document.querySelector<HTMLElement>(".kept-strip .last-plank");
           let pending: Moment | null = null; // the moment the next live change belongs to
           let beat = 0;
           // the waiting row as the kept ship says, except a word whose plank is still flying toward the pallet
@@ -292,6 +299,8 @@ const how =
           function renderKept(k: KeptShip): void {
             if (keptLabel) renderKeptSentence(keptLabel, k, mine);
             waiting?.show(k.next);
+            // the last plank follows the kept ship shown (a flag says whether it's ship 1, never its number)
+            if (lastLine) { const line = lastPlank(k); lastLine.hidden = line === null; lastLine.textContent = line ?? ""; }
           }
           // When the shown ship gives way, its waiting words are the next ship's: they rise from the row into the
           // kept sentence, each to its own place, rather than reappearing from nowhere. Presentation only.
@@ -372,6 +381,7 @@ const how =
               harbour?.latest(change, flight);
             },
             onHeld: (position, word) => harbour?.held(position, word),
+            onYours: (position) => harbour?.yours(position),
             onMine: (positions) => {
               mine = new Set(positions);
               harbour?.mine(positions[0] ?? null);

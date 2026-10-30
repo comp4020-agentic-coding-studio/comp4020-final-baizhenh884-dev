@@ -261,6 +261,11 @@ const image = new URL("/og.png", Astro.url.origin).href;
          has no line, your own kept word a dotted one). Legible as text, clearly fainter than a kept word */
       .kept-sentence .gap { color: #7a6a57; text-decoration: underline dashed 1px #7a6a57; text-underline-offset: 0.14em; }
       .kept-note { margin: 0; font-size: 15px; line-height: 1.45; color: #4a3d30; text-wrap: pretty; }
+      /* the last plank: one gap left, named, in the kept strip's own ink */
+      .last-plank { margin: 0; font: italic 400 clamp(19px, 1.45vw, 24px)/1.25 "Instrument Serif", serif; color: var(--brown); text-wrap: pretty; }
+      .last-plank[hidden] { display: none; }
+      /* your plank's line in the notation's slot: the notation's own face */
+      #part.yours { color: var(--brown); }
       .kept-sentence { counter-reset: kept; }
       .kept-sentence .w { position: relative; display: inline-block; padding-top: 12px; counter-increment: kept; }
       .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); pointer-events: none; white-space: nowrap; text-decoration: none; }

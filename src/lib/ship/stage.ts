@@ -109,5 +109,19 @@ export function flightAt(from: THREE.Vector3, to: THREE.Vector3, k: number, s1: 
   return { position, scale: toPallet ? 1 + (s1 - 1) * e : 1 };
 }
 
-// stub: slice 3b's spec lands first (spec/harbour-flight.test.ts)
-export const followView = (layout: Layout, _from: THREE.Vector3, _to: THREE.Vector3, _k: number): View => home(layout);
+// On a phone the camera follows a flying plank (decision 0005): `k` (0..1) through the flight, it leaves the fixed
+// view, comes toward the middle of the plank's way and where it lands, nearer by up to `NEAR`, and returns, so the
+// fixed view is where it starts and ends. Halfway it frames the plank and its landing (spec/harbour-flight.test.ts).
+const NEAR = 0.45;
+export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector3, k: number): View {
+  const h = home(layout), w = Math.sin(Math.PI * Math.min(1, Math.max(0, k)));
+  if (w < 1e-9) return { ...h, position: [...h.position], target: [...h.target] };
+  const pos = new THREE.Vector3(...h.position), tgt = new THREE.Vector3(...h.target);
+  // where to look: between the plank's way and where it lands, a little above, toward the landing
+  const focus = new THREE.Vector3().lerpVectors(from, to, 0.7).add(new THREE.Vector3(0, 1.2, 0));
+  const target = tgt.clone().lerp(focus, w);
+  // the camera keeps its own direction to the target, nearer
+  const offset = pos.clone().sub(tgt).multiplyScalar(1 - NEAR * w);
+  const position = target.clone().add(offset);
+  return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
+}
