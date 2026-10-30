@@ -338,28 +338,45 @@ describe("a plank flying on a real page, for another visitor's change", () => {
   }, 120_000);
 
   // The shipwrights are drawn from the stream's total, at most CREW_MAX of them, and change as views open and
-  // close: the harbour says how many it draws (data-crew, read by this check only: never text a visitor reads, and
-  // spec/present-only.test.ts keeps the total off the page's words).
-  localOnly("draws one shipwright per open view, up to the cap, and follows views opening and closing", async () => {
+  // close. The page never says how many (spec/present-only.test.ts keeps the total off it, attributes included),
+  // so this looks. The waiting figures stand as a crowd at the quay's near end (crewSpots), where nothing else moves
+  // (no sea): seen through the page's own fixed camera, that patch of the canvas changes when two more views open,
+  // and is back as it was when they close. (A tunic is too near the deck's colour to count figures by colour.)
+  localOnly("draws more shipwrights as views open, and takes them away as they close", async () => {
+    const [w, h] = [1440, 900];
+    const box = (await liveIn(new URL("/", baseUrl).href, `(() => { const r = document.querySelector('#harbour').getBoundingClientRect(); return [r.width, r.height]; })()`, [w, h], { steps: [READY] })) as [number, number];
+    const cam = new THREE.PerspectiveCamera();
+    place(cam, "desktop", box[0] / box[1]);
+    // the crowd's patch on screen: places 2 onwards (the first is this view's own), from their feet to their heads
+    const pts = crewSpots(CREW_MAX).slice(1).flatMap((s) => [0, 1.75].flatMap((y) => [-0.35, 0.35].map((x) => onScreen(cam, s.clone().add(new THREE.Vector3(x, y, 0))))));
+    const area = { x0: Math.min(...pts.map((p) => p.x)), x1: Math.max(...pts.map((p) => p.x)), y0: Math.min(...pts.map((p) => p.y)), y1: Math.max(...pts.map((p) => p.y)) };
     let extra: AbortController[] = [];
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
-      const harbour = document.querySelector('#harbour');
-      const read = () => Number(harbour.getAttribute('data-crew') ?? 0);
-      for (let i = 0; i < 50 && read() === 0; i++) await new Promise((r) => setTimeout(r, 100));
-      const alone = read();
+      const c = document.querySelector('#harbour canvas'), a = ${JSON.stringify(area)};
+      const grab = () => {
+        const g = document.createElement('canvas'); g.width = c.width; g.height = c.height;
+        const x = g.getContext('2d'); x.drawImage(c, 0, 0);
+        const x0 = Math.floor(a.x0 * c.width), y0 = Math.floor(a.y0 * c.height);
+        return x.getImageData(x0, y0, Math.ceil(a.x1 * c.width) - x0, Math.ceil(a.y1 * c.height) - y0).data;
+      };
+      // the share of the patch's pixels that differ from another grab of it
+      const differ = (p, q) => { let n = 0; for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]) > 30) n++; return n / (p.length / 4); };
+      await new Promise((r) => setTimeout(r, 1200));
+      const alone = grab(), still = (await new Promise((r) => setTimeout(r, 300)), grab());
+      await new Promise((r) => setTimeout(r, 2200));
+      const more = grab();
       await new Promise((r) => setTimeout(r, 2500));
-      const more = read();
-      await new Promise((r) => setTimeout(r, 2500));
-      return { alone, more, after: read() };
-    })()`, [1440, 900], { steps: [READY], then: async () => {
-      await new Promise((r) => setTimeout(r, 600));
+      const after = grab();
+      return { still: differ(alone, still), more: differ(alone, more), after: differ(alone, after) };
+    })()`, [w, h], { steps: [READY], then: async () => {
+      await new Promise((r) => setTimeout(r, 1700));
       extra = await Promise.all([0, 1].map(async () => { const c = new AbortController(); await fetch(new URL("/events", baseUrl), { headers: { accept: "text/event-stream" }, signal: c.signal }); return c; }));
       await new Promise((r) => setTimeout(r, 2500));
       for (const c of extra) c.abort();
-    } })) as { alone: number; more: number; after: number };
-    expect(m.alone, "no shipwright for this view").toBeGreaterThanOrEqual(1);
-    expect(m.more, "two more views didn't add two shipwrights").toBe(Math.min(CREW_MAX, m.alone + 2));
-    expect(m.after, "closing them didn't take their shipwrights away").toBe(m.alone);
+    } })) as { still: number; more: number; after: number };
+    expect(m.still, "the crowd's patch moves on its own, so it can't show figures coming and going").toBeLessThan(0.01);
+    expect(m.more, "two more views drew no more shipwrights").toBeGreaterThan(0.05);
+    expect(m.after, "closing them didn't take their shipwrights away").toBeLessThan(0.01);
   }, 120_000);
 
   localOnly("flies nothing on a load: a fresh page's harbour stands still once drawn", async () => {
