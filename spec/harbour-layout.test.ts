@@ -244,7 +244,8 @@ describe("the harbour on GET /", () => {
       })()`, [size[0], size[1]])) as { tag: string; word: string; under: string[]; above: boolean }[];
       const parts = ["Ram", "Hull", "Prow", "Stern", "Shields", "Mast", "Sail", "Oars", "Steering oar", "Pennant"];
       m.forEach((p, i) => {
-        expect(p.tag, `word ${i + 1} doesn't carry its number and part`).toContain(`${String(i + 1).padStart(2, "0")} · ${parts[i]}`);
+        // the number from the sentence's own counter (01 to 10, spec/numbering.test.ts), the part's name after it; Chrome reports attr() resolved
+        expect(p.tag, `word ${i + 1} doesn't carry its number and part`).toMatch(new RegExp(`^counter\\(\\w+, decimal-leading-zero\\) " · ${parts[i]}" / ""$`));
         expect(p.above, `word ${i + 1}'s part isn't above it`).toBe(true);
         expect(p.under, `something is shown under "${p.word}"`).toEqual([]);
       });
