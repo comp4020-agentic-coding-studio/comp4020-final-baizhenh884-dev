@@ -204,18 +204,20 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .sentence-strip .sentence .changed > span { background: var(--parchment); }
       @supports not (field-sizing: content) { .sentence-strip .sentence form:focus-within input[name="word"] { background: var(--parchment); } }
       .sentence-strip .sentence input:focus-visible { outline-color: var(--brown); }
-      /* each word's place and part, "01 · Ram", small above it: navigation, drawn, never read (spec/numbering.test.ts) */
-      .sentence-strip .sentence { counter-reset: word; }
-      /* a word is at least as wide as its index ("02 · Hull", --tag characters of the 9.5px mono, 0.61em each, and a
-         gap), so two short words' indices never run into each other (spec/numbering.test.ts) */
-      .sentence-strip .sentence .pos { counter-increment: word; padding-top: 13px; padding-bottom: 0.1em; vertical-align: baseline; min-width: calc(var(--tag, 0) * 9.5px * 0.61 + 8px); }
-      /* the last word keeps only its letters' width: its index may run on past the full stop, where nothing follows,
-         so the full stop stays with the word (spec/sentence-wrap.test.ts) */
-      .sentence-strip .sentence .end > .pos { min-width: 0; }
+      /* each word's place and part, "01·Ram", small above it: navigation, drawn, never read (spec/numbering.test.ts).
+         Two rows of labels over every line: a label wider than its word rises to the upper row, so the words keep
+         their ordinary spacing and no two labels meet (src/lib/sentence-step.ts labelRows, set by the server and the
+         live client per layout; spec/harbour-layout.test.ts, spec/numbering.test.ts). Every line keeps both rows,
+         so the words of a line stand level. */
+      .sentence-strip .sentence { counter-reset: word; --tag-size: 8px; --tag-row: calc(var(--tag-size) + 3px); }
+      .sentence-strip .sentence .pos { counter-increment: word; padding-top: calc(2 * var(--tag-row) + 2px); padding-bottom: 0.1em; vertical-align: baseline; }
       .sentence-strip .sentence .pos::before {
-        content: counter(word, decimal-leading-zero) " · " attr(data-part) / ""; position: absolute; left: 1px; top: 1px;
-        font: 500 9.5px/1 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--brown-soft); white-space: nowrap; pointer-events: none;
+        content: counter(word, decimal-leading-zero) "·" attr(data-part) / ""; position: absolute; left: 1px; top: calc(var(--tag-row) + 1px);
+        font: 500 var(--tag-size)/1 var(--mono); font-style: normal; letter-spacing: -0.03em; color: var(--brown-soft); white-space: nowrap; pointer-events: none;
       }
+      .sentence-strip .sentence .pos[data-row-desktop="2"]::before { top: 1px; }
+      /* a label that fits on neither row: its word takes just the room the label needs */
+      .sentence-strip .sentence .pos[data-row-desktop="room"] { min-width: calc(var(--tag-ch) * var(--tag-size) * 0.57 + 4px); }
       /* the notation's slot under the sentence: at rest the invitation and the way to /ship/; a word in hand, the notation */
       .sentence-strip .slot { position: relative; margin-top: 0.35rem; min-height: 1.45em; }
       #part, .sentence-strip .invite-row { margin: 0; color: var(--brown-soft); }
@@ -368,9 +370,14 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .kept-pointer { display: block; }
         .sentence-strip .head-row { justify-content: flex-end; }
         .sentence-strip .sentence { font-size: 30px; line-height: 1.04; }
-        .sentence-strip .sentence .pos { padding-top: 11px; }
-        .sentence-strip .sentence .pos::before { font-size: 8.5px; }
-        .sentence-strip .sentence .pos { min-width: calc(var(--tag, 0) * 8.5px * 0.61 + 6px); }
+        /* a phone's line is taller than its word (the 44px tap target): the upper row of labels sits in the room
+           above the word that target already gives, so it adds no height */
+        .sentence-strip .sentence { --tag-size: 7.5px; --tag-row: calc(var(--tag-size) + 2.5px); }
+        .sentence-strip .sentence .pos { padding-top: calc(var(--tag-row) + 2px); }
+        .sentence-strip .sentence .pos::before, .sentence-strip .sentence .pos[data-row-desktop="2"]::before { top: 1px; }
+        .sentence-strip .sentence .pos[data-row-phone="2"]::before { top: calc(1px - var(--tag-row)); }
+        .sentence-strip .sentence .pos[data-row-desktop="room"] { min-width: 0; }
+        .sentence-strip .sentence .pos[data-row-phone="room"] { min-width: calc(var(--tag-ch) * var(--tag-size) * 0.57 + 4px); }
         .sentence-strip .invite-ship { display: none; }
         .part-tag { display: none !important; }
         #home { display: none !important; }

@@ -4,17 +4,20 @@
 // the earlier forms (?at=N) and, kept, in the kept strip. It names its part
 // ("01 · Ram", drawn above the word, never read).
 import { PARTS } from "../lib/ship/rules";
+import type { LabelRow } from "../lib/sentence-step";
 
 interface Props {
   position: number;
   version: number;
   word: string;
   marked: boolean;
+  // which row its "01·Ram" stands in, on a desktop and on a phone (src/lib/sentence-step.ts labelRows)
+  rows: { desktop: LabelRow; phone: LabelRow };
 }
-const { position, version, word, marked } = Astro.props;
+const { position, version, word, marked, rows } = Astro.props;
 ---
 
-<div class="pos" data-part={PARTS[position][0].toUpperCase() + PARTS[position].slice(1)} style={`--tag: ${PARTS[position].length + 6}`}>
+<div class="pos" data-part={PARTS[position][0].toUpperCase() + PARTS[position].slice(1)} data-row-desktop={rows.desktop} data-row-phone={rows.phone} style={`--tag-ch: ${3 + PARTS[position].length}`}>
   <form method="post" action="/replace">
     <input type="hidden" name="position" value={position} />
     <input type="hidden" name="version" value={version} />

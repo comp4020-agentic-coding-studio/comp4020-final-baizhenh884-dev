@@ -20,6 +20,8 @@
 // Some sentences can't fit two lines at the smallest step (ten 24-letter
 // words): they stay at the floor and wrap.
 
+import { PARTS } from "./ship/rules";
+
 export const SIZE_STEPS = [1, 0.92, 0.85, 0.8] as const;
 
 const MEASURE = 11.26 * 0.965; // em, at step 1
@@ -55,6 +57,24 @@ export function sizeStep(words: readonly string[]): number {
   return i < 0 ? SIZE_STEPS.length - 1 : i;
 }
 
-// stub: the label rows' spec lands first (spec/sentence-step.test.ts)
+// Which row each word's "01·Ram" stands in. A label no wider than its word and the space after it stays down
+// (1). One that's wider rises to the upper row (2), unless the label before it has risen too and would reach into
+// it there; then it stays down, and its word is given just the room its label needs ("room"), so no two labels
+// ever meet and only two very short words in a row widen a gap. Predicted from glyph widths, like the step, at
+// each layout's smallest sentence size against its label size, where a label is widest for its word (desktop:
+// 8px over 30px x 0.8; phone: 7.5px over 30px), so a label rises whenever it might be needed. Shared by the
+// server and the live client; checked against the rendered page (spec/harbour-layout, spec/numbering).
 export type LabelRow = 1 | 2 | "room";
-export const labelRows = (words: readonly string[], _layout: "desktop" | "phone"): LabelRow[] => words.map(() => 1);
+const LABEL_EM = { desktop: (8 * 0.57) / (30 * 0.8), phone: (7.5 * 0.57) / 30 }; // a label character, in em of the word
+export const labelWidth = (position: number, layout: "desktop" | "phone"): number => (3 + (PARTS[position]?.length ?? 0)) * LABEL_EM[layout];
+export function labelRows(words: readonly string[], layout: "desktop" | "phone"): LabelRow[] {
+  const rows: LabelRow[] = [];
+  words.forEach((word, i) => {
+    const label = labelWidth(i, layout), room = width(word) + SPACE;
+    if (label <= room) return rows.push(1);
+    // the label before, risen: where it ends, measured from this word's start
+    const reach = rows[i - 1] === 2 ? labelWidth(i - 1, layout) - (width(words[i - 1]) + SPACE) : -Infinity;
+    rows.push(reach > 0 ? "room" : 2);
+  });
+  return rows;
+}
