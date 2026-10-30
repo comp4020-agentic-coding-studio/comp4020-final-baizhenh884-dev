@@ -191,18 +191,11 @@ describe("the carry, step by step", () => {
       const box = (pts: THREE.Vector3[]) => { const q = pts.map((p) => onScreen(cam, p)); return { x0: Math.min(...q.map((v) => v.x)), x1: Math.max(...q.map((v) => v.x)), y0: Math.min(...q.map((v) => v.y)), y1: Math.max(...q.map((v) => v.y)) }; };
       const half = PALLET_PLANK / 2;
       const planks = PALLET_SLOTS.map((p) => box([-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => p.clone().add(new THREE.Vector3(x * half, y * half * 0.6, z * half * 0.6)))))));
-      // a toy scale, seen (the maker, 31 October: 1.5–2× the first figures, 1.75 tall): every waiting figure at least
-      // 1.5× the first figures' height on screen, and no head hidden behind the figure in front
+      // a toy scale, seen (the maker, 31 October: 1.5–2× the first figures, which stood 1.75 tall). At that size the
+      // waiting crowd overlaps, the ones behind partly hidden (the maker's choice, 31 October: a full room reads as a
+      // dense crowd; only the quay's near end is clear of the hull, the rack and the frame)
       expect(FIGURE_HEIGHT, "the shipwrights aren't 1.5–2× the first figures").toBeGreaterThanOrEqual(1.75 * 1.5);
       expect(FIGURE_HEIGHT).toBeLessThanOrEqual(1.75 * 2);
-      const heads = spots.map((s) => box([s.clone().add(new THREE.Vector3(-FIGURE_HEIGHT * 0.1, FIGURE_HEIGHT * 0.82, 0)), s.clone().add(new THREE.Vector3(FIGURE_HEIGHT * 0.1, FIGURE_HEIGHT, 0))]));
-      const bodies = spots.map((s) => box([-1, 1].flatMap((x) => [0, FIGURE_HEIGHT * 0.8].map((y) => s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0))))));
-      for (const [i, hd] of heads.entries()) for (const [j, b] of bodies.entries()) {
-        // j stands nearer the camera than i
-        if (j === i || spots[j].z <= spots[i].z) continue;
-        const cover = Math.max(0, Math.min(hd.x1, b.x1) - Math.max(hd.x0, b.x0)) * Math.max(0, Math.min(hd.y1, b.y1) - Math.max(hd.y0, b.y0));
-        expect(cover / ((hd.x1 - hd.x0) * (hd.y1 - hd.y0)), `shipwright ${j + 1} hides shipwright ${i + 1}'s head`).toBeLessThan(0.5);
-      }
       for (const [i, s] of spots.entries()) {
         const f = box([-1, 1].flatMap((x) => [0, FIGURE_HEIGHT].map((y) => s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0)))));
         for (const [k, p] of planks.entries()) expect(f.x0 < p.x1 && f.x1 > p.x0 && f.y0 < p.y1 && f.y1 > p.y0, `shipwright ${i + 1} stands with the rack's plank ${k + 1}`).toBe(false);
