@@ -10,7 +10,7 @@ import { measureIn, servedPage } from "./chrome";
 
 const baseUrl = inject("baseUrl");
 
-type Row = { length: number; ch: string; sameLine: boolean; after: boolean };
+type Row = { row: string; length: number; ch: string; sameLine: boolean; after: boolean };
 
 async function fullStops(size: [number, number]): Promise<Row[]> {
   const doc = await servedPage(baseUrl);
@@ -26,8 +26,13 @@ async function fullStops(size: [number, number]): Promise<Row[]> {
     for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.data.includes('.') && !n.parentElement.closest('form, .pos > :not(form)')) stop = n;
     if (!stop) throw new Error('no full stop in the sentence');
     const out = [];
+    // every row its label can take (src/lib/sentence-step.ts labelRows), staged here rather than left to whichever
+    // words the server holds: a "room" label widens its slot, and production's own "peel" was the first to get one
+    const pos = last.closest('.pos');
     // every length, in a wide letter and a narrow one: a narrow short word is where the slot outgrows the word
-    for (let length = 1; length <= 24; length++) for (const ch of ['w', 'i']) {
+    for (const row of ['1', '2', 'room']) for (let length = 1; length <= 24; length++) for (const ch of ['w', 'i']) {
+      pos.dataset.rowDesktop = pos.dataset.rowPhone = row;
+      pos.style.setProperty('--tag-ch', '10');
       last.textContent = ch.repeat(length);
       const range = document.createRange();
       const at = stop.data.indexOf('.');
@@ -39,7 +44,7 @@ async function fullStops(size: [number, number]): Promise<Row[]> {
       letters.selectNodeContents(last);
       const dot = range.getBoundingClientRect(), word = letters.getBoundingClientRect();
       const mid = dot.top + dot.height / 2;
-      out.push({ length, ch, sameLine: mid > word.top && mid < word.bottom, after: dot.left >= word.right - 1 && dot.left - word.right < 12 });
+      out.push({ row, length, ch, sameLine: mid > word.top && mid < word.bottom, after: dot.left >= word.right - 1 && dot.left - word.right < 12 });
     }
     return out;
   })()`, size)) as Row[];
@@ -49,10 +54,10 @@ describe("the sentence's full stop", () => {
   for (const [name, size] of [["1920×1080", [1920, 1080]], ["1280×800", [1280, 800]], ["phone 390×844", [390, 844]]] as const) {
     it(`never wraps away from the last word (${name})`, async () => {
       const rows = await fullStops([size[0], size[1]]);
-      expect(rows).toHaveLength(48);
+      expect(rows).toHaveLength(144);
       for (const r of rows) {
-        expect(r.sameLine, `a last word of ${r.length} "${r.ch}": the full stop sits on its line`).toBe(true);
-        expect(r.after, `a last word of ${r.length} "${r.ch}": the full stop follows it directly`).toBe(true);
+        expect(r.sameLine, `a last word of ${r.length} "${r.ch}", label row ${r.row}: the full stop sits on its line`).toBe(true);
+        expect(r.after, `a last word of ${r.length} "${r.ch}", label row ${r.row}: the full stop follows it directly`).toBe(true);
       }
     }, 90_000);
   }
