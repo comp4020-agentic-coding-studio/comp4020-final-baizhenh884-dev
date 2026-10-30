@@ -131,8 +131,8 @@ export class HarbourView {
 
   // the shipwrights: one per open view (the stream's anonymous total), at most CREW_MAX drawn
   crewSet(total: number): void {
+    // drawn only: the total is never written on the page (spec/present-only.test.ts)
     this.crew.set(total);
-    this.host.setAttribute("data-crew", String(this.crew.count));
     this.requestFrame();
   }
   // whether one of them is this visitor's (marked only on this page)

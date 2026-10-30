@@ -169,12 +169,12 @@ export function carryPath(from: THREE.Vector3, to: THREE.Vector3, c: number): { 
 }
 
 // Where the shipwrights wait, at most CREW_MAX of them: at the quay's near end, by the catch past the live ship's
-// bow and back along the slipway's side, each in its own place. Measured, not picked: from the fixed view at 1440
+// bow and back along the slipway's side, a loose crowd in rows, each figure's head clear of those in front. Measured, not picked: from the fixed view at 1440
 // and 390 this is the only part of the quay where a figure stands clear of the rack's planks, the live hull and the
 // frame's edges (spec/harbour-flight.test.ts). A passer-by, when no other is free, walks in from the back of the
 // quay (PASSER).
 export const CREW_MAX = 8;
-const SPOTS: THREE.Vector3[] = [[2.7, 3.8], [2.7, 2.2], [2.7, 0.6], [2.1, -1.2], [1.0, -2.2], [2.3, -3.2], [0.9, -4.4], [2.2, -5.6]].map(([x, z]) => new THREE.Vector3(x, QUAY.deck, z));
+const SPOTS: THREE.Vector3[] = [[2.6, -0.6], [1.5, -0.6], [0.5, -1.2], [2.1, -3.4], [1.0, -3.6], [2.6, -6.0], [1.5, -6.2], [0.4, -6.6]].map(([x, z]) => new THREE.Vector3(x, QUAY.deck, z));
 export const crewSpots = (n: number): THREE.Vector3[] => SPOTS.slice(0, Math.max(0, Math.min(CREW_MAX, Math.floor(n)))).map((v) => v.clone());
 export const PASSER = new THREE.Vector3(1.4, QUAY.deck, -7.6);
 // a carried plank is held as an armful, at most this long, and grows back to its own size as it's set in place
