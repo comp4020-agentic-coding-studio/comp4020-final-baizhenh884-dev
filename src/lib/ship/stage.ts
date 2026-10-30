@@ -125,3 +125,12 @@ export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector
   const position = target.clone().add(offset);
   return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
 }
+
+// The carry and the shipwrights (docs/decisions/0005, amended 31 October): stubs until they're built, so their
+// checks fail for their reason.
+export const CREW_MAX = 8;
+export const onQuay = (_x: number, _z: number): boolean => false;
+export const catchPoint = (_position: number): THREE.Vector3 => new THREE.Vector3();
+export const tossAt = (from: THREE.Vector3, _to: THREE.Vector3, _k: number): THREE.Vector3 => from.clone();
+export const crewSpots = (_n: number): THREE.Vector3[] => [];
+export const carryPath = (from: THREE.Vector3, _to: THREE.Vector3, _c: number): { plank: THREE.Vector3; figure: THREE.Vector3 } => ({ plank: from.clone(), figure: from.clone() });

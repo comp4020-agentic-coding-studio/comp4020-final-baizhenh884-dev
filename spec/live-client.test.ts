@@ -4,7 +4,7 @@ import { foreseen, said } from "../src/lib/ship/notation";
 import { sizeStep } from "../src/lib/sentence-step";
 import { attach, deriveTotal, DRAFT_MS, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 import { waitingRow } from "../src/lib/kept-sentence";
-import { frameAt, leavesAt } from "../src/lib/ship/motion";
+import { carryAt, landsAt } from "../src/lib/ship/motion";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -877,26 +877,26 @@ describe("live page reconciliation", () => {
     });
   });
 
-  // A word waiting for the next house lands when its part does (found in the
+  // A word waiting for the next ship lands when its plank does (found in the
   // 29 October frames: the row showed the word at once, a second before the
-  // part flying toward it had left the live house). While the part is in
-  // flight the row holds that word back; it appears once the part has gone
-  // its whole way out, toward the row. With reduced motion, or when nothing
-  // flies (no house drawn), the page passes no flight and the word is there
-  // at once. Words already waiting never leave the row meanwhile, and a
-  // second change in flight never loses the first one's word.
+  // part flying toward it had left the live house). While the plank is
+  // carried the row holds that word back; it appears once the shipwright sets
+  // it down on the rack. With reduced motion, or when nothing is carried (no
+  // harbour drawn), the page passes no carry and the word is there at once.
+  // Words already waiting never leave the row meanwhile, and a second change
+  // finishes the first one's carry, so its word lands then.
   describe("a waiting word, landing", () => {
     const rowDoc = () => new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next ship:</span> <span class="ws"></span></p>').window.document;
     const next = (at: Record<number, string>) => Array.from({ length: 10 }, (_, i) => at[i] ?? null);
     const shown = (row: HTMLElement) => (row.hidden ? [] : [...row.querySelectorAll(".ws .w")].map((w) => w.textContent));
     afterEach(() => vi.useRealTimers());
 
-    it("lands when the crossing part has gone its whole way out, and with reduced motion at once", () => {
-      const at = leavesAt(false);
-      expect(at, "the part never leaves").toBeGreaterThan(0);
-      expect(frameAt("cross", at - 50).travel, "the word would land before its part has left").toBeLessThan(1);
-      expect(frameAt("cross", at).travel, "the word would land after its part has left").toBeGreaterThanOrEqual(0.999);
-      expect(leavesAt(true), "with reduced motion a waiting word still waits for a flight").toBe(0);
+    it("lands when the shipwright sets its plank down, and with reduced motion at once", () => {
+      const at = landsAt(false);
+      expect(at, "the plank is never set down").toBeGreaterThan(0);
+      expect(carryAt(at - 50).phase, "the word would land while its plank is still carried").toBe("carry");
+      expect(carryAt(at).phase, "the word would land after its plank is set down").toBe("set");
+      expect(landsAt(true), "with reduced motion a waiting word still waits for a carry").toBe(0);
     });
 
     it("isn't in the row while its part is in flight, and is there after", () => {
@@ -924,15 +924,19 @@ describe("live page reconciliation", () => {
       expect(row.hidden).toBe(false);
     });
 
-    it("loses no word when a second part flies before the first has landed", () => {
+    // a new change finishes any carry still under way at once (decision 0005, amended 31 October): the first
+    // plank is set down, so its word lands then, and the second waits for its own
+    it("lands the first word at once when a second plank is carried before the first is set down", () => {
       vi.useFakeTimers();
       const row = rowDoc().querySelector<HTMLElement>(".waiting")!;
       const rows = waitingRow(row, next({}));
-      rows.land(next({ 1: "two" }), 1500);
+      rows.land(next({ 1: "two" }), 2700);
       vi.advanceTimersByTime(800);
-      rows.land(next({ 1: "two", 3: "while" }), 1500);
-      expect(shown(row)).toEqual([]);
-      vi.advanceTimersByTime(1500);
+      rows.land(next({ 1: "two", 3: "while" }), 2700);
+      expect(shown(row), "the first word wasn't landed by the second change").toEqual(["two"]);
+      vi.advanceTimersByTime(2699);
+      expect(shown(row), "the second word landed before its plank").toEqual(["two"]);
+      vi.advanceTimersByTime(1);
       expect(shown(row), "a word in flight was lost").toEqual(["two", "while"]);
       // and the ship completing (its waiting words moving up) empties the row at once
       rows.show(next({}));

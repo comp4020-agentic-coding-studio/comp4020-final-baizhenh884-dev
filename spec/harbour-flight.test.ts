@@ -2,17 +2,19 @@ import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
-import { followView, flightAt, flightTarget, home, KEPT_POSE, LIVE_POSE, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed } from "../src/lib/ship/stage";
-import { arrivalAt, leavesAt } from "../src/lib/ship/motion";
+import { carryPath, catchPoint, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
+import { arrivalAt, carryAt, landsAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
-// The plank's flight (docs/decisions/0005-the-ship.md): once the server has
-// accepted a change, the old plank flies from the live ship to its place in
-// the one harbour: the kept ship's gap when it belongs to the ship shown, a
-// slot on the pallet when it belongs to the next; for this visitor's own
-// change and for every other visitor's change arriving live; never on a load,
-// a snapshot or a reconnect. The waiting word lands in its row with the
-// plank. With reduced motion nothing flies.
+// The plank's carry (docs/decisions/0005-the-ship.md, amended 31 October):
+// once the server has accepted a change, the old plank is tossed in a short
+// arc from the live ship to the quay's edge, a shipwright catches it and
+// carries it to its place in the one harbour: the kept ship's gap when it
+// belongs to the ship shown, a slot on the pallet when it belongs to the
+// next; for this visitor's own change and for every other visitor's change
+// arriving live; never on a load, a snapshot or a reconnect. A new change
+// finishes any carry still under way at once. The waiting word lands in its
+// row with the plank. With reduced motion nothing is tossed or carried.
 //
 // Where it flies is pure (src/lib/ship/stage.ts), checked here without a
 // renderer. That it happens on a real page, for another visitor's change, is
@@ -69,48 +71,77 @@ describe("where a plank flies", () => {
   });
 });
 
-// The flight as a visitor sees it, through the page's own camera at 1440×900 and 390×844 (the harbour's box
-// at each, measured on the served page: 1440×722 under a new visitor's full band, the smaller of the two,
-// and 390×351 on a phone): halfway through its flight, the plank is out over the water
-// between the two ships, no bigger than it stood on the live ship, and the gap it flies to is still an
-// outline. (Seen on 30 October: the copy flew at 1.69 times its size and was over the slipway by 300 ms.)
+// The carry as a visitor sees it, through the page's own camera at 1440×900 and 390×844 (the harbour's box at
+// each, measured on the served page: 1440×722 under a new visitor's full band, the smaller of the two, and
+// 390×351 on a phone): at the end of its toss the plank is at the quay's edge, out of the live ship and its own
+// size, and the gap it goes to is still an outline; while it's carried it's over the quay, never the water, and
+// the shipwright carrying it stands on the quay too.
 const HARBOURS = [["1440×900", "desktop", 1440, 722], ["390×844", "phone", 390, 351]] as const;
 function onScreen(cam: THREE.PerspectiveCamera, p: THREE.Vector3) { const v = p.clone().project(cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; }
 function screenSize(cam: THREE.PerspectiveCamera, centre: THREE.Vector3, size: number, heightPx: number) {
   const a = centre.clone().project(cam), b = centre.clone().add(new THREE.Vector3(0, size, 0)).project(cam);
   return (Math.abs(b.y - a.y) / 2) * heightPx;
 }
+const SENTENCE = ["make", "anchor", "website", "that", "people", "would", "miss", "if", "it", "disappeared"];
+const liveBox = () => { const ship = buildShip(SENTENCE); posed(ship.root, LIVE_POSE); ship.root.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(ship.root); ship.dispose(); return b; };
 
-describe("the flight, at its midpoint", () => {
-  for (const [name, layout, w, h] of HARBOURS) {
-    const aspect = w / h;
-    for (const [what, position] of [["the hull", 1], ["the stern", 3]] as const) {
-      for (const dest of ["slipway", "pallet"] as const) {
-        it(`flies ${what} over the water, its own size, to the ${dest}, the gap still an outline (${name})`, () => {
-          const cam = new THREE.PerspectiveCamera();
-          place(cam, layout, aspect);
-          const ship = buildShip(["make", "anchor", "website", "that", "people", "would", "miss", "if", "it", "disappeared"]);
-          posed(ship.root, LIVE_POSE);
-          ship.root.updateMatrixWorld(true);
-          const part = new THREE.Box3().setFromObject(ship.groups[position]), from = part.getCenter(new THREE.Vector3());
-          const partSize = part.getSize(new THREE.Vector3()), largest = Math.max(partSize.x, partSize.y, partSize.z);
-          const to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0];
-          const s1 = dest === "pallet" ? PALLET_PLANK / largest / LIVE_POSE.scale : 1;
-          const mid = flightAt(from, to, 0.5, s1, dest === "pallet");
-          ship.dispose();
-          const a = onScreen(cam, from), b = onScreen(cam, to), m = onScreen(cam, mid.position);
-          // between the two ships: a good part of the way across, neither still on the live ship nor already there
-          const across = (m.x - a.x) / (b.x - a.x);
-          expect(across, `halfway through, the plank is ${(100 * across).toFixed(0)}% of the way across`).toBeGreaterThan(0.25);
-          expect(across).toBeLessThan(0.75);
-          expect(m.y, "halfway through, the plank isn't above the water").toBeLessThan(Math.max(a.y, b.y));
-          // its own size: never bigger than it stood on the live ship
-          expect(mid.scale, `halfway through, the plank is ${mid.scale.toFixed(2)} times its size on the ship`).toBeLessThanOrEqual(1 + 1e-6);
-          // the gap it flies to is still an outline: the kept part hasn't begun to show
-          expect(arrivalAt(leavesAt(false) * 0.5).opacity, "the kept part shows before its plank has arrived").toBe(0);
-        });
-      }
+describe("the carry, step by step", () => {
+  for (const [what, position] of [["the hull", 1], ["the stern", 3]] as const) {
+    for (const dest of ["slipway", "pallet"] as const) {
+      const from = partHome(position, LIVE_POSE), to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0];
+      const caught = catchPoint(position);
+
+      it(`tosses ${what} out of the live ship to the quay's edge, a short arc, the gap still an outline (to the ${dest})`, () => {
+        const live = liveBox();
+        expect(tossAt(from, caught, 0).distanceTo(from), "the toss doesn't start where the part stood").toBeLessThan(1e-6);
+        expect(tossAt(from, caught, 1).distanceTo(caught), "the toss doesn't end at the catch").toBeLessThan(1e-6);
+        expect(live.containsPoint(caught), "the catch is inside the live ship").toBe(false);
+        expect(onQuay(caught.x, caught.z), "the catch isn't on the quay").toBe(true);
+        // short: it rises a little over its way, never the old long arc over the water
+        let top = -Infinity;
+        for (let k = 0; k <= 1; k += 0.05) top = Math.max(top, tossAt(from, caught, k).y);
+        expect(top - Math.max(from.y, caught.y), "the toss isn't an arc").toBeGreaterThan(0.4);
+        expect(top - Math.max(from.y, caught.y), "the toss is a long arc, not a short one").toBeLessThan(3);
+        expect(arrivalAt(carryAt(700).toss === 1 ? 700 : 0).opacity, "the kept part shows as the plank is caught").toBe(0);
+      });
+
+      it(`carries ${what} over the quay, never the water, with its shipwright on the quay (to the ${dest})`, () => {
+        for (let c = 0; c <= 1; c += 0.05) {
+          const p = carryPath(caught, to, c);
+          expect(onQuay(p.figure.x, p.figure.z), `the shipwright is off the quay at ${c.toFixed(2)}`).toBe(true);
+          expect(onQuay(p.plank.x, p.plank.z), `the plank is over the water at ${c.toFixed(2)}`).toBe(true);
+          expect(p.plank.y, "the plank is under the shipwright's feet").toBeGreaterThan(p.figure.y);
+        }
+        expect(carryPath(caught, to, 0).plank.distanceTo(caught), "the carry doesn't start where the plank was caught").toBeLessThan(0.6);
+        expect(carryPath(caught, to, 1).plank.distanceTo(to), "the carry doesn't end at its place").toBeLessThan(1e-6);
+      });
     }
+  }
+
+  for (const [name, layout, w, h] of HARBOURS) {
+    it(`keeps every waiting shipwright on the quay, in the frame and clear of the live hull (${name})`, () => {
+      const cam = new THREE.PerspectiveCamera();
+      place(cam, layout, w / h);
+      expect(CREW_MAX).toBe(8);
+      expect(crewSpots(20)).toHaveLength(CREW_MAX);
+      expect(crewSpots(0)).toHaveLength(0);
+      const ship = buildShip(SENTENCE);
+      posed(ship.root, LIVE_POSE);
+      ship.root.updateMatrixWorld(true);
+      const hull = new THREE.Box3().setFromObject(ship.groups[1]);
+      ship.dispose();
+      const spots = crewSpots(CREW_MAX);
+      for (const [i, s] of spots.entries()) {
+        expect(onQuay(s.x, s.z), `shipwright ${i + 1} stands in the water`).toBe(true);
+        const v = s.clone().add(new THREE.Vector3(0, 1, 0)).project(cam);
+        expect(Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1, `shipwright ${i + 1} is out of the frame`).toBe(true);
+        // never between the camera and the hull: a figure's height in front of the hull's box, on screen
+        const a = onScreen(cam, s), hb = [hull.min, hull.max].map((p) => onScreen(cam, p));
+        const overHull = a.x > Math.min(hb[0].x, hb[1].x) && a.x < Math.max(hb[0].x, hb[1].x) && s.z > hull.max.z;
+        expect(overHull, `shipwright ${i + 1} stands in front of the live hull`).toBe(false);
+      }
+      for (let a = 0; a < spots.length; a++) for (let b = a + 1; b < spots.length; b++) expect(spots[a].distanceTo(spots[b]), "two shipwrights stand in one place").toBeGreaterThan(0.6);
+    });
   }
 
   // A waiting plank on the pallet is a plank you can see, not a speck: at least 28px across at either size.
@@ -155,12 +186,12 @@ describe("the pallet, in view", () => {
 });
 
 // On a phone the camera follows the plank (decision 0005): it starts and ends at the fixed view, and halfway
-// through the flight both the plank and where it lands are in frame. A desktop never moves the camera for a flight.
+// through the carry both the plank and where it's set down are in frame. A desktop never moves the camera for it.
 describe("the phone's camera, following a plank", () => {
   for (const dest of ["slipway", "pallet"] as const) {
-    it(`frames the plank and where it lands, and comes back (390×844, to the ${dest})`, () => {
+    it(`frames the plank and where it's set down, and comes back (390×844, to the ${dest})`, () => {
       const [, layout, w, h] = HARBOURS[1];
-      const from = partHome(1, LIVE_POSE), to = dest === "slipway" ? partHome(1, KEPT_POSE) : PALLET_SLOTS[0];
+      const from = partHome(1, LIVE_POSE), to = dest === "slipway" ? partHome(1, KEPT_POSE) : PALLET_SLOTS[0], caught = catchPoint(1);
       const fixed = home(layout);
       for (const k of [0, 1]) {
         const v = followView(layout, from, to, k);
@@ -170,8 +201,8 @@ describe("the phone's camera, following a plank", () => {
       const v = followView(layout, from, to, 0.5), cam = new THREE.PerspectiveCamera(v.fov, w / h, 0.1, 400);
       cam.position.set(...v.position); cam.lookAt(...v.target); cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
       const inFrame = (p: THREE.Vector3) => { const q = p.clone().project(cam); return Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1 && q.z < 1; };
-      expect(inFrame(flightAt(from, to, 0.5, 1, false).position), "halfway, the plank is out of frame").toBe(true);
-      expect(inFrame(to), "halfway, where it lands is out of frame").toBe(true);
+      expect(inFrame(carryPath(caught, to, 0.5).plank), "halfway, the plank is out of frame").toBe(true);
+      expect(inFrame(to), "halfway, where it's set down is out of frame").toBe(true);
       // and it really moved: the follow isn't the fixed view
       expect(new THREE.Vector3(...v.position).distanceTo(new THREE.Vector3(...fixed.position)), "the camera didn't follow").toBeGreaterThan(1);
     });
@@ -215,7 +246,7 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     for (let i = 0; i < 500 && label() !== ${JSON.stringify(word)}; i++) await new Promise((r) => setTimeout(r, 20));
     const t0 = performance.now(), arrived = label() === ${JSON.stringify(word)};
     const shots = [];
-    for (const at of [300, 900, ${leavesAt(false) + 500}, 3600]) {
+    for (const at of [300, 900, ${landsAt(false) + 400}, 4600]) {
       await new Promise((r) => setTimeout(r, Math.max(0, at - (performance.now() - t0))));
       shots.push({ at, waiting: waiting(), flying: harbour.getAttribute('data-flying') });
     }
@@ -253,9 +284,71 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     const m = await run(w!, word);
     expect(m.ok && m.arrived, "the second visitor's change never reached the page").toBe(true);
     const grew = (s: { waiting: string[] }) => s.waiting.length > m.before.length;
-    expect(grew(m.shots[0]), "the waiting word landed before its plank had left (300 ms)").toBe(false);
-    expect(grew(m.shots[2]), "the waiting word didn't land once its plank had").toBe(true);
+    expect(grew(m.shots[0]) || grew(m.shots[1]), "the waiting word landed before its plank was set down").toBe(false);
+    expect(grew(m.shots[2]), "the waiting word didn't land once its plank was set down").toBe(true);
     expect(m.shots.slice(0, 2).some((s) => s.flying === String(w! + 1)), "no plank flew to the pallet").toBe(true);
+  }, 120_000);
+
+  // A new change finishes any carry still under way at once: a first plank carried to the rack, then a second
+  // visitor's change 600 ms into that carry. The first plank is set down at once, so its waiting word is in the
+  // row right after the second change (it lands only with its plank), while the second plank is on its way
+  // (data-flying names its place), and everything is set down in the end.
+  localOnly("finishes a carry still under way at once when a second change arrives", async () => {
+    if ((await moments()).waiting! < 0) {
+      const { crossing } = await moments();
+      expect(await secondVisitor(crossing!, fresh("first")), "staging a position for the next ship was refused").toBe(true);
+    }
+    const { waiting, crossing } = await moments();
+    expect(waiting !== null && waiting >= 0 && crossing !== null && crossing >= 0 && waiting !== crossing, "no waiting and crossing pair to stage").toBe(true);
+    const a = fresh("firstcarry"), b = fresh("secondcarry");
+    const ok = [false, false];
+    const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
+      const harbour = document.querySelector('#harbour');
+      const label = (p) => document.querySelectorAll('.sentence-strip .sentence label')[p].textContent.trim();
+      const row = () => [...document.querySelectorAll('.kept-strip .waiting .ws .w')].map((w) => w.textContent.trim());
+      for (let i = 0; i < 500 && label(${waiting}) !== ${JSON.stringify(a)}; i++) await new Promise((r) => setTimeout(r, 20));
+      const during = { flying: harbour.getAttribute('data-flying'), row: row() };
+      for (let i = 0; i < 500 && label(${crossing}) !== ${JSON.stringify(b)}; i++) await new Promise((r) => setTimeout(r, 20));
+      await new Promise((r) => setTimeout(r, 150));
+      const after = { flying: harbour.getAttribute('data-flying'), row: row() };
+      await new Promise((r) => setTimeout(r, 4200));
+      return { during, after, end: harbour.getAttribute('data-flying') };
+    })()`, [1440, 900], { steps: [READY], then: async () => {
+      ok[0] = await secondVisitor(waiting!, a);
+      await new Promise((r) => setTimeout(r, 600));
+      ok[1] = await secondVisitor(crossing!, b);
+    } })) as { during: { flying: string | null; row: string[] }; after: { flying: string | null; row: string[] }; end: string | null };
+    expect(ok, "a change was refused").toEqual([true, true]);
+    expect(m.during.flying, "the first plank was never carried").toBe(String(waiting! + 1));
+    expect(m.during.row, "the first word landed before its plank was set down").not.toContain(a);
+    expect(m.after.row, "the second change didn't finish the first carry: its word isn't in the row").toContain(a);
+    expect(m.after.flying, "the second plank isn't on its way").toBe(String(crossing! + 1));
+    expect(m.end, "a plank was still on its way long after it should have been set down").toBeNull();
+  }, 120_000);
+
+  // The shipwrights are drawn from the stream's total, at most CREW_MAX of them, and change as views open and
+  // close: the harbour says how many it draws (data-crew, read by this check only: never text a visitor reads, and
+  // spec/present-only.test.ts keeps the total off the page's words).
+  localOnly("draws one shipwright per open view, up to the cap, and follows views opening and closing", async () => {
+    let extra: AbortController[] = [];
+    const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
+      const harbour = document.querySelector('#harbour');
+      const read = () => Number(harbour.getAttribute('data-crew') ?? 0);
+      for (let i = 0; i < 50 && read() === 0; i++) await new Promise((r) => setTimeout(r, 100));
+      const alone = read();
+      await new Promise((r) => setTimeout(r, 2500));
+      const more = read();
+      await new Promise((r) => setTimeout(r, 2500));
+      return { alone, more, after: read() };
+    })()`, [1440, 900], { steps: [READY], then: async () => {
+      await new Promise((r) => setTimeout(r, 600));
+      extra = await Promise.all([0, 1].map(async () => { const c = new AbortController(); await fetch(new URL("/events", baseUrl), { headers: { accept: "text/event-stream" }, signal: c.signal }); return c; }));
+      await new Promise((r) => setTimeout(r, 2500));
+      for (const c of extra) c.abort();
+    } })) as { alone: number; more: number; after: number };
+    expect(m.alone, "no shipwright for this view").toBeGreaterThanOrEqual(1);
+    expect(m.more, "two more views didn't add two shipwrights").toBe(Math.min(CREW_MAX, m.alone + 2));
+    expect(m.after, "closing them didn't take their shipwrights away").toBe(m.alone);
   }, 120_000);
 
   localOnly("flies nothing on a load: a fresh page's harbour stands still once drawn", async () => {
