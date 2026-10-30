@@ -1,0 +1,128 @@
+---
+// GET /ship/: the shipwright's notes, how each part reads a word. Every row,
+// swatch and example is built from the rule table (src/lib/ship/rules.ts), so
+// this can't drift from the rule. Read-only and never live: nothing to type
+// into, because trying a word here would be the preview the ship refuses.
+// /readme/'s shell (spec/ship-page.test.ts).
+import Page from "../layouts/Page.astro";
+import { PAINT, PARTS, partOf, RULES, VOWEL_COLOUR } from "../lib/ship/rules";
+
+const n = (p: number) => String(p + 1).padStart(2, "0");
+const Name = (p: number) => PARTS[p][0].toUpperCase() + PARTS[p].slice(1);
+const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+// light enough a paint takes dark lettering
+const light = (c: number) => ((c >> 16) & 255) * 0.299 + ((c >> 8) & 255) * 0.587 + (c & 255) * 0.114 > 150;
+// pairs checked to change their part (spec/ship-page.test.ts)
+const EXAMPLES: [number, string, string][] = [
+  [7, "if", "whether"],
+  [0, "make", "potato"],
+  [4, "people", "students"],
+  [5, "it", "bookshelf"],
+];
+---
+
+<Page title="How the planks are made" description="How Theseus turns a word into a plank of the ship: which place builds which part, and what each part counts in how the word is spelled.">
+  <div class="readme ship-doc">
+    <header class="mast">
+      <h1 class="name">Theseus</h1><span class="sub caps">How the planks are made</span>
+      <nav aria-label="site"><a class="caps" href="/">The sentence</a></nav>
+    </header>
+    <article>
+      <p class="lede">Each of the ten places in the sentence always builds the same part of the ship.</p>
+      <p>
+        The shipwright never asks what a word means. Each part reads one thing you can count in how the word is spelled:
+        its letters, its vowels, its tall or round or hanging letters, the letters it repeats.
+      </p>
+      <p>Accents are read as their letters (é as e). A word with no letter at all still gets every part at its least.</p>
+    </article>
+
+    <div class="tables">
+      <section aria-labelledby="parts-heading">
+        <h2 id="parts-heading">Ten places, ten parts</h2>
+        <table>
+          <thead><tr><th scope="col"><span class="sr-only">Place</span></th><th scope="col">Part</th><th scope="col">Reads</th><th scope="col">Makes</th></tr></thead>
+          <tbody>
+            {RULES.map((r, p) => (
+              <tr data-part={PARTS[p]}>
+                <td class="num" data-n>{n(p)}</td>
+                <th scope="row">{Name(p)}</th>
+                <td data-reads>{r.reads}</td>
+                <td data-makes>{r.makes}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="colours-heading">
+        <h2 id="colours-heading">The colours</h2>
+        <p class="note">Each vowel has its colour, on a shield and on its stripe of the sail; every other letter's stripe is linen.</p>
+        <ul class="swatches">
+          {Object.entries(VOWEL_COLOUR).map(([v, c]) => (
+            <li data-vowel={v} data-colour={hex(c)}><i style={`background:${hex(c)}`}></i>{v}</li>
+          ))}
+        </ul>
+        <p class="note">The hull takes one of thirteen paints, by the word's first letter: a and n share the first, b and o the second, and so on.</p>
+        <ul class="paints">
+          {PAINT.map((c, k) => (
+            <li data-paint data-colour={hex(c)} style={`background:${hex(c)};color:${light(c) ? "#2a2019" : "#fffaf0"}`}>{String.fromCharCode(97 + k)}{String.fromCharCode(110 + k)}</li>
+          ))}
+        </ul>
+
+        <h2>Worked through</h2>
+        <ul class="examples">
+          {EXAMPLES.map(([p, was, word]) => {
+            const a = partOf(p, was), b = partOf(p, word);
+            return (
+              <li data-example data-position={p} data-was={was} data-word={word}>
+                <span class="caps">{n(p)} · {Name(p)}</span>
+                <span class="pair"><i>{was}</i> → <i>{word}</i></span>
+                <span class="why">{a.says} → {b.says} · {b.because}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </div>
+
+    <nav class="about caps" aria-label="site"><a href="/">Back to the sentence</a> · <a href="/readme/">About Theseus</a></nav>
+  </div>
+</Page>
+
+<style is:global>
+  /* /readme/'s shell, restated: readme.astro's own rules ship only with that page. Widened so the two
+     sections share a desktop screen; the masthead and the intro keep its 36rem reading measure. */
+  .ship-doc { max-width: none; }
+  .ship-doc .mast { max-width: 36rem; margin-bottom: clamp(36px, 9vh, 88px); }
+  .ship-doc .mast nav { margin-left: auto; color: var(--soft); }
+  .ship-doc .mast nav a { text-decoration-color: var(--hair); }
+  .ship-doc article { max-width: 36rem; }
+  .ship-doc article > p { font: 400 clamp(20px, 1.55vw, 24px)/1.4 "Instrument Serif", serif; color: var(--ink); margin: 0 0 1.15em; }
+  .ship-doc article > p.lede { font-size: clamp(27px, 2.5vw, 38px); line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 1em; }
+  .ship-doc .tables { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(32px, 4.5vw, 88px); margin-top: clamp(48px, 9vh, 96px); padding-top: 1.1rem; border-top: 1px solid var(--hair); }
+  .ship-doc h2 { font: 400 0.7rem/1.5 "Instrument Sans", system-ui, sans-serif; letter-spacing: 0.17em; text-transform: uppercase; color: var(--soft); margin: 0 0 0.9rem; }
+  .ship-doc section h2:not(:first-child) { margin-top: 2.6rem; }
+  .ship-doc table { width: 100%; border-collapse: collapse; font: 400 0.92rem/1.5 "Instrument Sans", system-ui, sans-serif; color: var(--soft); }
+  .ship-doc thead th { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 400; text-align: left; padding: 0 0.8rem 0.5rem 0; }
+  .ship-doc tbody th, .ship-doc tbody td { text-align: left; vertical-align: top; padding: 0.6rem 0.8rem 0.6rem 0; border-top: 1px solid var(--hair); font-weight: 400; }
+  .ship-doc tbody th { color: var(--ink); white-space: nowrap; overflow-wrap: normal; }
+  .ship-doc .num { width: 2.2rem; }
+  .ship-doc .note { margin: 0 0 0.7rem; font: 400 0.92rem/1.55 "Instrument Sans", system-ui, sans-serif; color: var(--soft); max-width: 46ch; }
+  .ship-doc ul { list-style: none; margin: 0; padding: 0; }
+  .ship-doc .swatches { display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; margin-bottom: 1.4rem; font: 500 0.9rem/1 var(--mono); color: var(--ink); }
+  .ship-doc .swatches li { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .ship-doc .swatches i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgb(42 32 25 / 0.35); }
+  .ship-doc .paints { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+  .ship-doc .paints li { font: 500 10px/1 var(--mono); text-align: center; padding: 16px 0 5px; border-radius: 3px; }
+  .ship-doc .examples li { display: grid; gap: 0.15rem; padding: 0.7rem 0; border-top: 1px solid var(--hair); font: 400 0.92rem/1.5 "Instrument Sans", system-ui, sans-serif; color: var(--soft); }
+  .ship-doc .examples .pair { color: var(--ink); font: italic 400 1.2rem/1.3 "Instrument Serif", serif; }
+  .ship-doc > .about { margin-top: 3.4rem; }
+  @media (max-width: 900px) {
+    .ship-doc .mast { margin-bottom: 2.4rem; }
+    .ship-doc .tables { grid-template-columns: minmax(0, 1fr); gap: 2.6rem; margin-top: 2.4rem; }
+    .ship-doc article > p.lede { font-size: 28px; }
+    .ship-doc article > p { font-size: 21px; }
+    .ship-doc tbody th { white-space: normal; }
+    .ship-doc .paints li { font-size: 8.5px; }
+  }
+</style>

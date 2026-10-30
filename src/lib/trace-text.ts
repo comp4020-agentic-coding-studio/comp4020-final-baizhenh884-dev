@@ -22,13 +22,13 @@ export type LatestParts = {
 // Where a replaced word is kept, against the kept ship shown now. No ship
 // numbers: "no counts on the page" (CLAUDE.md).
 const KEPT: Record<KeptWhere, string> = {
-  shown: "kept in the house opposite",
-  later: "kept for a later house",
-  earlier: "kept in a house already built",
+  shown: "kept in the ship of old planks",
+  later: "kept for a later ship",
+  earlier: "kept in a ship already built",
 };
 export const keptPhrase = (where: KeptWhere): string => KEPT[where];
 
-// a place by the sentence's own number ("place 01"), never the part of the house it builds
+// a place by the sentence's own number ("place 01"), never the part of the ship it builds
 const place = (position: number): string => `place ${String(position + 1).padStart(2, "0")}`;
 
 export function latestParts(latest: SettleTrace["latest"]): LatestParts {

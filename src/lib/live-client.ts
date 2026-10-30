@@ -1,5 +1,5 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
-import { foreseen, said as saidOne } from "./house/notation";
+import { foreseen, said as saidOne } from "./ship/notation";
 import { latestParts, replacedText, standingText } from "./trace-text";
 import { sizeStep } from "./sentence-step";
 
@@ -49,7 +49,7 @@ export type SettleTrace = {
 };
 
 const isSettleTrace = (t: Trace | SettleTrace): t is SettleTrace => "latest" in t;
-// longer than a crossing (1.9 s, house/motion.ts), so one burst is one announcement
+// longer than a crossing (1.9 s, ship/motion.ts), so one burst is one announcement
 export const ANNOUNCE_MS = 2500;
 // how long typing pauses before the draft's prediction is said
 export const DRAFT_MS = 700;
@@ -175,7 +175,7 @@ type Slot = {
 
 export type Options = {
   // told every newer version of a position, held back by a draft or not:
-  // what the house shows is the shared truth
+  // what the ship shows is the shared truth
   onLatest?: (change: Position) => void;
   // told the kept ship every time it's known to have changed (every change
   // event, and every snapshot): global, so never held back by a draft
@@ -565,7 +565,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
   const heard = new Map<number, string>();
   // the word each heard position held before this burst, so one change can say its part's family change
   const before = new Map<number, string>();
-  // replaced words this burst sent to the next house's waiting row (decided 29 October), by position
+  // replaced words this burst sent to the next ship's waiting row (decided 29 October), by position
   const waits = new Map<number, string>();
   let speakTimer: ReturnType<typeof setTimeout> | null = null;
   function announce(change: Position, was: string, waiting = false): void {
@@ -590,7 +590,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
           : said.length <= 3
             ? `Changed: words ${said.slice(0, -1).map(([p]) => n(p)).join(", ")} and ${n(said.at(-1)![0])}. The sentence now reads: ${words.join(" ")}.`
             : `Several words changed. The sentence now reads: ${words.join(" ")}.`;
-      if (waited.length) news.textContent += ` ${waited.map((w) => `“${w}”`).join(" and ")} ${waited.length === 1 ? "waits" : "wait"} for the next house.`;
+      if (waited.length) news.textContent += ` ${waited.map((w) => `“${w}”`).join(" and ")} ${waited.length === 1 ? "waits" : "wait"} for the next ship.`;
     }, ANNOUNCE_MS);
   }
 
@@ -613,7 +613,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       render();
     },
     applyChange(change) {
-      // the moment is told first, so the house knows how this change moves before onLatest exchanges it
+      // the moment is told first, so the harbour knows how this change moves before onLatest exchanges it
       const slot = slots.get(change.position);
       const newer = !!slot && change.version > slot.latest.version;
       const was = slot?.latest.word ?? change.word;
