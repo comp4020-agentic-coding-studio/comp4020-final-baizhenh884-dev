@@ -87,6 +87,10 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     // navigated only once the device is set, so the page loads as this device would load it
     const page = live ? new URL(file).href : new URL(`file://${file}`).href;
     await send("Page.enable");
+    // a foreground tab, as a visitor's is: without it a headless tab opened this way never has focus, so
+    // :focus and :focus-visible match nothing (the focus-outline check failed on every word until this)
+    await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await send("Page.bringToFront");
     await send("Page.navigate", { url: page });
     // Loaded means this page, complete: a new tab that hasn't begun its navigation is still about:blank, whose
     // readyState is already "complete", and a check measured there found no page at all (url=about:blank in CI).
