@@ -129,8 +129,13 @@ the scene and the rules, never code to copy.
   snapshot or a reconnect. The camera's fixed view is the default; on a
   desktop a drag orbits it within the prototype's limits (no pan, distance
   and angle clamped), with a way back; a phone has no orbit, so the canvas
-  never takes the page's scroll. (Until slice 3b merges, the phone's camera
-  doesn't yet follow the plank.)
+  never takes the page's scroll, and instead its camera follows a flying
+  plank to where it lands and comes back (never with reduced motion).
+- The plank that flies is the old part as it stood, in its own colours, and
+  bleaches to the kept ship's driftwood as it lands; it is never red. Red is
+  only the live ship's new part, for about a second; the kept part it
+  becomes arrives without red (`spec/ship-motion.test.ts`,
+  `spec/harbour-flight.test.ts`).
 - `three` is the one client rendering library, bundled by Vite and loaded as
   a deferred module: the sentence is painted before any script runs, and
   `GET /`'s scripts stay within 200 KB gzipped
@@ -570,7 +575,7 @@ hold.
   word reads as clickable before it's pointed at; pointing darkens it
   (`spec/harbour-layout.test.ts`). (Reason: at the 28 October playtest,
   people on a desktop didn't see the words could be clicked.)
-- Every live word carries its position and part, "01 · Ram", small above
+- Every live word carries its position and part, "01·Ram", small above
   it, and every kept word or gap its position, always, a phone included;
   drawn, never read (`spec/numbering.test.ts`).
 - Word and part as one selection. Pointing at a word, or at a part on a fine
@@ -584,7 +589,19 @@ hold.
   waiting for the next." The question, as the band's headline and at the
   foot beside About: "If every plank is replaced, is it still the same
   ship?" With reduced motion
-  nothing flies: the parts swap, outlined in red for a moment, then not.
+  nothing flies: the parts swap, the new one outlined in red for a moment,
+  then not.
+- Your plank (decision 0005): when another visitor replaces a word that is
+  yours, its plank glows as it flies, on your page only, and one line says
+  "Your plank was carried to the slipway. It's kept." in the notation's
+  slot, also in the polite live region; only from a live change, never a
+  load, snapshot or reconnect (`spec/live-client.test.ts`).
+- The last plank (maker, 30 October): when the ship shown has one gap left,
+  the kept strip names it: while ship 1 is being built, "One original plank
+  still stands: X"; for a later ship, "One plank still stands before the
+  ship of old planks is whole: X". Only ship 1's planks are originals. On
+  the server and live: the stream's kept ship carries `original` (whether
+  it's ship 1), a flag, never the ship's number (`spec/kept-ship.test.ts`).
 - A position that changed elsewhere while a visitor has an unsubmitted draft
   there shows an inert notice of the new word, without touching the draft or
   its expected version; the draft is only reconciled once the visitor clears
