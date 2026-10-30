@@ -16,9 +16,10 @@ const rows = JSON.parse(readFileSync(new URL("./fixtures/ship-counts.json", impo
 const WORDS = [...rows.map((r) => r[0]), "Café", "日本", "123", "it's"];
 const name = (p: number) => PARTS[p][0].toUpperCase() + PARTS[p].slice(1);
 const label = (p: number) => `${String(p + 1).padStart(2, "0")} · ${name(p)}`;
+// a part is unchanged when its rule value is (a and n share a paint: "anchor" → "night" leaves the hull as it was)
 const change = (p: number, was: string, w: string) => {
-  const a = partOf(p, was).says, b = partOf(p, w).says;
-  return a === b ? `${b}, unchanged` : `${a} → ${b}`;
+  const a = partOf(p, was), b = partOf(p, w);
+  return JSON.stringify(a.value) === JSON.stringify(b.value) ? `${b.says}, unchanged` : `${a.says} → ${b.says}`;
 };
 
 describe("the part notation", () => {
