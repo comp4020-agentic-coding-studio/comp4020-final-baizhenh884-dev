@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
-import { carryPath, catchPoint, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
+import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
 import { arrivalAt, carryAt, landsAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
@@ -118,6 +118,51 @@ describe("the carry, step by step", () => {
     }
   }
 
+  // Seen at 1440 (the maker, 31 October: mid-carry the figure and its armful were a few pixels, so the plank seemed to
+  // vanish at the quay's edge and reappear on the slipway): from 20% to 80% of the carry the plank, at the size it's
+  // carried (carriedScale), spans at least CARRIED_MIN_PX on its larger side through the fixed camera, and nothing
+  // stands between the camera and it: not the kept ship (its tallest), the cradle's blocks or the rack's planks.
+  for (const [what, position] of [["the hull", 1], ["the stern", 3], ["the ram", 0]] as const) {
+    for (const dest of ["slipway", "pallet"] as const) {
+      it(`carries ${what} large enough to see and in plain view, mid-carry at 1440×900 (to the ${dest})`, () => {
+        const [, layout, w, h] = HARBOURS[0];
+        const cam = new THREE.PerspectiveCamera();
+        place(cam, layout, w / h);
+        const ship = buildShip(SENTENCE);
+        posed(ship.root, LIVE_POSE);
+        ship.root.updateMatrixWorld(true);
+        const part = ship.groups[position], box0 = new THREE.Box3().setFromObject(part), centre0 = box0.getCenter(new THREE.Vector3()), size = box0.getSize(new THREE.Vector3());
+        const k = carriedScale(Math.max(size.x, size.y, size.z));
+        expect(k, `${what} is carried at ${k.toFixed(2)} of its size, not about half`).toBeGreaterThanOrEqual(0.45);
+        // what stands in the way: the kept ship at its tallest, the cradle, every waiting plank's box
+        const tall = buildShip(Array(10).fill("bookkeeper"));
+        posed(tall.root, KEPT_POSE);
+        const block = new THREE.BoxGeometry(1, 1, 1), blockers = new THREE.Group();
+        blockers.add(tall.root);
+        for (const b of CRADLE_BLOCKS) { const m = new THREE.Mesh(block); m.position.set(...b.at); m.scale.set(...b.size); blockers.add(m); }
+        for (const p of PALLET_SLOTS) { const m = new THREE.Mesh(block); m.position.copy(p); m.scale.set(PALLET_PLANK, PALLET_PLANK * 0.6, PALLET_PLANK * 0.6); blockers.add(m); }
+        blockers.updateMatrixWorld(true);
+        const to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0], ray = new THREE.Raycaster();
+        for (let c = 0.2; c <= 0.8 + 1e-9; c += 0.1) {
+          const at = carryPath(catchPoint(position), to, c).plank;
+          // the part's own box, carried: scaled about its centre and moved there
+          const corners = [0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((l) => new THREE.Vector3(i ? box0.max.x : box0.min.x, j ? box0.max.y : box0.min.y, l ? box0.max.z : box0.min.z).sub(centre0).multiplyScalar(k).add(at))));
+          const q = corners.map((p) => onScreen(cam, p));
+          const px = Math.max((Math.max(...q.map((v) => v.x)) - Math.min(...q.map((v) => v.x))) * w, (Math.max(...q.map((v) => v.y)) - Math.min(...q.map((v) => v.y))) * h);
+          expect(px, `${(100 * c).toFixed(0)}% through the carry ${what} is ${px.toFixed(0)}px across`).toBeGreaterThanOrEqual(CARRIED_MIN_PX);
+          for (const p of [at, ...corners.map((x) => x.clone().lerp(at, 0.3))]) {
+            const d = p.clone().sub(cam.position), dist = d.length();
+            ray.set(cam.position, d.normalize());
+            const hit = ray.intersectObject(blockers, true).find((x) => (x.object as THREE.Mesh).isMesh);
+            expect(hit && hit.distance < dist - 0.05, `${(100 * c).toFixed(0)}% through the carry something stands in front of ${what}`).toBeFalsy();
+          }
+        }
+        expect(CARRIED_MIN_PX).toBeGreaterThanOrEqual(40);
+        ship.dispose(); tall.dispose(); block.dispose();
+      });
+    }
+  }
+
   for (const [name, layout, w, h] of HARBOURS) {
     it(`keeps every waiting shipwright on the quay, in the frame, clear of the live hull and the rack (${name})`, () => {
       const cam = new THREE.PerspectiveCamera();
@@ -141,13 +186,25 @@ describe("the carry, step by step", () => {
         expect(overHull, `shipwright ${i + 1} stands in front of the live hull`).toBe(false);
       }
       for (let a = 0; a < spots.length; a++) for (let b = a + 1; b < spots.length; b++) expect(spots[a].distanceTo(spots[b]), "two shipwrights stand in one place").toBeGreaterThan(0.6);
+      // a toy scale, seen (the maker, 31 October: 1.5–2× the first figures, 1.75 tall): every waiting figure at least
+      // 1.5× the first figures' height on screen, and no head hidden behind the figure in front
+      expect(FIGURE_HEIGHT, "the shipwrights aren't 1.5–2× the first figures").toBeGreaterThanOrEqual(1.75 * 1.5);
+      expect(FIGURE_HEIGHT).toBeLessThanOrEqual(1.75 * 2);
+      const heads = spots.map((s) => box([s.clone().add(new THREE.Vector3(-FIGURE_HEIGHT * 0.1, FIGURE_HEIGHT * 0.82, 0)), s.clone().add(new THREE.Vector3(FIGURE_HEIGHT * 0.1, FIGURE_HEIGHT, 0))]));
+      const bodies = spots.map((s) => box([-1, 1].flatMap((x) => [0, FIGURE_HEIGHT * 0.8].map((y) => s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0))))));
+      for (const [i, hd] of heads.entries()) for (const [j, b] of bodies.entries()) {
+        // j stands nearer the camera than i
+        if (j === i || spots[j].z <= spots[i].z) continue;
+        const cover = Math.max(0, Math.min(hd.x1, b.x1) - Math.max(hd.x0, b.x0)) * Math.max(0, Math.min(hd.y1, b.y1) - Math.max(hd.y0, b.y0));
+        expect(cover / ((hd.x1 - hd.x0) * (hd.y1 - hd.y0)), `shipwright ${j + 1} hides shipwright ${i + 1}'s head`).toBeLessThan(0.5);
+      }
       // never mixed in with the rack's planks: on screen, no waiting figure (its whole height) overlaps a slot's
       // plank (seen in the first frames, 31 October: a figure behind the rack read as part of its plank)
       const box = (pts: THREE.Vector3[]) => { const q = pts.map((p) => onScreen(cam, p)); return { x0: Math.min(...q.map((v) => v.x)), x1: Math.max(...q.map((v) => v.x)), y0: Math.min(...q.map((v) => v.y)), y1: Math.max(...q.map((v) => v.y)) }; };
       const half = PALLET_PLANK / 2;
       const planks = PALLET_SLOTS.map((p) => box([-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => p.clone().add(new THREE.Vector3(x * half, y * half * 0.6, z * half * 0.6)))))));
       for (const [i, s] of spots.entries()) {
-        const f = box([-1, 1].flatMap((x) => [0, 1.75].map((y) => s.clone().add(new THREE.Vector3(x * 0.3, y, 0)))));
+        const f = box([-1, 1].flatMap((x) => [0, FIGURE_HEIGHT].map((y) => s.clone().add(new THREE.Vector3(x * FIGURE_HEIGHT * 0.17, y, 0)))));
         for (const [k, p] of planks.entries()) expect(f.x0 < p.x1 && f.x1 > p.x0 && f.y0 < p.y1 && f.y1 > p.y0, `shipwright ${i + 1} stands with the rack's plank ${k + 1}`).toBe(false);
       }
     });

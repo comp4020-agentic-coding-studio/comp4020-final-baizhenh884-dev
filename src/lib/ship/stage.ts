@@ -179,3 +179,9 @@ export const crewSpots = (n: number): THREE.Vector3[] => SPOTS.slice(0, Math.max
 export const PASSER = new THREE.Vector3(1.4, QUAY.deck, -7.6);
 // a carried plank is held as an armful, at most this long, and grows back to its own size as it's set in place
 export const ARMFUL = 1.4;
+
+// The carried plank, seen (the maker, 31 October): stubs until built, so their checks fail for their reason.
+export const CARRIED_MIN_PX = 40;
+export const carriedScale = (_largest: number): number => ARMFUL / Math.max(_largest, 0.01);
+export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));
+export const FIGURE_HEIGHT = 1.75;
