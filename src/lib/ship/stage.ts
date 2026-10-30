@@ -73,7 +73,7 @@ const PART_AT: [number, number, number][] = [
   [0.35, 4.6, 0], // mast
   [0.6, 3.0, 0], // sail
   [0, -0.4, 1.6], // oars
-  [-3.3, -0.2, 1.0], // steering oar
+  [-3.3, -0.2, 1.0], // rudder
   [-3.0, 2.9, 0], // pennant
 ];
 export function partHome(position: number, pose: Pose): THREE.Vector3 {

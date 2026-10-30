@@ -8,7 +8,7 @@
 // punctuation count as nothing (decided 30 October). A word with no letter
 // still gives every part its minimum; the pennant shows the word as written.
 
-export const PARTS = ["ram", "hull", "prow", "stern", "shields", "mast", "sail", "oars", "steering oar", "pennant"];
+export const PARTS = ["ram", "hull", "prow", "stern", "shields", "mast", "sail", "oars", "rudder", "pennant"];
 
 const VOWELS = "aeiou";
 const TALL = "bdfhklt";
@@ -140,7 +140,7 @@ export const RULES: Rule[] = [
   },
   {
     reads: "hanging letters (g j p q y)",
-    makes: "how deep the steering oar reaches: a step per hanging letter, up to four",
+    makes: "how deep the rudder reaches: a step per hanging letter, up to four",
     part: (c) => {
       const value = Math.min(c.hanging, 4);
       return { value, says: `depth ${value}`, because: plural(c.hanging, "hanging letter") };
