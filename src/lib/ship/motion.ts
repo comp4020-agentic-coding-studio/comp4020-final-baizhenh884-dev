@@ -98,19 +98,24 @@ export function leavesAt(reduced: boolean): number {
 const ARRIVE = { start: 1500, travel: 1100 };
 
 export function arrivalAt(ms: number, reduced = false): Arrival {
-  if (reduced) return { travel: 0, opacity: 1, red: ms < TIMING.reduced.hold ? 1 : 0 };
-  const a = clamp((ms - ARRIVE.start) / ARRIVE.travel), after = ms - ARRIVE.start - ARRIVE.travel;
+  if (reduced) return { travel: 0, opacity: 1, red: 0 };
+  const a = clamp((ms - ARRIVE.start) / ARRIVE.travel);
   return {
     travel: 1 - out3(a),
     opacity: clamp(a / 0.25),
-    // rebuilding is red: while it arrives and sets down, then it settles to the kept house's own edges
-    red: a <= 0 ? 0 : 1 - clamp(after / TIMING.cross.hold),
+    // never red: the old plank arrives as itself (red is the live ship's new part alone)
+    red: 0,
   };
 }
 
-// stubs: slice 3b's spec lands first (spec/ship-motion.test.ts)
+// Red is the live ship's new part only (the maker, 30 October), for about a second: on as it's set down, fading
+// out by RED_MS. With reduced motion it's outlined in red for the reduced hold, then not.
+export const RED_MS = 1000;
+export const newPartRed = (ms: number, reduced: boolean): number =>
+  reduced ? (ms < TIMING.reduced.hold ? 1 : 0) : ms >= RED_MS ? 0 : 1 - ease(clamp(ms / RED_MS));
+
+// The plank that flies is the old part as it stood: its own colour until it nears the slipway, then it bleaches to
+// the kept ship's driftwood (half its colour, half drift) as it lands, `k` (0..1) of the way through its flight.
 import { Color } from "three";
 export const DRIFT = new Color(0xcbb894);
-export const RED_MS = 0;
-export const newPartRed = (_ms: number, _reduced: boolean): number => 0;
-export const plankColour = (base: Color, _k: number): Color => base.clone();
+export const plankColour = (base: Color, k: number): Color => base.clone().lerp(DRIFT, 0.5 * ease(clamp((k - 0.6) / 0.4)));
