@@ -302,15 +302,15 @@ describe("Kept ship markup on GET /", () => {
   it("is read-only, its house decorative and its sentence readable", async () => {
     const v = new Visitor();
     const doc = await v.page();
-    const plate = doc.querySelector(".kept-plate");
-    expect(plate, "GET / has no kept-ship plate").not.toBeNull();
+    const plate = doc.querySelector(".kept-strip");
+    expect(plate, "GET / has no kept strip").not.toBeNull();
     expect(plate!.querySelector("form"), "the kept ship has an interactive form").toBeNull();
     const house = doc.querySelector("#harbour");
     expect(house?.getAttribute("aria-hidden"), "the kept house isn't aria-hidden").toBe("true");
     const sentence = doc.querySelector(".kept-sentence");
     expect(sentence, "GET / has no kept sentence").not.toBeNull();
     expect(sentence!.closest('[aria-hidden="true"]'), "the kept sentence is hidden from screen readers").toBeNull();
-    // a gap shows the word still standing at its position in the live sentence (drawn faint, spec/two-ships-layout.test.ts)
+    // a gap shows the word still standing at its position in the live sentence (drawn faint, spec/harbour-layout.test.ts)
     const live = [...doc.querySelectorAll('.sentence-strip .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
     [...doc.querySelectorAll(".kept-sentence .w")].forEach((w, i) => {
       if (w.classList.contains("gap")) expect(w.textContent!.trim(), `gap ${i} doesn't show the word still standing there`).toBe(live[i]);
