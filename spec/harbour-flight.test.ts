@@ -70,10 +70,11 @@ describe("where a plank flies", () => {
 });
 
 // The flight as a visitor sees it, through the page's own camera at 1440×900 and 390×844 (the harbour's box
-// at each, as harbour-layout measures it): halfway through its flight, the plank is out over the water
+// at each, measured on the served page: 1440×722 under a new visitor's full band, the smaller of the two,
+// and 390×351 on a phone): halfway through its flight, the plank is out over the water
 // between the two ships, no bigger than it stood on the live ship, and the gap it flies to is still an
 // outline. (Seen on 30 October: the copy flew at 1.69 times its size and was over the slipway by 300 ms.)
-const HARBOURS = [["1440×900", "desktop", 1440 / 590], ["390×844", "phone", 390 / 242]] as const;
+const HARBOURS = [["1440×900", "desktop", 1440, 722], ["390×844", "phone", 390, 351]] as const;
 function onScreen(cam: THREE.PerspectiveCamera, p: THREE.Vector3) { const v = p.clone().project(cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; }
 function screenSize(cam: THREE.PerspectiveCamera, centre: THREE.Vector3, size: number, heightPx: number) {
   const a = centre.clone().project(cam), b = centre.clone().add(new THREE.Vector3(0, size, 0)).project(cam);
@@ -81,7 +82,8 @@ function screenSize(cam: THREE.PerspectiveCamera, centre: THREE.Vector3, size: n
 }
 
 describe("the flight, at its midpoint", () => {
-  for (const [name, layout, aspect] of HARBOURS) {
+  for (const [name, layout, w, h] of HARBOURS) {
+    const aspect = w / h;
     for (const [what, position] of [["the hull", 1], ["the stern", 3]] as const) {
       for (const dest of ["slipway", "pallet"] as const) {
         it(`flies ${what} over the water, its own size, to the ${dest}, the gap still an outline (${name})`, () => {
@@ -112,12 +114,11 @@ describe("the flight, at its midpoint", () => {
   }
 
   // A waiting plank on the pallet is a plank you can see, not a speck: at least 28px across at either size.
-  for (const [name, layout, aspect] of HARBOURS) {
+  for (const [name, layout, w, h] of HARBOURS) {
     it(`sets a waiting plank on the pallet large enough to see (${name})`, () => {
       const cam = new THREE.PerspectiveCamera();
-      place(cam, layout, aspect);
-      const heightPx = layout === "desktop" ? 590 : 242;
-      const px = screenSize(cam, PALLET_SLOTS[0], PALLET_PLANK, heightPx);
+      place(cam, layout, w / h);
+      const px = screenSize(cam, PALLET_SLOTS[0], PALLET_PLANK, h);
       expect(px, `a waiting plank is ${px.toFixed(0)}px tall`).toBeGreaterThanOrEqual(28);
     });
   }
