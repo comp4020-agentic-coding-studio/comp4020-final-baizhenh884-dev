@@ -15,7 +15,7 @@ import { LiveBody } from "./live-body";
 import { arrivalAt, carryAt, carryEnd, landsAt, newPartRed, plankColour, type Kind } from "./motion";
 import { Crew, type Figure } from "./crew";
 import { buildHarbour, swell } from "./scene";
-import { carriedScale, carryPath, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
+import { carriedScale, carryPath, heldAt, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -37,7 +37,7 @@ function based(g: THREE.Group): void {
 // A plank on its way: the old part, taken off the live ship whole, tossed to the quay's edge, caught by a
 // shipwright and carried to where it's kept (motion.ts carryAt, stage.ts tossAt and carryPath). It's set down at
 // `lands` (its waiting word lands then), and released at `end`, when the kept part it becomes has faded in under it.
-type Flight = { start: number; lands: number; end: number; group: THREE.Group; from: THREE.Vector3; caught: THREE.Vector3; to: THREE.Vector3; s1: number; carried: number; spin: number; landed: boolean; yours: boolean; figure: Figure; stood: THREE.Vector3; done(): void };
+type Flight = { start: number; lands: number; end: number; group: THREE.Group; from: THREE.Vector3; caught: THREE.Vector3; to: THREE.Vector3; s1: number; carried: number; height: number; spin: number; landed: boolean; yours: boolean; figure: Figure; stood: THREE.Vector3; done(): void };
 
 export type Scene = "now" | "earlier" | "kept";
 
@@ -118,7 +118,7 @@ export class HarbourView {
     if (plank) {
       this.harbour.scene.add(plank.group);
       this.host.setAttribute("data-flying", String(position + 1));
-      this.flights.push({ start: performance.now(), lands: landsAt(false), end: carryEnd(false), group: plank.group, from: plank.from, caught: catchPoint(position), to: to!, s1: plank.s1, carried: plank.carried, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, yours, ...this.carrier(own), done: landed });
+      this.flights.push({ start: performance.now(), lands: landsAt(false), end: carryEnd(false), group: plank.group, from: plank.from, caught: catchPoint(position), to: to!, s1: plank.s1, carried: plank.carried, height: plank.height, spin: (position % 2 ? 1 : -1) * 0.5, landed: false, yours, ...this.carrier(own), done: landed });
     } else landed();
     this.paint();
   }
@@ -285,7 +285,7 @@ export class HarbourView {
   }
 
   // a copy of a standing part to fly, in world space; it owns its geometry and materials
-  private copy(g: THREE.Group): { group: THREE.Group; from: THREE.Vector3; s1: number; carried: number } {
+  private copy(g: THREE.Group): { group: THREE.Group; from: THREE.Vector3; s1: number; carried: number; height: number } {
     g.updateMatrixWorld(true);
     const out = new THREE.Group(), mats = new Map<THREE.Material, THREE.Material>();
     g.traverse((o) => {
@@ -307,7 +307,7 @@ export class HarbourView {
     // toward the pallet it shrinks to exactly the pallet plank it becomes
     // carried, it's about half its size and never too small to see (stage.ts carriedScale)
     const largest = Math.max(size.x, size.y, size.z, 0.01);
-    return { group: out, from: c.clone(), s1: Math.min(1, PALLET_PLANK / largest), carried: carriedScale(largest) };
+    return { group: out, from: c.clone(), s1: Math.min(1, PALLET_PLANK / largest), carried: carriedScale(largest), height: size.y };
   }
 
   private release(g: THREE.Group): void {
@@ -436,7 +436,9 @@ export class HarbourView {
       // tossed out of the live ship to the quay's edge, caught, then carried: plank and shipwright together
       const carry = carryPath(fl.caught, fl.to, c.carry), waiting = carryPath(fl.caught, fl.to, 0);
       const at = c.phase === "toss" ? tossAt(fl.from, fl.caught, c.toss) : c.phase === "catch" ? fl.caught.clone().lerp(waiting.plank, (t - 700) / 200) : carry.plank;
-      fl.group.position.copy(at);
+      // overhead from the catch until it's set in place: its underside on the hands (stage.ts gives the hands)
+      const overhead = c.phase === "toss" ? 0 : c.phase === "catch" ? (t - 700) / 200 : c.carry <= 0.82 ? 1 : 1 - (c.carry - 0.82) / 0.18;
+      fl.group.position.copy(at).lerp(heldAt(at, fl.height, fl.carried), Math.max(0, overhead));
       // caught, it's held at its carried size above the head; set in place it grows to what it becomes there (its own size on the
       // kept ship, the pallet's plank on the rack); tossed, it keeps the size it stood
       const kept = toPallet ? fl.s1 : 1, set = c.phase === "set" || c.phase === "done" ? c.set : c.carry > 0.82 ? (c.carry - 0.82) / 0.18 : 0;

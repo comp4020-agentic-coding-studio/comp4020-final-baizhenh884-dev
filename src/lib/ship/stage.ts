@@ -135,7 +135,10 @@ export const onQuay = (x: number, z: number): boolean => x >= QUAY.x[0] + MARGIN
 // the shipwrights stand at a toy scale (the maker, 31 October: 1.5–2× the first, so they're seen at 1440), and hold a
 // carried plank above their heads
 export const FIGURE_HEIGHT = 3.0;
-const HOLD = FIGURE_HEIGHT + 0.5;
+// the raised hands, where a carried plank's underside rests
+export const HOLD = FIGURE_HEIGHT * 1.1;
+// a carried plank's centre, held overhead: half its carried height above the hands (`at`, from carryPath)
+export const heldAt = (at: THREE.Vector3, height: number, scale: number): THREE.Vector3 => at.clone().add(new THREE.Vector3(0, (height * scale) / 2, 0));
 // the line they walk a plank along: the quay's front, on the camera's side of the rack and the slipway's cradle
 const FRONT = QUAY.z[1] - 0.6;
 
@@ -192,6 +195,3 @@ const CARRIED_MIN_WORLD = 1.25;
 export const carriedScale = (largest: number): number => Math.min(1, Math.max(0.5, CARRIED_MIN_WORLD / Math.max(largest, 0.01)));
 // the kept ship's cradle (scene.ts draws it from these)
 export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));
-
-// the carried plank, held overhead (the maker, 31 October): a stub until built, so its check measures where the page draws it
-export const heldAt = (at: THREE.Vector3, _height: number, _scale: number): THREE.Vector3 => at.clone();
