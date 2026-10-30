@@ -108,7 +108,7 @@ the scene and the rules, never code to copy.
   `/replace`, the HTTP contract and the backend are unchanged, and the
   sentence stays usable without the ship or without JS.
 - Ten fixed parts, one per position: 01 ram, 02 hull, 03 prow, 04 stern,
-  05 shields, 06 mast, 07 sail, 08 oars, 09 steering oar, 10 pennant. Each
+  05 shields, 06 mast, 07 sail, 08 oars, 09 rudder, 10 pennant. Each
   part reads one thing you can count in the word's spelling, from one table
   (`src/lib/ship/rules.ts`) that the ship, the notation, the prediction and
   `/ship/` all read, never a second copy. Never by meaning.
