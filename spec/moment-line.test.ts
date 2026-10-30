@@ -71,7 +71,7 @@ describe("ship 1's loud line", () => {
 });
 
 describe("the phone pointer to the kept half", () => {
-  it("acknowledges a crossing, a word waiting for the next house, or ship 1's completion for a moment, quietly, then returns (390×844)", async () => {
+  it("acknowledges a crossing, a word waiting for the next ship, or ship 1's completion for a moment, quietly, then returns (390×844)", async () => {
     const r = (await measureIn(await page(false), `(async () => {
       await document.fonts.ready;
       const p = document.querySelector('.sentence-strip .kept-pointer');
