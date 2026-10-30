@@ -183,6 +183,23 @@ So, **anonymous shipwrights**:
   page names it: "One original plank still stands: it" (the word standing
   there).
 
+**Amended 31 October (the maker), when the shipwrights slice was planned:**
+- **The plank is carried, not flown the whole way.** It is tossed in a short
+  arc to the quay's edge, a shipwright catches it and carries it to the
+  slipway or the rack, about 3 s in all. Every plank is carried the same way:
+  when no other figure is on the quay, a passing one walks in to catch it.
+- **A new change finishes any carry still under way at once.** The plank is
+  set down, its kept part and its waiting word appear, and the new toss
+  begins. This keeps the live ships equal to a fresh build. With reduced
+  motion nothing is tossed or carried, as before.
+- **At most 8 figures are drawn,** so a full room doesn't bury the slipway.
+  Past 8 the scene looks the same.
+- **Logging.** Nothing about the total is logged. Decision 0002's
+  `stream-open` / `stream-close` lines stay: they record who did what, not
+  who is present, and they predate this decision.
+- The stream's total travels as its own event, `crew` (`{ total }`), and the
+  snapshot and change events are unchanged.
+
 Still no numeric counts, names, identity, feed, scores or chat. Co-presence
 comes through the shared ship, not an audience display. "Your plank" and "the
 last plank" come with the harbour; the shipwrights are a slice of their own
