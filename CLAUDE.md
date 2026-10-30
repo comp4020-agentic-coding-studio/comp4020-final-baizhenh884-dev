@@ -99,8 +99,8 @@ person may change" section only.
 Decided in `docs/decisions/0005-the-ship.md`, which retires the house: its
 grammar, its frozen-grammar rule and its specs are replaced, not edited. The
 realtime limits above (since Crit 9) still hold. The prototype behind the
-ship (`_review_frames/ship-prototype/`) lives outside this repo: it is the
-reference for the look, the scene and the rules, never code to copy.
+ship (`docs/exploration/ship-prototype/`) is the reference for the look,
+the scene and the rules, never code to copy.
 
 - The public object is one shared ten-word sentence and one ship, two forms
   of the same thing, and the kept sentence and its ship of old planks. The
@@ -126,11 +126,16 @@ reference for the look, the scene and the rules, never code to copy.
   server has accepted a change, the old plank flies from the live ship to its
   place (the kept ship's gap, or the pallet): for this visitor's own change
   and for every other visitor's change arriving live; never on a load, a
-  snapshot or a reconnect. On a phone the camera follows the plank there and
-  back.
-- `three` is the one client rendering library, bundled by Vite. Client
-  JavaScript may render, select and animate the ships; it never decides a
-  replacement.
+  snapshot or a reconnect. The camera's fixed view is the default; on a
+  desktop a drag orbits it within the prototype's limits (no pan, distance
+  and angle clamped), with a way back; a phone has no orbit, so the canvas
+  never takes the page's scroll. (Until slice 3b merges, the phone's camera
+  doesn't yet follow the plank.)
+- `three` is the one client rendering library, bundled by Vite and loaded as
+  a deferred module: the sentence is painted before any script runs, and
+  `GET /`'s scripts stay within 200 KB gzipped
+  (`spec/harbour-budget.test.ts`). Client JavaScript may render, select and
+  animate the ships; it never decides a replacement.
 - The ships are never stored: SQLite keeps only the sentence and its history,
   and an earlier form's ship is built from that earlier sentence alone.
 - No preview: typing a replacement never changes either ship; the new part
@@ -146,16 +151,13 @@ reference for the look, the scene and the rules, never code to copy.
   visitors' changes are announced politely, coalesced.
 - Without WebGL (or before it loads) the page is the sentence, its forms, the
   kept sentence and the waiting row, complete and usable; nothing waits on the
-  canvas.
+  canvas (`spec/harbour-fallback.test.ts`).
 - Co-presence, partly superseding decision 0001's option B (its own slice,
   after the harbour): each open `GET /` stream is one anonymous shipwright on
   the quay or slipway; no name, per-person colour, list or number shown
   anywhere; server memory only, never stored or logged per stream; the
   stream carries an anonymous total only. Until that slice merges, the
   realtime limits above still forbid presence.
-- Until slice 2 merges, the house is still what ships, and the house rules
-  and specs below still bind it; each slice moves its own bullets from house
-  to ship in the same PR, so this file never describes code that isn't there.
 
 ## Stack
 
@@ -234,12 +236,14 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 
 - Never report a requirement as verified by a check that doesn't test it. Say
   it's unverified and what would verify it.
-- A difference between two houses counts only if it shows in the settled house
-  at page scale. The exchange animation proves nothing about it, and neither
-  does a count that includes a neighbour moving: measure the settled territory
+- A difference between two ships counts only if it shows in the settled part
+  at page scale. The flight proves nothing about it: measure the settled part
   itself.
-- Bounding boxes and counts can't judge architecture or equality. Compare real
-  geometry, and judge how the house reads in a rendered browser.
+- Bounding boxes and counts can't judge a ship or equality. Compare real
+  geometry, and judge how the ship reads in a rendered browser.
+- A layout check stages its whole state (`stageHarbour` in `spec/chrome.ts`):
+  every server-derived element it measures is set by the check, never left
+  to whatever an earlier spec file left in the shared container.
 - Never weaken or skip a local/CI check because production can't run it.
 - New checks go in `spec/*.test.ts` (`spec/README.md` covers the shipped
   ones), assert the contract rather than the implementation, and are written
@@ -352,7 +356,7 @@ What the code must hold to. The README says why; don't restate it here.
   sentence's final full stop belongs to the sentence, not to a word.
 - No word is protected: the maker's starting words and every visitor's word can
   be replaced by any later valid replacement. No visitor owns a word, or the
-  part of the house it stands for.
+  part of the ship it stands for.
 - History keeps every successful replacement, in order, so every earlier whole
   sentence can be rebuilt. `GET /?at=N` is the sentence after N replacements
   (0 is the start). Earlier forms are read-only; only the current sentence can
@@ -360,8 +364,9 @@ What the code must hold to. The README says why; don't restate it here.
 - Public views never show who made a change or when anyone else acted, and no
   counts appear on the page: no totals, no "3 of 12", no popularity or scores.
   The ordinal in a `?at=N` URL is navigation, not a count shown on the page,
-  and so are the part notation ("05 — entry"), the 01–10 index above each
-  word and kept gap, and the house's numbered tag: each names a position.
+  and so are the part notation ("08 · Oars"), the 01–10 index and part name
+  above each word and kept gap, and the part tag on the ships: each names a
+  position.
   (Enforced in code and checked by review; no automated check yet.)
 - A visitor who has contributed and comes back can recognise their
   contribution in context: their word if it still stands, or that it has been
@@ -393,37 +398,37 @@ What the code must hold to. The README says why; don't restate it here.
   changed, while the draft and the version it was based on stay as they
   were.
 - Historical `?at=N` views never update live and never subscribe to realtime
-  behaviour. Their house is built from that earlier sentence alone and is
-  read-only.
-- An earlier house, `GET /?kept=k`, is completed kept ship k alone: its ten
-  words and its house, read-only, never live, reached one at a time
-  (Earlier house / Later house / Back to now), never listed together. Ship
+  behaviour. Their ship is built from that earlier sentence alone, on its
+  own, and is read-only.
+- An earlier ship, `GET /?kept=k`, is completed kept ship k alone: its ten
+  words and its ship on the slipway, read-only, never live, reached one at a
+  time (Earlier ship / Later ship / Back to now), never listed together. Ship
   k is derived from `changes` by the same rule as the kept ship being built
   (`completedShip` in `src/lib/kept-ship.ts`), nothing stored. Anything that
   isn't a completed ship (not a whole number from 1, the ship still being
   built, or later) is 404. Its number is navigation in the URL only, never
   shown on the page (`spec/kept-houses.test.ts`, `spec/kept-ship.test.ts`).
-- Every replaced word visibly goes to the kept half. One that belongs to
-  the next ship (ship + 1, by the same rule) waits in a row under the kept
-  house, "Waiting for the next house:", in place order with its 01–10
-  index, hidden when none waits; when the ship completes, those words move
-  up into the kept sentence. Derived from `changes` (`next` in
-  `src/lib/kept-ship.ts`, carried by the stream as a derived value),
-  nothing stored. Live for every open `GET /`; the part flies toward the
-  row only from a change event, never a load, snapshot or reconnect, and
-  a phone's "kept below" acknowledgement fires for it too. Real text after
-  the kept sentence, announced in the polite live region, coalesced. No
-  counts. The row never moves or shrinks either house: it lengthens the
-  page instead (`spec/kept-ship.test.ts`, `spec/kept-moment.test.ts`,
-  `spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
-- The house follows authoritative shared state, not a held draft: a newer
+- Every replaced word visibly goes to the slipway. One that belongs to the
+  next ship (ship + 1, by the same rule) waits: as a plank on the pallet,
+  and as text in a row after the kept sentence, "Waiting for the next
+  ship:", in place order with its 01–10 index, hidden when none waits; plank
+  and word land when the flight does (at once with reduced motion or no
+  canvas); when the ship completes, they move up into the kept ship.
+  Derived from `changes` (`next` in `src/lib/kept-ship.ts`, carried by the
+  stream as a derived value), nothing stored. Live for every open `GET /`;
+  it flies only from a change event, never a load, snapshot or reconnect,
+  and a phone's "kept below" acknowledgement fires for it too. Real text
+  after the kept sentence, announced in the polite live region, coalesced.
+  No counts (`spec/kept-ship.test.ts`, `spec/kept-moment.test.ts`,
+  `spec/live-client.test.ts`, `spec/harbour-flight.test.ts`,
+  `spec/harbour-layout.test.ts`).
+- The ship follows authoritative shared state, not a held draft: a newer
   shared word reaches it once, including at a position where a draft keeps the
   word on screen back, and the draft, its expected version and the label stay
   as they were (`spec/live-client.test.ts`).
-- Live equals fresh: after any sequence of live changes, every territory's
-  geometry equals that of a fresh build of the same final sentence
-  (`spec/house-live-body.test.ts`). Whether a standing neighbour is kept is
-  decided on its geometry, never on its outline or a count.
+- Live equals fresh: after any sequence of live changes, every part's
+  geometry, on both ships, equals that of a fresh build of the same final
+  sentence and kept ship (`spec/ship-body.test.ts`, `spec/ship-kept.test.ts`).
 - A screen reader reaches what the page shows: the kept sentence is read as
   its words, each gap as "still standing: <word>" (`spec/kept-ship.test.ts`,
   `spec/kept-sentence.test.ts`); others' changes are announced in one polite
@@ -432,47 +437,45 @@ What the code must hold to. The README says why; don't restate it here.
   plain text naming positions and words, never who or when; and a draft's
   prediction in a second polite live region, once typing pauses (never per
   key), or once that the word was replaced by someone else and to choose it
-  again (`spec/live-client.test.ts`, `spec/house-notation.test.ts`).
-- The part notation names its part's family and, after an accepted change
-  (own or another visitor's), the family before and after ("arch → cut", or
-  "arch, unchanged") and, on a desktop, every letter test that decided it,
-  all from `describeTerritory()` (`src/lib/house/notation.ts`), never a
-  second copy of the rule. A phone shows the family change only: the reason
-  would reach the house there. Same slot, moves nothing, and clear of every
-  house at rest by 8px on a desktop and 16px on a phone. Decorative to
-  assistive technology, which hears the same family change in the polite
-  live region (`spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
-- `GET /house/` explains how the house reads a word: the places and parts,
-  each part's family order, the letter tests and worked examples, generated
-  from `src/lib/house/` so it can't drift. Read-only, never live, never a
-  place to try a word; reached from `/readme/` and from `/`: the question
-  band's masthead row, in full and folded, and on a desktop beside the
-  invitation at rest, hidden while a word is chosen (`spec/house-page.test.ts`,
-  `spec/question-band.test.ts`, `spec/two-ships-layout.test.ts`).
+  again (`spec/live-client.test.ts`, `spec/ship-notation.test.ts`).
+- The part notation names its part and what the word makes of it and, after
+  an accepted change (own or another visitor's), before and after ("2 oars a
+  side → 7 oars a side", or "…, unchanged") and, on a desktop, the count that
+  decided it ("7 letters"), all from the rule table (`partOf` in
+  `src/lib/ship/rules.ts`), never a second copy. A phone shows the change
+  only. Same slot, moves nothing, one line. Decorative to assistive
+  technology, which hears the same change in the polite live region
+  (`spec/ship-notation.test.ts`, `spec/harbour-layout.test.ts`).
+- `GET /ship/` (the shipwright's notes) explains how each part reads a word:
+  the ten parts, what each counts and makes, the vowel colours, the paints
+  and worked examples, server-rendered from the rule table so it can't drift
+  and readable without a script. Read-only, never live, never a place to try
+  a word; reached from `/readme/` and from `/` (the band's masthead row, in
+  full and folded, and the foot). `GET /house/` answers 301 to `/ship/`
+  (`spec/ship-page.test.ts`, `spec/question-band.test.ts`).
 - A kept gap shows the word still standing at its position, faint, over a
   dashed line (a second cue besides lightness: a kept word has no line,
   your own kept word a dotted one). It keeps the 4.5:1 floor on its grid
   like any text and a ceiling of 60% of the faintest kept word's contrast.
   Under the kept sentence: "Replaced words, back in their places. Faint
-  words still stand." The house at rest stays clear of
-  that line (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October
-  playtest an empty gap was read as a fill-in-the-blank quiz, and the kept
-  sentence as the original.)
+  words still stand." (`spec/harbour-layout.test.ts`). (Reason: at the 28
+  October playtest an empty gap was read as a fill-in-the-blank quiz, and the
+  kept sentence as the original.)
 - Escape on a word in hand cancels it: it empties the draft as the visitor
   would (so a change it held back applies then), lets go of the field, and
   never submits. While a replacement is typed, the notation's slot names the
   part (its number alone on a phone), the word being replaced, struck, and
-  the family the draft would give it, from `notation()`, with the deciding
-  test on a desktop; never the keys, which stay in the rule paragraph. A
+  what the draft would make of it, from the rule table, with the deciding
+  count on a desktop; never the keys, which stay in the rule paragraph. A
   draft that can't be a word predicts nothing, from its spelling alone
   (never the blocklist). If another visitor replaced the word: its number,
-  the struck word, "now “X”" and "choose again". One line, clear of every
-  house at rest; only a word is shortened, never the prediction; the struck
-  word never shortened on a desktop (`spec/live-client.test.ts`,
-  `spec/house-notation.test.ts`, `spec/two-ships-layout.test.ts`).
+  the struck word, "now “X”" and "choose again". One line; only a word is
+  shortened, never the prediction; the struck word never shortened on a
+  desktop (`spec/live-client.test.ts`,
+  `spec/ship-notation.test.ts`, `spec/harbour-layout.test.ts`).
 - The focused word field shows a visible keyboard focus (2px, ink) that
   never touches a neighbouring word, on a phone included
-  (`spec/two-ships-layout.test.ts`).
+  (`spec/harbour-layout.test.ts`).
 - Every page has one visible h1 (the masthead's "Theseus"), a header, one
   main, a meta description, Open Graph tags with an image that loads, and a
   favicon (`spec/page-shell.test.ts`).
@@ -485,12 +488,10 @@ What the code must hold to. The README says why; don't restate it here.
   holding a draft, including moving between words) and applies once they
   let go. Ten 24-letter words may wrap past two lines at the floor
   (`spec/sentence-step.test.ts`, `spec/live-client.test.ts`,
-  `spec/two-ships-layout.test.ts`). The step is a prediction from glyph
+  `spec/harbour-layout.test.ts`). The step is a prediction from glyph
   widths, not a measurement in the visitor's browser: two lines is checked
   only in Chrome on macOS and Linux (the 500-sentence set). Elsewhere
-  (Windows, Safari, Firefox) a rare third line is possible. A third line
-  never shrinks the house: the house row keeps its half-screen floor, so
-  the house moves down by a line at the same size.
+  (Windows, Safari, Firefox) a rare third line is possible.
 - Realtime delivery is presentation only: SQLite remains the sole source of
   truth, server memory holds no authoritative sentence state, and the
   existing per-position version/stale-check and whichever eligibility rule
@@ -534,56 +535,56 @@ hold.
   visitors. The one exception is private: under settle mode, a visitor's
   own holding word fills a thin line until it settles (how much of their
   hold is left), on their own page only, never red, and not with reduced
-  motion (`spec/live-client.test.ts`, `spec/two-ships-layout.test.ts`).
-- On a desktop each house's row takes at least half the screen, both level,
-  under the sentence and the invitation; the notes under them may fall below
-  the first screen, reachable by scrolling.
+  motion (`spec/live-client.test.ts`, `spec/harbour-layout.test.ts`).
+- The sentence shares the first screen with the harbour (maker, 30 October):
+  on a desktop at 1920, 1440 and 1280 the whole sentence strip sits over or
+  under the scene within the first screen, as the prototype's panel does;
+  the kept strip and the notes may fall below it, reachable by scrolling.
+  At rest the sentence strip never covers the live ship's hull, at 1920,
+  1440, 1280 and 390 (the harbour's counterpart of the house's "clear of
+  every house at rest") (`spec/harbour-layout.test.ts`).
 - On a phone, a new visitor's first screen (the question band in full) holds
-  the question, the three steps and the whole live sentence; the house may
+  the question, the three steps and the whole live sentence; the harbour may
   start one scroll below. Ten 13-letter words run the sentence itself past
   that screen. Once the band is folded (this visitor has made a change), the
-  live house starts on the first screen, ten 13-letter words included
-  (`spec/two-ships-layout.test.ts`).
-- The visual treatment (fading, layout) is judged, not specified. Its
-  direction is a drawing sheet: the standing half on drafting paper
-  (#ECE8DF, a faint grid, an inset hairline frame, a title-block foot), the
-  kept half a blueprint (#1D3350, a faint white grid) with its house in
-  ivory outlined in white; labels in IBM Plex Mono caps, self-hosted, the
-  sentences in Instrument Serif. The sentence is the protagonist and the
-  house its body; a standing house stays restrained; red is only a part
-  being rebuilt now.
-- The question first: above both halves of `GET /`, a band with the
+  harbour and the whole sentence fit the first screen together, ten
+  13-letter words included (`spec/harbour-layout.test.ts`).
+- The visual treatment is judged, not specified. Its direction is the
+  prototype's sunlit harbour: Athens on the shore, the live ship painted on
+  teal water, the kept ship bleached like driftwood on its slipway, a part
+  still standing drawn as an outline, the next ship's planks on a pallet;
+  parchment strips for the sentence and the kept sentence. The sentence is
+  the protagonist and the ship its body; red is only a part being rebuilt
+  now.
+- The question first: above the harbour on `GET /`, a band with the
   question, one sentence on Theseus's ship and three numbered steps on how
   to play, in full until this visitor has made a change (from their trace,
   on the server, never live), then the question alone. Step 1 names the
   device's gesture (Click on a desktop, Tap on a touch screen); step 2 says
-  a part is rebuilt from how the word is spelled, not what it means; step 3
-  says replaced words are kept on the right (below on a phone): in the
-  second house, or waiting for the next. Its copy claims nothing the rules
-  don't do (`spec/question-band.test.ts`).
+  its plank is rebuilt from how the word is spelled, not what it means; step
+  3 says replaced words are kept on the slipway: in the ship of old planks,
+  or waiting for the next. Its copy claims nothing the rules don't do
+  (`spec/question-band.test.ts`). Kept until slice 4, which decides with
+  evidence whether the opening story replaces the three steps.
 - Every word at rest carries a faint solid underline on every device, so a
   word reads as clickable before it's pointed at; pointing darkens it
-  (`spec/two-ships-layout.test.ts`). (Reason: at the 28 October playtest,
+  (`spec/harbour-layout.test.ts`). (Reason: at the 28 October playtest,
   people on a desktop didn't see the words could be clicked.)
-- Every live word and every kept word or gap carries its position, 01–10,
-  small above it, always, a phone included; drawn, never read
-  (`spec/numbering.test.ts`).
-- Word and house as one selection (settled; change only with a recorded
-  reason). Pointing at a word, or at a territory on a fine pointer, marks both
-  by paired emphasis and a numbered tag on that territory, with no line. A
-  focused or selected word gets a thin line to its territory, ending in that
-  tag, and the part notation ("05 — entry"). No tag at rest. An accepted
-  change draws that line and tag red while exactly that part is exchanged,
-  then everything returns to neutral. A phone has no line and no tag.
-  (Reason for the tag, replacing the line's plain end: the drawing-sheet
-  redesign, the maker's decision of 2026-10-25, so the house names the
-  same position as the index above the word.) Under the standing
-  house: "Ten words. Ten parts. Change a word, and its part is rebuilt."
-  Under the kept house: "Replaced words are kept here: in this house, or
-  waiting for the next." At
-  the foot beside About: "If every word and every part is replaced, is it
-  still the same thing?" With reduced motion nothing moves and the cue stands
-  still for a moment, then clears.
+- Every live word carries its position and part, "01 · Ram", small above
+  it, and every kept word or gap its position, always, a phone included;
+  drawn, never read (`spec/numbering.test.ts`).
+- Word and part as one selection. Pointing at a word, or at a part on a fine
+  pointer, lights that part on both ships and shows a tag on each with its
+  number and name; a focused or selected word keeps its parts lit and shows
+  the notation. No tag at rest. An accepted change draws the rebuilt part
+  red while it is exchanged, then everything returns to neutral. A phone has
+  no tag on the canvas; the notation and the strip say the part. Under the
+  sentence: "Ten words. Ten planks. Change a word, and its plank is rebuilt."
+  Under the kept sentence: "Replaced words are kept here: in this ship, or
+  waiting for the next." The question, as the band's headline and at the
+  foot beside About: "If every plank is replaced, is it still the same
+  ship?" With reduced motion
+  nothing flies: the parts swap, outlined in red for a moment, then not.
 - A position that changed elsewhere while a visitor has an unsubmitted draft
   there shows an inert notice of the new word, without touching the draft or
   its expected version; the draft is only reconciled once the visitor clears
@@ -591,18 +592,11 @@ hold.
 
 ### Known issues
 
-- At 1920, a kept sentence that wraps to three lines (ten long kept words)
-  grows the shared head row, and the live house sits ~23px under its
-  sentence instead of ≤20px. Present on `main` at 8499d6f; repro in
-  `spec/two-ships-layout.test.ts` (`pinShortKept`), whose checks measure
-  with a short kept sentence. The next redesign replaces the side-by-side
-  halves with one stage, which removes that shared row; if it doesn't
-  happen, fix this then.
-- Only the next house waits. A word replaced at a position that already
+- Only the next ship waits. A word replaced at a position that already
   has a word waiting (the third time it changes while the current ship is
   being built) belongs to a ship further ahead and isn't shown until that
   ship is next (decided 29 October: one waiting row, not a queue of
-  houses). It's kept in `changes` and appears in its ship in time.
+  ships). It's kept in `changes` and appears in its ship in time.
 
 ## Stop and ask
 
