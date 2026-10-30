@@ -15,7 +15,7 @@ export type Pose = { position: [number, number, number]; rotationY: number; scal
 // the live ship on the water; the kept ship on its slipway, on the quay to the right; the pallet beside it
 export const LIVE_POSE: Pose = { position: [-4.2, 0, 4.2], rotationY: -0.22, scale: 1.3 };
 export const KEPT_POSE: Pose = { position: [7.4, 2.05, -3.4], rotationY: -0.06, scale: 1.3 };
-export const PALLET: [number, number, number] = [10.6, 1.12, 2.2];
+export const PALLET: [number, number, number] = [8.0, 1.12, 3.8];
 
 // a desktop drag turns the view about its target, never pans, within these
 export const ORBIT = { minDistance: 14, maxDistance: 60, minPolar: 0.55, maxPolar: 1.32 };
@@ -86,7 +86,7 @@ export const PALLET_PLANK = 1.9;
 
 // The pallet's slots, two rows of five, in place order: a waiting plank lies in the slot of its turn among the
 // planks waiting now.
-export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 4 + (k % 5) * 2, PALLET[1] + 1.05, PALLET[2] - 1 + Math.floor(k / 5) * 2));
+export const PALLET_SLOTS: THREE.Vector3[] = Array.from({ length: 10 }, (_, k) => new THREE.Vector3(PALLET[0] - 4 + (k % 5) * 2, PALLET[1] + 1.4, PALLET[2] - 1 + Math.floor(k / 5) * 2));
 export function palletSlot(position: number, next: readonly (string | null)[]): THREE.Vector3 {
   const n = next.slice(0, position + 1).filter((w) => w !== null).length - 1;
   return PALLET_SLOTS[Math.max(0, Math.min(PALLET_SLOTS.length - 1, n))].clone();

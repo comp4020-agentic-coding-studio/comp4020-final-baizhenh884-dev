@@ -76,8 +76,8 @@ export function buildHarbour(): Harbour {
   box(110, 3, 34, stone, 0, -0.5, -24);
   box(110, 1.2, 1.2, quay, 0, 0.45, -7.2);
   const [kx, , kz] = KEPT_POSE.position;
-  box(17, 1.6, 13.6, quay, kx + 0.9, 0.2, kz + 1.5);
-  box(16.2, 0.08, 12.8, 0xd6bf93, kx + 0.9, 1.04, kz + 1.5);
+  box(17, 1.6, 16, quay, kx + 0.9, 0.2, kz + 2.7);
+  box(16.2, 0.08, 15.2, 0xd6bf93, kx + 0.9, 1.04, kz + 2.7);
   // the kept ship's cradle, and the shed's posts and its crane
   for (const x of [-4, -1.4, 1.2, 3.8]) box(0.6, 0.95, 2, wood, kx + x, 1.45, kz);
   for (const [x, z] of [[-6, 3.7], [-6, -3.7], [6.4, 3.7], [6.4, -3.7]]) post(new THREE.Vector3(kx + x, 1, kz + z), new THREE.Vector3(kx + x, 7.2, kz + z), 0.08, wood);
@@ -85,7 +85,9 @@ export function buildHarbour(): Harbour {
   post(new THREE.Vector3(kx + 7.8, 8.9, kz - 4.3), new THREE.Vector3(kx + 2.1, 9.6, kz - 0.3), 0.09, wood);
   post(new THREE.Vector3(kx + 2.1, 9.6, kz - 0.3), new THREE.Vector3(kx + 2.1, 7.4, kz - 0.3), 0.015, dark);
   // the pallet for the next ship's planks
-  box(10.4, 0.16, 4.4, wood, PALLET[0], PALLET[1], PALLET[2]);
+  // a rack at the quay's front edge, raised on trestles so its planks stand clear of the deck
+  box(10.4, 0.16, 4.4, wood, PALLET[0], PALLET[1] + 0.35, PALLET[2]);
+  for (const x of [-4.6, 0, 4.6]) box(0.3, 0.35, 4, dark, PALLET[0] + x, PALLET[1] + 0.1, PALLET[2]);
   // the town: white houses with blue doors, a few domes and cypresses, on a seeded scatter (the same harbour every load)
   let seed = 7;
   const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
