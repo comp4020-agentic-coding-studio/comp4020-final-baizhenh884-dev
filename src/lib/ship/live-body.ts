@@ -6,9 +6,9 @@
 // `groups` is ever released.
 
 import * as THREE from "three";
-import { buildBody } from "./build";
+import { buildBody } from "../house/build";
 import { arrivalAt, duration, frameAt, type Arrival as ArrivalFrame, type Frame, type Kind } from "./motion";
-import { dress, type Look, undress } from "./theme";
+import { dress, type Look, undress } from "../house/theme";
 
 export type Exchange = { start: number; kind: Kind; position: number; outgoing: THREE.Group; incoming: THREE.Group; trace: THREE.Group; away: THREE.Vector3; across: THREE.Vector3; inY: number };
 // a crossing part arriving in the kept house: the standing group at `position`, set down from `from` (its offset at the start)

@@ -11,8 +11,8 @@
 
 import * as THREE from "three";
 import type { KeptShip, Moment } from "../kept-moment";
-import { LiveBody } from "./live-body";
-import { duration } from "./motion";
+import { LiveBody } from "../ship/live-body";
+import { duration } from "../ship/motion";
 
 // how long a later ship stands whole once its last part has arrived
 export const BEAT_MS = 1400;

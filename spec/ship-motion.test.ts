@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { arrivalAt, duration, frameAt, type Kind } from "../src/lib/house/motion";
+import { arrivalAt, duration, frameAt, leavesAt, type Kind } from "../src/lib/ship/motion";
 
-// How a territory is exchanged, as numbers over time (motion.ts). Pure, so it
-// runs the same against any APP_URL. The rules (CLAUDE.md House scope):
-//   - body → trace: the old body's drawing appears as the body withdraws and
-//     is never gone and back again
-//   - red only while the body is being rebuilt; nothing is red at the end
-//   - reduced motion: nothing moves, the new body is simply there
-//   - a crossing (docs/decisions/0003, Slice 5): the old part travels out of
-//     the standing house toward the kept one, and only once it has left does
-//     it arrive in the kept house's gap. Calm at rest, loud at the change: it
-//     runs longer than an ordinary exchange. Reduced motion: nothing travels,
-//     the parts simply swap.
+// How a ship's part is exchanged, as numbers over time (src/lib/ship/motion.ts,
+// moved from the house unchanged). Pure, so it runs the same against any
+// APP_URL. The rules (CLAUDE.md "Scope (Final Project: the ship, in one
+// harbour)"):
+//   - part → trace: the old part's drawing appears as it withdraws and is
+//     never gone and back again
+//   - red only while the part is being rebuilt; nothing is red at the end
+//   - reduced motion: nothing moves, the new part is simply there
+//   - a crossing: the old plank flies from the live ship toward the slipway
+//     (the kept ship's gap, or the pallet), and only once it has left does it
+//     arrive there. Calm at rest, loud at the change: it runs longer than an
+//     ordinary exchange. Reduced motion: nothing flies, the parts swap.
 
 const samples = (kind: Kind, reduced = false) => {
   const end = duration(kind, reduced), out = [];
@@ -19,7 +20,7 @@ const samples = (kind: Kind, reduced = false) => {
   return out;
 };
 
-describe("House exchange motion", () => {
+describe("the ship's exchange motion", () => {
   for (const kind of ["own", "remote", "cross"] as const) {
     it(`${kind}: the old body becomes its drawing, which is never gone and back`, () => {
       const f = samples(kind);
@@ -65,7 +66,7 @@ describe("House exchange motion", () => {
     for (const kind of ["own", "remote"] as const) expect(samples(kind).every((x) => x.travel === 0), `an ${kind} exchange travelled`).toBe(true);
   });
 
-  it("cross: it arrives in the kept house only once it has left the standing one, then sets down, not red", () => {
+  it("cross: it arrives at the slipway only once it has left the live ship, then sets down, not red", () => {
     const end = duration("cross", false);
     let arrived = false, last = Infinity;
     for (let t = 0; t <= end + 50; t += 10) {
@@ -89,12 +90,20 @@ describe("House exchange motion", () => {
     expect(duration("cross", false)).toBeGreaterThan(duration("remote", false));
   });
 
-  it("cross, reduced motion: nothing travels; the kept part is simply there", () => {
+  it("cross, reduced motion: nothing flies; the kept part is simply there", () => {
     expect(samples("cross", true).every((x) => x.travel === 0)).toBe(true);
     for (let t = 0; t <= duration("cross", true) + 50; t += 10) expect(arrivalAt(t, true)).toMatchObject({ travel: 0, opacity: 1 });
   });
 
   it("an own change runs faster than another visitor's", () => {
     expect(duration("own", false)).toBeLessThan(duration("remote", false));
+  });
+
+  // the waiting word lands with its plank (#15): when the plank has gone its whole way, and at once with reduced motion
+  it("cross: a waiting word may land once the plank has left, never before, and at once with reduced motion", () => {
+    const at = leavesAt(false);
+    expect(frameAt("cross", at - 50).travel).toBeLessThan(1);
+    expect(frameAt("cross", at).travel).toBeGreaterThanOrEqual(0.999);
+    expect(leavesAt(true)).toBe(0);
   });
 });

@@ -8,8 +8,8 @@ import * as THREE from "three";
 import { place } from "./camera";
 import type { KeptShip, Moment } from "../kept-moment";
 import { KeptStage } from "./kept-stage";
-import { LiveBody } from "./live-body";
-import type { Kind } from "./motion";
+import { LiveBody } from "../ship/live-body";
+import type { Kind } from "../ship/motion";
 import { EDGE, FIELD, INK, lights, type Look, partTone, RECEDE_TO, RED } from "./theme";
 import { anchorOf } from "./thread";
 

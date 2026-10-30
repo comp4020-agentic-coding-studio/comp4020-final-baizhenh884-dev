@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { LiveBody } from "../src/lib/house/live-body";
+import { LiveBody } from "../src/lib/ship/live-body";
 import { buildShip } from "../src/lib/ship/build";
 import { counts, PAINT, paintOf, partOf, PARTS, VOWEL_COLOUR } from "../src/lib/ship/rules";
 

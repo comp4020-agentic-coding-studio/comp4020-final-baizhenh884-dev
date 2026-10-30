@@ -86,8 +86,8 @@ describe("an earlier house, /?kept=k", () => {
     expect(words, "ship 1 isn't the maker's ten words").toEqual(["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"]);
     expect(doc.querySelectorAll(".kept-sentence .w.gap"), "a completed ship has a gap").toHaveLength(0);
     expect(doc.querySelector('form[action="/replace"]'), "an earlier house can be changed").toBeNull();
-    expect(doc.querySelector("#house-kept")?.getAttribute("aria-hidden"), "its house isn't decorative").toBe("true");
-    expect(doc.querySelector(".stands-half"), "an earlier house shows the live half too").toBeNull();
+    expect(doc.querySelector("#harbour")?.getAttribute("aria-hidden"), "its house isn't decorative").toBe("true");
+    expect(doc.querySelector(".sentence-strip"), "an earlier house shows the live half too").toBeNull();
     expect(raw, "an earlier house subscribes to the live stream").not.toContain("/events");
     // the ship's number is navigation in the URL only, never text on the page
     const text = doc.body.textContent ?? "";
@@ -115,12 +115,12 @@ describe("an earlier house, /?kept=k", () => {
     const now = await new Visitor().sentence();
     const shownBuilding = Math.min(...now.map((p) => p.version));
     const { doc } = await new Visitor().get("/");
-    const link = doc.querySelector(".kept-half a.earlier-house");
+    const link = doc.querySelector(".kept-strip a.earlier-ship");
     expect(link, "GET / has no way to the earlier houses").not.toBeNull();
-    expect(link!.textContent?.trim()).toBe("Earlier house");
+    expect(link!.textContent?.trim()).toBe("Earlier ship");
     // the most recent completed ship (a held ship 1 is the one shown, so its house is still that ship)
     expect(link!.getAttribute("href")).toBe(`?kept=${shownBuilding - 1}`);
-    expect(doc.querySelectorAll(".kept-half a.earlier-house"), "the earlier houses are listed").toHaveLength(1);
+    expect(doc.querySelectorAll(".kept-strip a.earlier-ship"), "the earlier houses are listed").toHaveLength(1);
     expect(link!.getAttribute("rel"), "the Earlier house link takes the Earlier form's rel=prev").toBeNull();
     expect(doc.querySelectorAll('a[rel~="prev"]'), "GET / has more than one rel=prev").toHaveLength(1);
   }, 120_000);

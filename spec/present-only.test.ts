@@ -41,7 +41,7 @@ describe("GET / shows only what stands now", () => {
     await replace(0, first);
     await replace(0, second);
     const { doc } = await page();
-    const sentence = doc.querySelector(".stands-half .sentence");
+    const sentence = doc.querySelector(".sentence-strip .sentence");
     expect(sentence, "GET / has no live sentence").not.toBeNull();
     expect(sentence!.textContent, `the replaced word "${first}" still shows in the live sentence`).not.toContain(first);
     expect(sentence!.textContent).toContain(second);

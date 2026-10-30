@@ -1,15 +1,16 @@
 import { describe, expect, inject, it } from "vitest";
-import { tagged } from "../src/lib/house/thread";
+import { tagged } from "../src/lib/ship/tag";
+import { PARTS } from "../src/lib/ship/rules";
 import { measureIn, QUERY_JS, servedPage, stageWords } from "./chrome";
 
-// The drawing sheet's numbering. Every word of the live sentence and every
-// word or gap of the kept sentence carries its position, 01 to 10, small
-// above it, always, on a phone too. Like the part notation ("05 — entry"),
-// an index names a position: it's navigation, never a count. It's drawn, not
-// read: assistive technology reads the sentences as their words (and a gap as
-// "blank"), never the numbers. On the live house, a numbered tag stands on
-// the territory of the pointed or chosen word only, never at rest and never
-// on a phone (src/lib/house/thread.ts).
+// The numbering. Every word of the live sentence carries its position and
+// part, "01 · Ram", small above it, and every word or gap of the kept
+// sentence its position, always, on a phone too. Like the part notation
+// ("08 · Oars"), an index names a position: it's navigation, never a count.
+// It's drawn, not read: assistive technology reads the sentences as their
+// words, never the numbers or the part names. In the harbour, a tag with the
+// part's number and name stands on the part of the pointed or chosen word
+// only, never at rest and never on a phone (src/lib/ship/tag.ts).
 
 const baseUrl = inject("baseUrl");
 const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
@@ -66,17 +67,22 @@ describe("the numbering", () => {
             const own = ink(el.querySelector('label') || el);
             return { content: s.content, font: s.fontFamily, contrast: Math.min(ratio(fg, flat), ratio(fg, line)), top, bottom: box.bottom, left, ownTop: own.top, overlaps };
           };
-          const live = [...document.querySelectorAll('.stands-half .sentence .pos')];
+          const live = [...document.querySelectorAll('.sentence-strip .sentence .pos')];
           const liveLabels = live.map((p) => p.querySelector('label'));
-          const keptWords = [...document.querySelectorAll('.kept-half .kept-sentence .w')];
-          return { live: live.map((p) => index(p, '.stands-half', liveLabels)), kept: keptWords.map((w) => index(w, '.kept-half', keptWords)) };
-        })()`, [size[0], size[1]])) as { live: Index[]; kept: Index[] };
+          const keptWords = [...document.querySelectorAll('.kept-strip .kept-sentence .w')];
+          return { live: live.map((p) => ({ ...index(p, '.sentence-strip', liveLabels), part: p.getAttribute('data-part') })), kept: keptWords.map((w) => index(w, '.kept-strip', keptWords)) };
+        })()`, [size[0], size[1]])) as { live: (Index & { part: string | null })[]; kept: Index[] };
+        // each live word's index names its part too, from the rule table's names
+        m.live.forEach((x, i) => {
+          expect(x.part, `live word ${i + 1} doesn't name its part`).toBe(PARTS[i][0].toUpperCase() + PARTS[i].slice(1));
+          expect(x.content, `live word ${i + 1}'s index doesn't add its part`).toMatch(/^counter\(\w+, decimal-leading-zero\) " · " attr\(data-part\) \/ ""$/);
+        });
         for (const [what, list] of [["live word", m.live], ["kept word or gap", m.kept]] as const) {
           expect(list, `not ten ${what}s`).toHaveLength(10);
           for (const [i, x] of list.entries()) {
             const at = `${what} ${i + 1}`;
             // the number, 01 to 10 in order, from the sentence's own counter; its alternative text empty, so it's never read
-            expect(x.content, `${at} has no index`).toMatch(/^counter\(\w+, decimal-leading-zero\) \/ ""$/);
+            expect(x.content, `${at} has no index`).toMatch(/^counter\(\w+, decimal-leading-zero\)( " · " attr\(data-part\))? \/ ""$/);
             expect(x.font, `${at}'s index isn't in Plex Mono`).toMatch(/IBM Plex Mono/);
             expect(x.contrast, `${at}'s index is too faint on its grid`).toBeGreaterThanOrEqual(4.5);
             // over its own word: wholly above its letters (or a gap's line)
@@ -102,7 +108,7 @@ describe("the numbering", () => {
       const rows = (await measureIn(doc, `(async () => {
         await document.fonts.ready;
         // each number's top, and its word's or gap's box (a gap's box is shorter than a word's on the same line)
-        return [...document.querySelectorAll('.kept-half .kept-sentence .w')].map((w) => {
+        return [...document.querySelectorAll('.kept-strip .kept-sentence .w')].map((w) => {
           const r = w.getBoundingClientRect(), s = getComputedStyle(w, '::before');
           const top = s.top === 'auto' ? r.bottom - parseFloat(s.bottom) - parseFloat(s.height) : r.top + parseFloat(s.top);
           return { gap: w.classList.contains('gap'), top, boxTop: r.top, boxBottom: r.bottom };
@@ -129,8 +135,8 @@ describe("the numbering", () => {
     const m = (await measureIn(doc, `(() => {
       const q = ${QUERY_JS};
       const s = (sel, pseudo) => getComputedStyle(q(sel), pseudo);
-      return { liveReset: s('.stands-half .sentence').counterReset, liveStep: s('.stands-half .sentence .pos').counterIncrement,
-        keptReset: s('.kept-half .kept-sentence').counterReset, keptStep: s('.kept-half .kept-sentence .w').counterIncrement };
+      return { liveReset: s('.sentence-strip .sentence').counterReset, liveStep: s('.sentence-strip .sentence .pos').counterIncrement,
+        keptReset: s('.kept-strip .kept-sentence').counterReset, keptStep: s('.kept-strip .kept-sentence .w').counterIncrement };
     })()`, [1440, 900])) as Record<string, string>;
     const name = (v: string) => v.split(" ")[0];
     for (const [k, v] of Object.entries(m)) expect(v, `no counter: ${k}`).not.toBe("none");
@@ -140,9 +146,9 @@ describe("the numbering", () => {
     expect(m.keptReset.split(" ")[1] ?? "0", "the kept count doesn't start at 01").toBe("0");
   }, 60_000);
 
-  // Which territory carries the numbered tag: the one a word is at work on (chosen, or being rebuilt),
-  // else the one pointed at; none at rest. Where the line is drawn, the tag is its end.
-  it("tags the pointed or chosen territory only, never at rest", () => {
+  // Which part carries the tag: the one a word is at work on (chosen, or being rebuilt), else the one pointed
+  // at; none at rest.
+  it("tags the pointed or chosen part only, never at rest", () => {
     const rest = { selected: null, held: false, hovered: null, rebuilding: null };
     expect(tagged(rest)).toBeNull();
     expect(tagged({ ...rest, hovered: 3 })).toBe(3);
@@ -152,11 +158,14 @@ describe("the numbering", () => {
     expect(tagged({ ...rest, rebuilding: 7, hovered: 1 }), "the part being rebuilt isn't the one tagged").toBe(7);
   });
 
-  it("draws no tag on a phone", async () => {
+  // the tags are the harbour's own elements, one for each ship, decorative; a phone never shows them
+  it("draws no tag on a phone, and a tag for each ship on a desktop", async () => {
     const doc = await servedPage(baseUrl);
-    const shown = (await measureIn(doc, `(() => { const t = document.querySelector('#thread .tag'); return !!t && getComputedStyle(document.querySelector('#thread')).display !== 'none'; })()`, [390, 844])) as boolean;
-    expect(shown, "a phone draws the house's numbered tag").toBe(false);
-    const desk = (await measureIn(doc, `(() => !!document.querySelector('#thread .tag text'))()`, [1440, 900])) as boolean;
-    expect(desk, "the desktop thread has no numbered tag").toBe(true);
+    const tags = [...doc.querySelectorAll(".part-tag")];
+    expect(tags.map((t) => t.getAttribute("data-ship")).sort(), "there isn't one tag for each ship").toEqual(["kept", "live"]);
+    for (const t of tags) expect(t.getAttribute("aria-hidden"), "a tag is read").toBe("true");
+    const show = `(() => { document.querySelectorAll('.part-tag').forEach((t) => { t.hidden = false; t.textContent = '08 · Oars'; }); return [...document.querySelectorAll('.part-tag')].some((t) => getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().width > 0); })()`;
+    expect((await measureIn(doc, show, [390, 844])) as boolean, "a phone draws a part tag").toBe(false);
+    expect((await measureIn(doc, show, [1440, 900])) as boolean, "a desktop draws no part tag").toBe(true);
   }, 60_000);
 });

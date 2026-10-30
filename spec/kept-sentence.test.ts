@@ -48,7 +48,7 @@ describe("the kept sentence, redrawn live", () => {
 // sentence's), as real text read after the kept sentence. No count anywhere.
 // Empty, it's hidden: nothing waits.
 describe("the waiting row, redrawn live", () => {
-  const doc = new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next house:</span> <span class="ws"></span></p>').window.document;
+  const doc = new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next ship:</span> <span class="ws"></span></p>').window.document;
   const row = doc.querySelector<HTMLElement>(".waiting")!;
   const next = (at: Record<number, string>) => Array.from({ length: 10 }, (_, i) => at[i] ?? null);
 
@@ -58,7 +58,7 @@ describe("the waiting row, redrawn live", () => {
     const ws = [...row.querySelectorAll(".ws .w")];
     expect(ws.map((w) => w.textContent)).toEqual(["ceremony", "students", "wonder"]);
     expect(ws.map((w) => w.getAttribute("data-n"))).toEqual(["03", "05", "07"]);
-    expect(readable(row)).toBe("Waiting for the next house: ceremony students wonder");
+    expect(readable(row)).toBe("Waiting for the next ship: ceremony students wonder");
     expect(readable(row), "the row counts").not.toMatch(/\d/);
   });
 

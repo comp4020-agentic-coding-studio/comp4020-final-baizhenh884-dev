@@ -10,12 +10,12 @@ import { measureIn, servedPage } from "./chrome";
 // changes only on a fresh page from the server, so another visitor's change
 // never folds it. It names no rule the app doesn't keep: under settle mode a
 // visitor replaces a piece at a time, and a replaced word is kept only where
-// the kept house still has a gap for it, so "replaced words are kept", not
+// the kept ship still has a gap for it, so "replaced words are kept", not
 // "your word is kept".
 
 const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
-const QUESTION = "If every word and every part is replaced, is it still the same thing?";
+const QUESTION = "If every plank is replaced, is it still the same ship?";
 
 class Visitor {
   private cookies = new Map<string, string>();
@@ -63,9 +63,9 @@ describe("the question first", () => {
     const band = doc.querySelector("#question");
     expect(band, "GET / has no question band").not.toBeNull();
     expect(band!.closest("[aria-hidden='true']"), "the band is hidden from assistive technology").toBeNull();
-    // above both halves: before them in the page
-    const two = doc.querySelector(".two")!;
-    expect(band!.compareDocumentPosition(two) & doc.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING, "the band isn't above the halves").toBeTruthy();
+    // above the harbour: before it in the page
+    const harbour = doc.querySelector("#harbour")!;
+    expect(band!.compareDocumentPosition(harbour) & doc.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING, "the band isn't above the harbour").toBeTruthy();
     expect(text(band!.querySelector(".question-line")), "the band doesn't ask the question").toBe(QUESTION);
     expect(text(band!.querySelector(".ship")), "the band doesn't name Theseus's ship").toMatch(/Theseus.s ship/);
     const steps = [...band!.querySelectorAll("ol.how-to-play > li")].map(text);
@@ -73,29 +73,24 @@ describe("the question first", () => {
     expect(steps[0]).toMatch(/word/i);
     expect(steps[1]).toMatch(/Enter/);
     expect(steps[2]).toMatch(/kept/i);
-    // replaced words go to the second house, or wait for the next (decided 29 October): the step says both
-    const step3 = band!.querySelectorAll("ol.how-to-play > li")[2];
-    expect(step3.querySelector(".side-by-side")?.textContent).toBe("on the right");
-    expect(step3.querySelector(".stacked")?.textContent).toBe("below");
-    const as = (keep: string, drop: string) => { const c = step3.cloneNode(true) as Element; c.querySelector(drop)?.remove(); return text(c); };
-    expect(as("side-by-side", ".stacked")).toBe("Replaced words are kept on the right: in the second house, or waiting for the next.");
-    expect(as("stacked", ".side-by-side")).toBe("Replaced words are kept below: in the second house, or waiting for the next.");
+    // replaced words go to the ship of old planks, or wait for the next (decided 29 October; the ship, 30 October)
+    expect(steps[2]).toBe("Replaced words are kept on the slipway: in the ship of old planks, or waiting for the next.");
   });
 
-  // The 28 October playtest: nobody knew the house reads a word's spelling, not its meaning (they expected
-  // meaning to change it), and nobody found /house/. Step 2 says so; how to play links to /house/.
-  it("says the house is rebuilt from how a word is spelled, not what it means, and links how it reads a word", async () => {
+  // The 28 October playtest: people expected meaning to change the house, and didn't find how it read a word.
+  // Step 2 says a plank is rebuilt from the spelling, not the meaning; the band links the shipwright's notes.
+  it("says a plank is rebuilt from how a word is spelled, not what it means, and links how the planks are made", async () => {
     const { doc } = await new Visitor().page("/");
     const band = doc.querySelector("#question")!;
     const step2 = text(band.querySelectorAll("ol.how-to-play > li")[1]);
-    expect(step2, "step 2 doesn't say the part is rebuilt from the spelling").toMatch(/spell/i);
+    expect(step2, "step 2 doesn't say the plank is rebuilt from the spelling").toMatch(/plank.*spell/i);
     expect(step2, "step 2 doesn't say meaning doesn't count").toMatch(/not (by |from )?what it means|not its meaning/i);
     // one link, with the question, so it stays when the band folds (two would be read twice)
-    const links = band.querySelectorAll('a[href="/house/"]');
-    expect(links, "the band doesn't link to /house/ exactly once").toHaveLength(1);
+    const links = band.querySelectorAll('a[href="/ship/"]');
+    expect(links, "the band doesn't link to /ship/ exactly once").toHaveLength(1);
     const link = links[0];
-    expect(text(link), "the /house/ link doesn't say what it is").toMatch(/how the house reads a word/i);
-    expect(link!.closest("[aria-hidden='true']"), "the /house/ link is hidden from assistive technology").toBeNull();
+    expect(text(link), "the /ship/ link doesn't say what it is").toMatch(/^how the planks are made$/i);
+    expect(link!.closest("[aria-hidden='true']"), "the /ship/ link is hidden from assistive technology").toBeNull();
   });
 
   // Step 1 names the device's own gesture: click on a desktop, tap on a phone. Both are in the page (no
@@ -115,7 +110,7 @@ describe("the question first", () => {
     expect(all, "the band promises a visitor's own word is kept (only where a gap waits for it)").not.toMatch(/\byour (word|replaced word) is kept\b|\bthe word you replaced is kept\b/i);
   });
 
-  it("is never on an earlier form or an earlier house", async () => {
+  it("is never on an earlier form or an earlier ship", async () => {
     const v = new Visitor();
     const { doc } = await v.page("/?at=0");
     expect(doc.querySelector("#question"), "an earlier form shows the question band").toBeNull();
@@ -131,8 +126,8 @@ describe("the question first", () => {
     expect(text(after!.querySelector(".question-line"))).toBe(QUESTION);
     expect(after!.querySelector(".ship"), "the folded band still tells Theseus's ship").toBeNull();
     expect(after!.querySelector("ol.how-to-play"), "the folded band still shows how to play").toBeNull();
-    // /house/ stays one step away once the band is folded: the link stands with the question, not in how to play
-    expect(after!.querySelector('.question-main a[href="/house/"]'), "the folded band loses its link to /house/").not.toBeNull();
+    // /ship/ stays one step away once the band is folded: the link stands with the question, not in how to play
+    expect(after!.querySelector('.question-main a[href="/ship/"]'), "the folded band loses its link to /ship/").not.toBeNull();
     // another visitor's change never folds a stranger's band
     const still = (await stranger.page("/")).doc.querySelector("#question");
     expect(still!.querySelector("ol.how-to-play"), "someone else's change folded a stranger's band").not.toBeNull();
@@ -164,7 +159,7 @@ describe("the question first", () => {
         const q = band.querySelector('.question-line'), qr = q.getBoundingClientRect(), qs = getComputedStyle(q);
         const steps = [...band.querySelectorAll('ol.how-to-play > li')].map((li) => li.getBoundingClientRect());
         const shown = (sel) => { const el = band.querySelector(sel); return !!el && el.getBoundingClientRect().width > 0; };
-        const link = band.querySelector('a[href="/house/"]'), lr = link && link.getBoundingClientRect();
+        const link = band.querySelector('a[href="/ship/"]'), lr = link && link.getBoundingClientRect();
         return { texts, qLines: Math.round(qr.height / parseFloat(qs.lineHeight)), qRight: qr.right, width: innerWidth, flat, bottom: band.getBoundingClientRect().bottom,
           stepsBeside: steps.length ? steps[0].left > qr.right - 1 : null, click: shown('.on-desktop'), tap: shown('.on-phone'),
           link: lr ? { shown: lr.width > 0, right: lr.right, bottom: lr.bottom } : null };
@@ -181,10 +176,10 @@ describe("the question first", () => {
       if (size[0] > 900) expect(g.qLines, "folded, the question isn't on one line").toBe(1);
       // step 1 shows the device's own gesture only
       expect([f.click, f.tap], "step 1 doesn't show only the device's own gesture").toEqual(size[0] > 900 ? [true, false] : [false, true]);
-      // the /house/ link is shown, in full and folded, inside the page
+      // the /ship/ link is shown, in full and folded, inside the page
       for (const [form, x] of [["in full", f], ["folded", g]] as const) {
-        expect(x.link?.shown, `the band's /house/ link isn't shown (${form})`).toBe(true);
-        expect(x.link!.right, `the band's /house/ link runs out of the page (${form})`).toBeLessThanOrEqual(x.width);
+        expect(x.link?.shown, `the band's /ship/ link isn't shown (${form})`).toBe(true);
+        expect(x.link!.right, `the band's /ship/ link runs out of the page (${form})`).toBeLessThanOrEqual(x.width);
       }
       expect(g.bottom, "folded, the band isn't shorter than in full").toBeLessThan(f.bottom);
     }, 90_000);

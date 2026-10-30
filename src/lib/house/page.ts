@@ -8,7 +8,7 @@ import { drafting, notation, showDrafting } from "./notation";
 import type { KeptShip, Moment } from "../kept-moment";
 import type { Look } from "./theme";
 import { HouseView } from "./view";
-import { TIMING, type Kind } from "./motion";
+import { TIMING, type Kind } from "../ship/motion";
 import { tagged, tagLabel, threadPath } from "./thread";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;

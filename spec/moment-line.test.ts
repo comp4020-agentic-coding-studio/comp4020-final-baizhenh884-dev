@@ -38,7 +38,7 @@ const lineIn = async (size: [number, number], longWords: boolean) =>
     const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
     const line = showMomentLine(document, false, 1500);
     await new Promise((r) => setTimeout(r, 900)); // the line and its veil have faded in
-    const words = [...document.querySelectorAll('.sentence form[action="/replace"] label, .stands-half .invite')].map((l) => ({ ...box(l), text: l.textContent }));
+    const words = [...document.querySelectorAll('.sentence form[action="/replace"] label, .sentence-strip .invite')].map((l) => ({ ...box(l), text: l.textContent }));
     const veilOf = () => [...document.querySelectorAll('.half')].map((h) => Number(getComputedStyle(h, '::after').opacity));
     const veil = veilOf(), rgb = getComputedStyle(line).color.match(/[\\d.]+/g).map(Number);
     const out = { line: box(line), words, viewport: [innerWidth, innerHeight], wrap: getComputedStyle(line).textWrap ?? getComputedStyle(line).textWrapStyle,
@@ -73,7 +73,7 @@ describe("the phone pointer to the kept half", () => {
   it("acknowledges a crossing, a word waiting for the next house, or ship 1's completion for a moment, quietly, then returns (390×844)", async () => {
     const r = (await measureIn(await page(false), `(async () => {
       await document.fonts.ready;
-      const p = document.querySelector('.stands-half .kept-pointer');
+      const p = document.querySelector('.sentence-strip .kept-pointer');
       const before = p.textContent, soft = getComputedStyle(p).color;
       const out = [];
       for (const kind of ["cross", "first", "wait"]) {
@@ -94,6 +94,6 @@ describe("the phone pointer to the kept half", () => {
       expect(o.after, `${o.kind}: the pointer didn't return`).toBe(r.before);
     }
     expect(r.out[0].during, "a crossing and ship 1's completion read the same").not.toBe(r.out[1].during);
-    expect(r.out[2].during, "a waiting word doesn't say it waits for the next house").toMatch(/next house/i);
+    expect(r.out[2].during, "a waiting word doesn't say it waits for the next ship").toMatch(/next ship/i);
   }, 90_000);
 });

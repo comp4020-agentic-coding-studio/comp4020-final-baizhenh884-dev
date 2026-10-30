@@ -1,19 +1,21 @@
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { LiveBody } from "../src/lib/house/live-body";
-import { BEAT_MS, KeptStage } from "../src/lib/house/kept-stage";
-import { TERRITORIES } from "../src/lib/house/territories";
+import { LiveBody } from "../src/lib/ship/live-body";
+import { BEAT_MS, KeptStage } from "../src/lib/ship/kept-stage";
+import { buildShip } from "../src/lib/ship/build";
+import { PARTS } from "../src/lib/ship/rules";
 import { classifyMoment } from "../src/lib/kept-moment";
 import { deriveKeptShip, type KeptChange } from "../src/lib/kept-ship";
 
-// The kept house live (docs/decisions/0003, Slice 5), without a renderer:
-// KeptStage takes each kept ship a change event brings, with its moment, and
-// moves the kept body (a crossing part arriving in its gap, a later ship's
-// quiet beat). In a busy room several changes land within a second or two,
-// so (as the standing house already does) a new change finishes whatever is
-// still in flight at once: nothing stacks up, nothing lags behind the truth,
-// and after any burst the kept house is exactly what a fresh load shows.
+// The kept ship live on its slipway (docs/decisions/0003, 0005), without a
+// renderer: KeptStage takes each kept ship a change event brings, with its
+// moment, and moves the kept body (a plank arriving in its gap, a later
+// ship's quiet beat). In a busy room several changes land within a second or
+// two, so (as the live ship does) a new change finishes whatever is still in
+// flight at once: nothing stacks up, nothing lags behind the truth, and after
+// any burst the kept ship is exactly what a fresh load shows. Ported from the
+// house's kept stage, the same properties, on the ship's body.
 // The kept states come from deriveKeptShip over a simulated history, so they
 // pass through ship 1's completion and hold, and ship 2's completion.
 
@@ -36,8 +38,7 @@ function form(g: THREE.Group): string {
   return solids.sort().join("|");
 }
 
-const POOL = (JSON.parse(readFileSync(new URL("./fixtures/house-descriptors.json", import.meta.url), "utf8")) as { rows: [number, string][] }).rows
-  .filter((r) => r[0] === 0).map((r) => r[1]).slice(0, 325);
+const POOL = (JSON.parse(readFileSync(new URL("./fixtures/ship-counts.json", import.meta.url), "utf8")) as { rows: [string][] }).rows.map((r) => r[0]);
 function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -69,16 +70,17 @@ function history(seed: number, length: number) {
 }
 
 function freshMismatches(stage: KeptStage, kept: { words: string[]; gaps: boolean[] }): string[] {
-  const fresh = new LiveBody("kept", drawing);
+  const fresh = new LiveBody("kept", drawing, buildShip, () => {});
   fresh.show(kept.words);
-  const out: string[] = TERRITORIES.filter((_, i) => form(stage.body.groups[i]) !== form(fresh.groups[i])).map((t) => t.id);
+  const out: string[] = PARTS.filter((_, i) => form(stage.body.groups[i]) !== form(fresh.groups[i]));
+  if (stage.body.groups.map((g) => g.name).join() !== PARTS.join()) out.push("not the ship");
   if (JSON.stringify(stage.gaps) !== JSON.stringify(kept.gaps)) out.push("gaps");
   if (stage.animating) out.push("not settled");
   fresh.dispose();
   return out;
 }
 
-describe("The kept house, live", () => {
+describe("the kept ship, live", () => {
   it("passes through ship 1's completion and ship 2's in the simulated history", () => {
     const ships = history(1, 40).map((s) => s.kept.ship);
     expect(Math.max(...ships), "the history never reached ship 3").toBeGreaterThanOrEqual(3);

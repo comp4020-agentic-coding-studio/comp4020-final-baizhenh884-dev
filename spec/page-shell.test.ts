@@ -12,7 +12,7 @@ const get = async (path: string) => {
   expect(res.status, `GET ${path}`).toBe(200);
   return new JSDOM(await res.text()).window.document;
 };
-const PAGES = ["/", "/house/", "/readme/", "/?at=0"];
+const PAGES = ["/", "/ship/", "/readme/", "/?at=0"];
 
 describe("every page's shell", () => {
   for (const path of PAGES) {
