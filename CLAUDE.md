@@ -41,6 +41,9 @@ from what `README.md` argues "good" means (see "Product contract").
   current sentence: the words, the visitor's own trace, and the link to the
   immediately previous whole sentence. Nothing else goes live: no presence,
   no online/visitor counts, no activity or change feed, no chat, no rooms.
+  The one exception is the shipwrights (decision 0005, "Scope (Final
+  Project: the ship, in one harbour)"): an anonymous total of open streams,
+  drawn as figures, never shown as a number.
   Catch-up after a disconnect is a fresh read from SQLite, never a replay
   log, a queue, or any durable pub/sub.
 
@@ -123,14 +126,21 @@ the scene and the rules, never code to copy.
   change.
 - One harbour, one canvas: the live ship on the water, the kept ship on a
   slipway, the next ship's waiting planks on a pallet beside it. Once the
-  server has accepted a change, the old plank flies from the live ship to its
-  place (the kept ship's gap, or the pallet): for this visitor's own change
-  and for every other visitor's change arriving live; never on a load, a
-  snapshot or a reconnect. The camera's fixed view is the default; on a
-  desktop a drag orbits it within the prototype's limits (no pan, distance
-  and angle clamped), with a way back; a phone has no orbit, so the canvas
-  never takes the page's scroll, and instead its camera follows a flying
-  plank to where it lands and comes back (never with reduced motion).
+  server has accepted a change, the old plank is carried from the live ship
+  to its place (the kept ship's gap, or the pallet): for this visitor's own
+  change and for every other visitor's change arriving live; never on a load,
+  a snapshot or a reconnect. It is tossed in a short arc to the quay's edge,
+  caught by a shipwright and carried to the slipway or the rack, about 3 s in
+  all. Every plank is carried the same way: when no other shipwright is on
+  the quay, a passing one walks in to catch it. A new change finishes any
+  carry still under way at once (the plank set down, its kept part and
+  waiting word in place), so live always equals fresh. The camera's fixed
+  view is the default; on a desktop a drag orbits it within the prototype's
+  limits (no pan, distance and angle clamped), with a way back; a phone has
+  no orbit, so the canvas never takes the page's scroll, and instead its
+  camera follows the plank to where it's set down and comes back (never with
+  reduced motion). With reduced motion nothing is tossed or carried: the
+  parts swap, and the shipwrights stand still.
 - The plank that flies is the old part as it stood, in its own colours, and
   bleaches to the kept ship's driftwood as it lands; it is never red. Red is
   only the live ship's new part, for about a second; the kept part it
@@ -157,12 +167,18 @@ the scene and the rules, never code to copy.
 - Without WebGL (or before it loads) the page is the sentence, its forms, the
   kept sentence and the waiting row, complete and usable; nothing waits on the
   canvas (`spec/harbour-fallback.test.ts`).
-- Co-presence, partly superseding decision 0001's option B (its own slice,
-  after the harbour): each open `GET /` stream is one anonymous shipwright on
-  the quay or slipway; no name, per-person colour, list or number shown
-  anywhere; server memory only, never stored or logged per stream; the
-  stream carries an anonymous total only. Until that slice merges, the
-  realtime limits above still forbid presence.
+- Co-presence, partly superseding decision 0001's option B: each open
+  `GET /` stream is one anonymous shipwright on the quay or slipway, at most
+  8 drawn (past 8 the scene looks the same); every figure alike, with no
+  name, per-person colour, list or number shown anywhere. The total is held
+  in server memory only, never stored, and the stream carries it alone
+  (`crew`: `{ total }`), never who is present. Nothing about the total is
+  logged; the Crit 10 `stream-open` / `stream-close` lines (decision 0002's
+  logging of who did what) stay as they are. Your own change is carried by
+  your figure, marked only on your page; the server never says which figure
+  is yours. Without WebGL there are no figures and no text about them
+  (`spec/realtime.test.ts`, `spec/present-only.test.ts`,
+  `spec/harbour-flight.test.ts`).
 
 ## Stack
 
@@ -371,8 +387,10 @@ What the code must hold to. The README says why; don't restate it here.
   The ordinal in a `?at=N` URL is navigation, not a count shown on the page,
   and so are the part notation ("08 · Oars"), the 01–10 index and part name
   above each word and kept gap, and the part tag on the ships: each names a
-  position.
-  (Enforced in code and checked by review; no automated check yet.)
+  position. The shipwrights' total is drawn as figures, never written as a
+  number, in the page's text, its attributes or anywhere a visitor can read
+  it (`spec/present-only.test.ts`).
+  (Otherwise enforced in code and checked by review; no automated check yet.)
 - A visitor who has contributed and comes back can recognise their
   contribution in context: their word if it still stands, or that it has been
   replaced. Its markup is fixed in the HTTP contract at the top of
@@ -505,8 +523,9 @@ What the code must hold to. The README says why; don't restate it here.
   event rebases a draft onto a newer version; if it's submitted, the
   existing stale rule applies exactly as before.
 - No presence, online/visitor counts, visitor identity, or activity/change
-  feed is added for realtime; the existing no-who/when/counts rule extends to
-  whatever the realtime channel carries.
+  feed is added for realtime, except the shipwrights' anonymous total
+  (above); the existing no-who/when/counts rule extends to whatever the
+  realtime channel carries.
 - The realtime layer never weakens an existing server-enforced product rule.
   Existing server-side validation, persistence and output-safety guarantees
   remain authoritative; stale, invalid, or ineligible replacements (whatever
