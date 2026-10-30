@@ -186,6 +186,8 @@ export type Options = {
   onMine?: (positions: number[]) => void;
   // told a position whose draft holds a newer word back (that word), or no longer does (null)
   onHeld?: (position: number, word: string | null) => void;
+  // stub: slice 3b's spec lands first (spec/live-client.test.ts "your plank")
+  onYours?: (position: number) => void;
 };
 
 export function attach(doc: Document, options: Options = {}): LivePage {

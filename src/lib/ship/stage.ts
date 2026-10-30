@@ -108,3 +108,6 @@ export function flightAt(from: THREE.Vector3, to: THREE.Vector3, k: number, s1: 
   position.y += Math.sin(Math.PI * e) * 4.5;
   return { position, scale: toPallet ? 1 + (s1 - 1) * e : 1 };
 }
+
+// stub: slice 3b's spec lands first (spec/harbour-flight.test.ts)
+export const followView = (layout: Layout, _from: THREE.Vector3, _to: THREE.Vector3, _k: number): View => home(layout);

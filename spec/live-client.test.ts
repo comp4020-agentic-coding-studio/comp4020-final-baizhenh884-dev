@@ -709,6 +709,36 @@ describe("live page reconciliation", () => {
   // The house shows the shared truth: every newer version of a position,
   // including one a draft holds back from the word on screen, while the
   // draft, its version and the label stay exactly as above.
+  // Your plank (decision 0005): when another visitor replaces a word that's yours, standing, the page is told so
+  // (onYours) from that change alone: never from a snapshot or a reconnect, never for anyone else's word. It
+  // reads the trace this page already has; nothing about the visitor reaches anyone else.
+  describe("your plank", () => {
+    localOnly("tells this page when its own standing word is replaced, from the change only, never a snapshot", async () => {
+      const ann = await arrive();
+      const doc = await ann.page("/");
+      const yours: number[] = [];
+      const page = attach(doc, { onYours: (position) => yours.push(position) });
+      const [mine, other] = positionsOf(doc);
+      // this page's own standing word at `mine`, in either mode's trace shape
+      const trace: Trace = { position: mine.position, word: mine.word, standing: true };
+      const settle: SettleTrace = { latest: { position: mine.position, word: mine.word, standing: true, settled: false, settlesInMs: 60_000 }, otherStanding: [], otherReplaced: [] };
+      page.applySnapshot({ positions: positionsOf(doc), trace: process.env.RULE_MODE === "settle" ? settle : trace });
+      expect(yours, "a snapshot told this page its plank was replaced").toEqual([]);
+      // someone else's word replaced: not yours
+      page.applyChange({ position: other.position, word: fresh(), version: other.version + 1 });
+      expect(yours, "another visitor's word counted as yours").toEqual([]);
+      // yours replaced, from a live change: told once
+      page.applyChange({ position: mine.position, word: fresh(), version: mine.version + 1 });
+      expect(yours, "this page wasn't told its plank was replaced").toEqual([mine.position]);
+      // the same change again (a duplicate or stale version) tells nothing more
+      page.applyChange({ position: mine.position, word: fresh(), version: mine.version + 1 });
+      expect(yours, "a duplicate told it twice").toEqual([mine.position]);
+      // a reconnect's snapshot afterwards tells nothing
+      page.applySnapshot({ positions: positionsOf(doc), trace: null });
+      expect(yours, "a reconnect's snapshot told it again").toEqual([mine.position]);
+    });
+  });
+
   describe("the house's view of the sentence", () => {
     localOnly("hears every newer version once, and nothing older or repeated", async () => {
       const doc = await (await arrive()).page("/");

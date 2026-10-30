@@ -1,6 +1,7 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
 import { completedShip, deriveKeptShip, keptWhere, type CurrentWord, type KeptChange } from "../src/lib/kept-ship";
+import { lastPlank } from "../src/lib/kept-sentence";
 
 // Kept ships (docs/decisions/0003-settle-and-kept-ships.md): ship m0 =
 // min(version) across the ten positions is the ship being built; the ship
@@ -181,8 +182,8 @@ const readable = (el: Element): string => {
 };
 const baseUrl = inject("baseUrl");
 const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUrl).hostname);
-const changesTheSentence = (name: string, fn: () => Promise<void>) =>
-  it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn);
+const changesTheSentence = (name: string, fn: () => Promise<void>, timeout?: number) =>
+  it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn, timeout);
 
 class Visitor {
   private cookies = new Map<string, string>();
@@ -386,4 +387,64 @@ describe("Kept ship markup on GET /", () => {
     expect(after[gapIndex].classList.contains("gap"), "the replaced gap is still a gap").toBe(false);
     expect(after[gapIndex].textContent?.trim(), "the kept ship doesn't show the word that stood there").toBe(slot.word);
   });
+});
+
+// The last plank (the maker, 30 October): when the ship shown has one gap left, the kept strip names the word
+// still standing there, so a room can rally for it. Only ship 1's planks are originals: "One original plank still
+// stands: X" while it's being built; "One plank still stands before the ship of old planks is whole: X" after.
+// Pure (src/lib/kept-sentence.ts), the server's and the live page's alike; never a count.
+describe("the last plank", () => {
+  const ship = (gaps: number[], original: boolean) => ({ words: Array.from({ length: 10 }, (_, i) => `w${i}`), gaps: Array.from({ length: 10 }, (_, i) => gaps.includes(i)), next: Array(10).fill(null), original });
+  it("names the one word still standing in ship 1 as its original plank", () => {
+    expect(lastPlank(ship([6], true))).toBe("One original plank still stands: w6");
+  });
+  it("names it for a later ship without calling it original", () => {
+    expect(lastPlank(ship([2], false))).toBe("One plank still stands before the ship of old planks is whole: w2");
+  });
+  it("says nothing while more than one gap is left, or none", () => {
+    for (const original of [true, false]) {
+      expect(lastPlank(ship([1, 2], original))).toBeNull();
+      expect(lastPlank(ship([], original))).toBeNull();
+      expect(lastPlank(ship([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], original))).toBeNull();
+    }
+  });
+  it("never counts", () => {
+    // the line around the word: no digit, no "of", no total
+    for (const original of [true, false]) for (let g = 0; g < 10; g++) {
+      const line = lastPlank(ship([g], original));
+      expect(line, "no line for one gap").not.toBeNull();
+      expect(line!.replace(`w${g}`, ""), "the line counts").not.toMatch(/\d|\btotal\b|\bleft\b/);
+    }
+  });
+
+  // on GET /, live: a strip line the server renders from the kept ship it shows, and the stream's kept ship
+  // carries `original`, a flag, never the ship's number
+  changesTheSentence("names the last plank on GET /, and the stream says whether the ship is the original, never its number", async () => {
+    // bring the ship shown down to one gap: fresh visitors replace each gap but one
+    for (let i = 0; i < 40; i++) {
+      const doc = await new Visitor().page();
+      const gaps = [...doc.querySelectorAll(".kept-sentence .w")].flatMap((w, k) => (w.classList.contains("gap") ? [k] : []));
+      if (gaps.length <= 1) break;
+      const v = new Visitor();
+      const now = await v.sentence();
+      expect(await v.replace(now[gaps[0]], `lp${Date.now().toString(36).replace(/\d/g, (d) => "abcdefghij"[+d])}`)).toBe(303);
+    }
+    const doc = await new Visitor().page();
+    const spans = [...doc.querySelectorAll(".kept-sentence .w")], gaps = spans.flatMap((w, k) => (w.classList.contains("gap") ? [k] : []));
+    const line = doc.querySelector<HTMLElement>(".kept-strip .last-plank");
+    if (gaps.length === 1) {
+      expect(line, "one gap left and the strip doesn't name it").not.toBeNull();
+      expect(line!.textContent!.trim()).toMatch(new RegExp(`^One (original )?plank still stands(?: before the ship of old planks is whole)?: ${spans[gaps[0]].textContent!.trim()}$`));
+      expect(line!.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
+    } else expect(line?.hidden ?? true, "the strip names a last plank with no single gap").toBe(true);
+    // the stream's first snapshot: the kept ship says whether it's the original, and carries no ship number
+    const res = await fetch(new URL("/events", baseUrl));
+    const reader = res.body!.getReader();
+    let text = "";
+    while (!text.includes("\n\n")) text += new TextDecoder().decode((await reader.read()).value);
+    await reader.cancel();
+    const data = JSON.parse(text.split("\n").find((l) => l.startsWith("data:"))!.slice(5));
+    expect(typeof data.keptShip.original, "the stream's kept ship doesn't say whether it's the original").toBe("boolean");
+    expect("ship" in data.keptShip, "the stream carries the ship's number").toBe(false);
+  }, 120_000);
 });

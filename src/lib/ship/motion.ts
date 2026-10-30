@@ -107,3 +107,10 @@ export function arrivalAt(ms: number, reduced = false): Arrival {
     red: a <= 0 ? 0 : 1 - clamp(after / TIMING.cross.hold),
   };
 }
+
+// stubs: slice 3b's spec lands first (spec/ship-motion.test.ts)
+import { Color } from "three";
+export const DRIFT = new Color(0xcbb894);
+export const RED_MS = 0;
+export const newPartRed = (_ms: number, _reduced: boolean): number => 0;
+export const plankColour = (base: Color, _k: number): Color => base.clone();

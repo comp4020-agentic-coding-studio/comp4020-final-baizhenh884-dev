@@ -81,3 +81,6 @@ export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): 
     },
   };
 }
+
+// stub: slice 3b's spec lands first (spec/kept-ship.test.ts)
+export const lastPlank = (_k: { words: string[]; gaps: boolean[]; original?: boolean }): string | null => null;
