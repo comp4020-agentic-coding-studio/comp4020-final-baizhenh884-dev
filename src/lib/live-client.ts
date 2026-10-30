@@ -145,7 +145,8 @@ function asKeptShip(v: unknown): KeptShip | null {
   if (v.words.length !== 10 || v.gaps.length !== 10 || v.next.length !== 10) return null;
   if (v.words.some((w) => typeof w !== "string") || v.gaps.some((g) => typeof g !== "boolean")) return null;
   if (v.next.some((w) => w !== null && typeof w !== "string")) return null;
-  return { words: v.words as string[], gaps: v.gaps as boolean[], next: v.next as (string | null)[] };
+  if (v.original !== undefined && typeof v.original !== "boolean") return null;
+  return { words: v.words as string[], gaps: v.gaps as boolean[], next: v.next as (string | null)[], ...(v.original === undefined ? {} : { original: v.original }) };
 }
 
 function asReplacedItem(v: unknown): ReplacedItem | null {
@@ -186,7 +187,8 @@ export type Options = {
   onMine?: (positions: number[]) => void;
   // told a position whose draft holds a newer word back (that word), or no longer does (null)
   onHeld?: (position: number, word: string | null) => void;
-  // stub: slice 3b's spec lands first (spec/live-client.test.ts "your plank")
+  // this visitor's own standing word was just replaced by someone else (your plank, decision 0005): told from a
+  // live change only, never a snapshot or a reconnect, and before onLatest, so its flight can be marked
   onYours?: (position: number) => void;
 };
 
@@ -629,6 +631,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       const newer = !!slot && change.version > slot.latest.version;
       const was = slot?.latest.word ?? change.word;
       const moment = change.keptShip && newer ? classifyMoment(keptSent, change.keptShip, change.position) : null;
+      if (newer && isMarked(change.position)) options.onYours?.(change.position);
       if (change.keptShip) tellKept(change.keptShip, moment);
       offer(change);
       if (newer) announce(change, was, moment?.kind === "wait");
