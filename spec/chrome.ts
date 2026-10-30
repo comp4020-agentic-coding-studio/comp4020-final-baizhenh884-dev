@@ -45,7 +45,10 @@ function chrome(): string {
 
 // What a live page load may change about the browser: extra Chrome flags (e.g. --disable-webgl), scripts off,
 // reduced motion, and steps to run in the page (each awaited, in order) before the expression measures it.
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number };
+// `then`: once the steps have run (the page is ready), node does this (a second browser's change, say), and only
+// then is the expression measured; the expression may start before it resolves via `while` (run in the page
+// first, its promise awaited after `then`), so the page watches while the change happens.
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown> };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -109,7 +112,10 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
       const r = await send("Runtime.evaluate", { expression: step, awaitPromise: true, returnByValue: true });
       if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text);
     }
-    const out = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    // the expression starts watching first; node acts while it watches; then its result is awaited
+    const watching = send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    if (opts.then) await opts.then();
+    const out = await watching;
     if (out.result?.exceptionDetails) throw new Error(out.result.exceptionDetails.exception?.description ?? out.result.exceptionDetails.text);
     return out.result?.result?.value;
   } finally {
