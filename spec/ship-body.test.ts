@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { LiveBody } from "../src/lib/house/live-body";
+import { LiveBody } from "../src/lib/ship/live-body";
 import { buildShip } from "../src/lib/ship/build";
 import { counts, PAINT, paintOf, partOf, PARTS, VOWEL_COLOUR } from "../src/lib/ship/rules";
 
@@ -96,7 +96,7 @@ describe("the ship's body", () => {
     }
   }, 30_000); // 129 whole ships
 
-  it("raises the mast, curls the prow and lowers the steering oar step by step with their counts", () => {
+  it("raises the mast, curls the prow and lowers the rudder step by step with their counts", () => {
     const height = (w: string) => { const s = buildShip(Array(10).fill(w)), b = new THREE.Box3().setFromObject(s.groups[5]); s.dispose(); return b.max.y; };
     const depth = (w: string) => { const s = buildShip(Array(10).fill(w)), b = new THREE.Box3().setFromObject(s.groups[8]); s.dispose(); return b.min.y; };
     const curl = (w: string) => { const s = buildShip(Array(10).fill(w)), n = s.groups[2].userData.turn as number; s.dispose(); return n; };
@@ -105,8 +105,8 @@ describe("the ship's body", () => {
     for (let k = 1; k < 5; k++) expect(masts[k], `mast step ${k}`).toBeGreaterThan(masts[k - 1]);
     expect(masts[5], "the mast isn't capped at five").toBeCloseTo(masts[4], 6);
     const oars = ["it", "jump", "jiggly", "jigglypuppy"].map(depth);
-    for (let k = 1; k < 3; k++) expect(oars[k], `steering oar step ${k}`).toBeLessThan(oars[k - 1]);
-    expect(oars[3], "the steering oar isn't capped at four").toBeCloseTo(oars[2], 6);
+    for (let k = 1; k < 3; k++) expect(oars[k], `rudder step ${k}`).toBeLessThan(oars[k - 1]);
+    expect(oars[3], "the rudder isn't capped at four").toBeCloseTo(oars[2], 6);
     expect(curl("hi")).toBe(0);
     expect(curl("bed")).toBeGreaterThan(curl("be"));
   });

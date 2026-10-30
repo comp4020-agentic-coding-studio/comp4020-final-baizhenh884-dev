@@ -14,11 +14,11 @@ const html = (await readme.compiledContent())
   .replace(/<h1([^>]*)>(.*?)<\/h1>/, '<p class="readme-title"$1>$2</p>');
 ---
 
-<Page title={`About ${title}`} description="About Theseus: a shared sentence and the house built from it, what good means here, and how it works.">
+<Page title={`About ${title}`} description="About Theseus: a shared sentence and the ship built from it, what good means here, and how it works.">
   <div class="readme">
     <header class="mast">
       <h1 class="name">{title}</h1><span class="sub caps">About</span>
-      <nav aria-label="site"><a class="caps" href="/house/">How the house reads a word</a><a class="caps" href="/">The sentence</a></nav>
+      <nav aria-label="site"><a class="caps" href="/ship/">How the planks are made</a><a class="caps" href="/">The sentence</a></nav>
     </header>
     <article set:html={html} />
   </div>

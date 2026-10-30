@@ -1,8 +1,7 @@
-// The kept house, live (docs/decisions/0003-settle-and-kept-ships.md, Slice
-// 5), without a renderer, so it runs and is tested in node
-// (spec/house-kept-stage.test.ts). It takes each kept ship a change event
-// brings, with that change's moment (kept-moment.ts), and moves the kept
-// body: a crossing part sets down into its gap; a later ship's completion is
+// The kept ship on its slipway, live (docs/decisions/0003, 0005), without a
+// renderer, so it runs and is tested in node (spec/ship-kept.test.ts). It
+// takes each kept ship a change event brings, with that change's moment
+// (kept-moment.ts), and moves the kept body: a plank sets down into its gap; a later ship's completion is
 // a quiet beat (the completed ship whole for a moment, then the next one,
 // with no line and no hold). A newer change finishes whatever is still under
 // way at once, so nothing stacks up or lags behind the truth: `target` is
@@ -28,8 +27,9 @@ export class KeptStage {
   private words: string[] = [];
   private beat: { start: number; next: KeptShip } | null = null;
 
-  constructor(drawing: (g: THREE.Group) => THREE.Group) {
-    this.body = new LiveBody("kept", drawing);
+  // `dressing`: how an old plank looks (weathered, on the page; nothing, in node)
+  constructor(drawing: (g: THREE.Group) => THREE.Group, dressing: (g: THREE.Group, position: number) => void = () => {}) {
+    this.body = new LiveBody("kept", drawing, undefined, dressing);
   }
 
   get animating(): boolean { return this.body.animating || this.beat !== null; }
@@ -53,7 +53,7 @@ export class KeptStage {
       return;
     }
     this.put(kept);
-    // a word waiting for the next house isn't in this ship: nothing arrives in the kept house
+    // a plank waiting for the next ship isn't in this one: nothing arrives in the kept ship
     if (moment && moment.kind !== "wait") this.body.arrive(moment.position, now, from);
   }
 
@@ -77,7 +77,7 @@ export class KeptStage {
   }
 
   private put(kept: KeptShip): void {
-    // the same words are the same body: only which territories are gaps changes
+    // the same words are the same body: only which parts are gaps changes
     if (!this.body.groups.length || !same(this.words, kept.words)) this.body.show(kept.words);
     this.words = [...kept.words];
     this.gaps = [...kept.gaps];

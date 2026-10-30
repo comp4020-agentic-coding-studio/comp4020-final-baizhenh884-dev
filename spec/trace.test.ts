@@ -312,7 +312,7 @@ describe("Your trace", () => {
     };
     let w = await where();
     expect(w.text, "the replaced word isn't named").toContain(mine);
-    expect(w.text, "the trace doesn't say where it's kept").toMatch(/kept in the house opposite|kept for a later house|kept in a house already built/);
+    expect(w.text, "the trace doesn't say where it's kept").toMatch(/kept in the ship of old planks|kept for a later ship|kept in a ship already built/);
 
     // bring the shown ship round to the author's word: fresh visitors move the positions furthest behind
     for (let i = 0; i < 60 && w.keptWords[p] !== mine; i++) {
@@ -322,7 +322,7 @@ describe("Your trace", () => {
       w = await where();
     }
     expect(w.keptWords[p], "the kept ship never came round to the author's word").toBe(mine);
-    expect(w.text, "the trace doesn't say the word is in the house opposite").toContain("kept in the house opposite");
+    expect(w.text, "the trace doesn't say the word is in the ship of old planks").toContain("kept in the ship of old planks");
     const mark = w.doc.querySelectorAll(".kept-sentence .w")[p];
     expect(mark.querySelector("mark") ?? (mark.closest("mark") as Element | null), "the author's kept word isn't marked for them").not.toBeNull();
 

@@ -1,0 +1,38 @@
+---
+// An earlier ship (/?kept=k): one completed kept ship on its own, read-only,
+// never live, reached one at a time like an earlier form. Its number is in
+// the URL only, never on the page (no counts, CLAUDE.md). Built from that
+// ship's words alone; nothing about it is stored.
+interface Props {
+  words: string[];
+  prev: number | null; // the completed ship before it, if any
+  next: number | null; // the completed ship after it, if any
+}
+const { words, prev, next } = Astro.props;
+---
+
+<div class="lone-ship">
+  <header class="mast">
+    <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two ships</span>
+  </header>
+  {/* the kept ship alone on its slipway, whole, as old planks */}
+  <div id="harbour" class="harbour" data-scene="kept" aria-hidden="true"></div>
+  <div class="kept-strip-lone strip">
+    <p class="caps strip-label kept-label">A ship that was kept (read-only)</p>
+    <p class="kept-sentence">
+      {words.map((w, i) => (i < words.length - 1 ? <><span class="w">{w}</span>{" "}</> : <span class="end"><span class="w">{w}</span>.</span>))}
+    </p>
+    <nav class="history caps" aria-label="Earlier ships">
+      {prev !== null && <a rel="prev" href={`?kept=${prev}`}>Earlier ship</a>}
+      {next !== null && <a rel="next" href={`?kept=${next}`}>Later ship</a>}
+      <a href="/">Back to now</a>
+    </nav>
+  </div>
+  <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/ship/">How the planks are made</a></nav>
+</div>
+<script>
+  // drawn once from these words, as old planks, whole; never goes live
+  import { mountEarlierShip } from "../lib/ship/page";
+
+  mountEarlierShip(document);
+</script>

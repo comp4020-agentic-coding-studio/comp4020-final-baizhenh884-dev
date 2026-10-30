@@ -6,12 +6,16 @@
 // `groups` is ever released.
 
 import * as THREE from "three";
-import { buildBody } from "./build";
 import { arrivalAt, duration, frameAt, type Arrival as ArrivalFrame, type Frame, type Kind } from "./motion";
-import { dress, type Look, undress } from "./theme";
+import { buildShip } from "./build";
+
+// which ship a body is: the live one on the water, the kept one on the slipway, or an earlier one alone
+export type Look = "live" | "kept" | "earlier";
+// a part's materials are listed on its group by the builder (build.ts): releasing the group releases them
+const undress = (g: THREE.Group) => { for (const m of (g.userData.materials as THREE.Material[] | undefined) ?? []) m.dispose(); };
 
 export type Exchange = { start: number; kind: Kind; position: number; outgoing: THREE.Group; incoming: THREE.Group; trace: THREE.Group; away: THREE.Vector3; across: THREE.Vector3; inY: number };
-// a crossing part arriving in the kept house: the standing group at `position`, set down from `from` (its offset at the start)
+// a plank arriving in the kept ship: the standing group at `position`, set down from `from` (its offset at the start)
 export type Arrival = { start: number; position: number; group: THREE.Group; from: THREE.Vector3 };
 export type Follow = { start: number; outgoing: THREE.Group; incoming: THREE.Group };
 export const FOLLOW_MS = 450;
@@ -42,13 +46,13 @@ export class LiveBody {
   readonly follows: Follow[] = [];
   readonly arrivals: Arrival[] = [];
 
-  // `build` makes a whole body of ten groups owned by position (the house's, or the ship's: src/lib/ship/build.ts);
-  // `dressing` gives each adopted group its look (the house's theme by default; the ship arrives dressed)
+  // `build` makes a whole body of ten groups owned by position (build.ts); `dressing` gives each adopted
+  // group its look (the ship arrives dressed by its builder, so by default nothing)
   constructor(
-    private look: Look,
+    private look: Look | string,
     private drawing: (g: THREE.Group) => THREE.Group,
-    private build: (words: readonly string[]) => { groups: THREE.Group[] } = buildBody,
-    private dressing: (g: THREE.Group, position: number, look: Look) => void = dress,
+    private build: (words: readonly string[]) => { groups: THREE.Group[] } = buildShip,
+    private dressing: (g: THREE.Group, position: number, look: Look | string) => void = () => {},
   ) {}
 
   // the territories standing now, by position (read-only to callers)
@@ -64,10 +68,10 @@ export class LiveBody {
   }
 
   // One position's word changed. The body is rebuilt from the whole new
-  // sentence: that territory is exchanged; a neighbour whose form followed from
-  // it (a roof's overhang, a threshold's spread) follows quietly; every other
+  // sentence: that part is exchanged; a neighbour whose form changed with it
+  // (none does on the ship: each part reads only its own word) follows quietly; every other
   // territory keeps its standing group and the rebuilt copy is released. A
-  // crossing's old part travels `across` (its whole way out of the house, in
+  // crossing's old part travels `across` (its whole way to the kept ship, in
   // world units, which the view measures) as well.
   change(position: number, words: readonly string[], kind: Kind, now: number, across = new THREE.Vector3()): void {
     if (!this.current.length) return this.show(words);

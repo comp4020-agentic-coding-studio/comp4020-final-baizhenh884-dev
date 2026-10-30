@@ -302,16 +302,16 @@ describe("Kept ship markup on GET /", () => {
   it("is read-only, its house decorative and its sentence readable", async () => {
     const v = new Visitor();
     const doc = await v.page();
-    const plate = doc.querySelector(".kept-plate");
-    expect(plate, "GET / has no kept-ship plate").not.toBeNull();
+    const plate = doc.querySelector(".kept-strip");
+    expect(plate, "GET / has no kept strip").not.toBeNull();
     expect(plate!.querySelector("form"), "the kept ship has an interactive form").toBeNull();
-    const house = doc.querySelector("#house-kept");
+    const house = doc.querySelector("#harbour");
     expect(house?.getAttribute("aria-hidden"), "the kept house isn't aria-hidden").toBe("true");
     const sentence = doc.querySelector(".kept-sentence");
     expect(sentence, "GET / has no kept sentence").not.toBeNull();
     expect(sentence!.closest('[aria-hidden="true"]'), "the kept sentence is hidden from screen readers").toBeNull();
-    // a gap shows the word still standing at its position in the live sentence (drawn faint, spec/two-ships-layout.test.ts)
-    const live = [...doc.querySelectorAll('.stands-half .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
+    // a gap shows the word still standing at its position in the live sentence (drawn faint, spec/harbour-layout.test.ts)
+    const live = [...doc.querySelectorAll('.sentence-strip .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
     [...doc.querySelectorAll(".kept-sentence .w")].forEach((w, i) => {
       if (w.classList.contains("gap")) expect(w.textContent!.trim(), `gap ${i} doesn't show the word still standing there`).toBe(live[i]);
     });
@@ -334,7 +334,7 @@ describe("Kept ship markup on GET /", () => {
   const OLD_LINE = "The words above have been replaced in the sentence; the gaps are words that still stand there.";
   it("says once what its words and faint words are, on GET / only", async () => {
     const doc = await new Visitor().page();
-    const note = doc.querySelector(".kept-half .kept-note");
+    const note = doc.querySelector(".kept-strip .kept-note");
     expect(note?.textContent?.trim(), "the kept half doesn't say what its words and faint words are").toBe(KEPT_LINE);
     expect(note?.closest('[aria-hidden="true"]'), "the line is hidden from screen readers").toBeNull();
     expect(doc.body.textContent, "the foot's older line for empty gaps is still there").not.toContain(OLD_LINE);
@@ -348,7 +348,7 @@ describe("Kept ship markup on GET /", () => {
   // replaced words go, both ways.
   it("serves the next house's waiting words under the kept house, as words in place order, after the kept sentence", async () => {
     const doc = await new Visitor().page();
-    const row = doc.querySelector<HTMLElement>(".kept-half .waiting");
+    const row = doc.querySelector<HTMLElement>(".kept-strip .waiting");
     expect(row, "GET / has no waiting row").not.toBeNull();
     expect(row!.closest('[aria-hidden="true"]'), "the waiting row is hidden from screen readers").toBeNull();
     const sentence = doc.querySelector(".kept-sentence")!;
@@ -358,8 +358,8 @@ describe("Kept ship markup on GET /", () => {
     const places = ws.map((w) => Number(w.getAttribute("data-n")));
     expect(places, "waiting words aren't in place order").toEqual([...places].sort((a, b) => a - b));
     expect(new Set(places).size, "more than one word waits at a place").toBe(places.length);
-    if (ws.length) expect(readable(row!)).toBe(`Waiting for the next house: ${ws.map((w) => w.textContent).join(" ")}`);
-    expect(doc.querySelector(".kept-half .plate-note")?.textContent?.trim()).toBe("Replaced words are kept here: in this house, or waiting for the next.");
+    if (ws.length) expect(readable(row!)).toBe(`Waiting for the next ship: ${ws.map((w) => w.textContent).join(" ")}`);
+    expect(doc.querySelector(".kept-strip .plate-note")?.textContent?.trim()).toBe("Replaced words are kept here: in this ship, or waiting for the next.");
   });
 
   // The shared sentence accumulates every other spec file's replacements, so

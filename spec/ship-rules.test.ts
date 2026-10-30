@@ -19,7 +19,7 @@ const fixture = JSON.parse(readFileSync(new URL("./fixtures/ship-counts.json", i
 
 describe("the ship's parts", () => {
   it("gives the ten positions their ten fixed parts, in order", () => {
-    expect(PARTS).toEqual(["ram", "hull", "prow", "stern", "shields", "mast", "sail", "oars", "steering oar", "pennant"]);
+    expect(PARTS).toEqual(["ram", "hull", "prow", "stern", "shields", "mast", "sail", "oars", "rudder", "pennant"]);
   });
 
   it("has one rule per part, each saying what it reads and what it makes", () => {
@@ -120,7 +120,7 @@ describe("what each part makes", () => {
     expect(partOf(7, "incomprehensibilities").value).toBe(12);
   });
 
-  it("steering oar: one step deeper per hanging letter, up to four", () => {
+  it("rudder: one step deeper per hanging letter, up to four", () => {
     expect(partOf(8, "it").value).toBe(0);
     expect(partOf(8, "jiggly").value).toBe(4);
     expect(partOf(8, "jigglypuppy").value).toBe(4);

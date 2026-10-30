@@ -216,8 +216,8 @@ function oars(k: Kit, per: number): void {
   }
 }
 
-// 09 steering oar: hanging letters reach it deeper, a step each, on both quarters
-function steering(k: Kit, steps: number): void {
+// 09 rudder: hanging letters reach it deeper, a step each, on both quarters
+function rudder(k: Kit, steps: number): void {
   const L = 0.75 + 0.3 * steps, wood = k.mat(C.wood), u = 0.12;
   for (const side of [-1, 1]) {
     const a = V(xAt(u) + 0.2, sAt(u) + 0.35, side * (bAt(u) + 0.05)), b = V(xAt(u) - 0.55 * L, -0.55 * L, side * (bAt(u) + 0.5 * L));
@@ -259,7 +259,7 @@ export function buildShip(words: readonly string[]): BuiltShip {
       () => mast(k, v as number),
       () => sail(k, v as (string | null)[]),
       () => oars(k, v as number),
-      () => steering(k, v as number),
+      () => rudder(k, v as number),
       () => pennant(k, v as string),
     ][i]();
     return g;

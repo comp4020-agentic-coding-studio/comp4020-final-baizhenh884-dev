@@ -1,5 +1,5 @@
 ---
-import EarlierHouse from "../components/EarlierHouse.astro";
+import EarlierShip from "../components/EarlierShip.astro";
 import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
 import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
@@ -11,9 +11,9 @@ const visitor = ensureVisitor(Astro.cookies, Astro.locals);
 
 // GET /?at=N: the whole sentence after the first N changes, read-only.
 // GET /: the current sentence, the only one that can be changed.
-// Each has its house: a body built in the browser from these same words,
-// never stored, and beside the sentence rather than instead of it.
-// GET /?kept=k: completed kept ship k on its own (an earlier house), or 404
+// Each has its harbour: the ships built in the browser from these same words,
+// never stored, behind the sentence rather than instead of it.
+// GET /?kept=k: completed kept ship k on its own (an earlier ship), or 404
 const keptParam = Astro.url.searchParams.get("kept");
 const lone = keptParam !== null && /^[1-9][0-9]{0,14}$/.test(keptParam) ? completedShipAt(Number(keptParam)) : null;
 if (keptParam !== null && !lone) return new Response("Not found", { status: 404 });
@@ -36,7 +36,7 @@ const n = Number(at);
 // kept ship isn't rendered (?at=N is a single read-only form of the sentence,
 // not a live pairing). Always computed (cheap, one read), used only below.
 const kept = keptShipAt();
-// the most recent completed kept ship, the one way into the earlier houses (0: none yet)
+// the most recent completed kept ship, the one way into the earlier ships (0: none yet)
 const lastCompleted = earlier ? 0 : Math.min(...current.map((p) => p.version)) - 1;
 
 // Which trace shape renders is itself rule-mode config, never guessed from
@@ -71,13 +71,15 @@ const how =
 <Page title="Theseus">
   {
     lone ? (
-      <EarlierHouse words={lone} prev={lonePrev} next={loneNext} />
+      <EarlierShip words={lone} prev={lonePrev} next={loneNext} />
     ) : earlier ? (
       <>
         <header class="mast">
-          <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
+          <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two ships</span>
         </header>
-        <div class="text">
+        {/* an earlier form: its own ship alone on the water, built from its own words, never live */}
+        <div id="harbour" class="harbour" data-scene="earlier" aria-hidden="true"></div>
+        <div class="sentence-strip strip earlier-strip">
           <p class="form-state caps">An earlier form (read-only)</p>
           <p class="sentence past">
             {earlier.map((w, i) => (
@@ -93,10 +95,9 @@ const how =
             <a rel={n + 1 === changes ? "next" : undefined} href="/">Back to now</a>
           </nav>
         </div>
-        <div id="house" aria-hidden="true"></div>
+        <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/ship/">How the planks are made</a></nav>
         <script>
-          // An earlier form shows its own body, built from its own words, and never goes live.
-          import { mountEarlier } from "../lib/house/page";
+          import { mountEarlier } from "../lib/ship/page";
 
           mountEarlier(document);
         </script>
@@ -105,16 +106,18 @@ const how =
       <>
         {/* The question first: in full until this visitor has made a change (the server knows from their trace), then
             the question alone. Never live: it changes only on a fresh page, so another visitor's change never folds it. */}
+        {/* the first screen: the question band, and the harbour with the sentence strip over its foot */}
+        <div class="first">
         <section id="question" class:list={["sheet", { folded: !!trace?.trace }]} aria-labelledby="question-line">
           <div class="question-main">
-            {/* the way to how the house reads a word stands on the masthead's row: one link, kept when the band folds */}
+            {/* the way to how the planks are made stands on the masthead's row: one link, kept when the band folds */}
             <header class="mast">
-              <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two houses</span>
-              <a class="caps band-house" href="/house/">How the house reads a word</a>
+              <h1 class="name">Theseus</h1><span class="sub caps">One sentence, two ships</span>
+              <a class="caps band-ship" href="/ship/">How the planks are made</a>
             </header>
-            <h2 id="question-line" class="question-line">If every word and every part is replaced, is it still the same thing?</h2>
+            <h2 id="question-line" class="question-line">If every plank is replaced, is it still the same ship?</h2>
             {!trace?.trace && (
-              <p class="ship">Theseus’s ship had every plank replaced, one by one. Here the ship is a sentence of ten words and the house it builds, and each visitor replaces a piece at a time.</p>
+              <p class="ship">Theseus’s ship had every plank replaced, one by one. Here the ship is built from a sentence of ten words, a plank for each, and each visitor replaces a piece at a time.</p>
             )}
           </div>
           {!trace?.trace && (
@@ -123,172 +126,166 @@ const how =
               <ol class="how-to-play">
                 {/* each device's own gesture; the layout shows only the device's */}
                 <li><span><span class="on-desktop">Click any word in the sentence.</span><span class="on-phone">Tap any word in the sentence.</span></span></li>
-                <li><span>Type your own and press Enter. Its part of the house is rebuilt from how the word is spelled, not what it means.</span></li>
-                <li><span>Replaced words are kept <span class="side-by-side">on the right</span><span class="stacked">below</span>: in the second house, or waiting for the next.</span></li>
+                <li><span>Type your own and press Enter. Its plank is rebuilt from how the word is spelled, not what it means.</span></li>
+                <li><span>Replaced words are kept on the slipway: in the ship of old planks, or waiting for the next.</span></li>
               </ol>
             </div>
           )}
         </section>
-        <div class="two">
-          <div class="half stands-half sheet" id="stands">
-            <div class="half-head">
-              {/* on a phone the halves stack: the header row names the other half, as desktop does side by side, and goes there */}
-              <div class="head-row">
-                <p class="caps half-label">What stands</p>
-                <a class="caps to-kept" href="#kept">What was kept ↓</a>
-              </div>
+        {/* the stage: the harbour (decorative), and over its foot the sentence strip */}
+        <div class="stage">
+          {/* one canvas: the live ship on the water, the kept ship on its slipway, the pallet; built in the browser */}
+          <div id="harbour" class="harbour" data-scene="now" aria-hidden="true"></div>
+          {/* each ship's tag for the part pointed at or chosen (a desktop; never at rest) */}
+          <p class="part-tag caps" data-ship="live" aria-hidden="true" hidden></p>
+          <p class="part-tag caps" data-ship="kept" aria-hidden="true" hidden></p>
+          <button id="home" class="caps" type="button" hidden>Back to the harbour</button>
+          <div id="sentence" class="sentence-strip strip">
+            <div class="head-row">
+              <p class="caps strip-label">Ten words · ten planks</p>
+              <a class="caps to-kept" href="#kept">What was kept ↓</a>
             </div>
-            <div class="text current">
-              <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
-              {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
-              <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
-              {/* what the part notation predicts while a word is typed, said once typing pauses (the notation is aria-hidden) */}
-              <p class="sr-only" id="foreseen" aria-live="polite" aria-atomic="true"></p>
-              {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
-              <div class="sentence" data-step={sizeStep(current.map((p) => p.word))} data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
-                {current.slice(0, -1).map((p) => (
-                  <>
-                    <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />{" "}
-                  </>
-                ))}
-                {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
-                {current.slice(-1).map((p) => (
-                  <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />.</span>
-                ))}
-              </div>
+            <p class="sr-only" data-sentence-summary>The sentence now reads: {current.map((p) => p.word).join(" ")}.</p>
+            {/* others' changes, said politely once a burst has settled (src/lib/live-client.ts); empty on load */}
+            <p class="sr-only" id="news" aria-live="polite" aria-atomic="true"></p>
+            {/* what the part notation predicts while a word is typed, said once typing pauses (the notation is aria-hidden) */}
+            <p class="sr-only" id="foreseen" aria-live="polite" aria-atomic="true"></p>
+            {/* under settle, the hold's length, so a holding word can show how much of it is left (live-client) */}
+            <div class="sentence" data-step={sizeStep(current.map((p) => p.word))} data-settle-ms={trace?.mode === "settle" ? SETTLE_SECONDS * 1000 : undefined}>
+              {current.slice(0, -1).map((p) => (
+                <>
+                  <WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />{" "}
+                </>
+              ))}
+              {/* the full stop belongs to the sentence: it stays on the last word's line, never wraps alone */}
+              {current.slice(-1).map((p) => (
+                <span class="end"><WordSlot position={p.position} version={p.version} word={p.word} marked={markedPositions.has(p.position)} />.</span>
+              ))}
+            </div>
+            <div class="slot">
               <p id="part" class="caps" aria-hidden="true" hidden></p>
               {/* at rest the notation's slot invites a change; choosing a word puts the notation there instead */}
               <div class="invite-row">
                 <p class="invite caps" aria-hidden="true">Choose any word and type your own</p>
-                <a class="caps invite-house" href="/house/">How the house reads a word</a>
+                <a class="caps invite-ship" href="/ship/">How the planks are made</a>
               </div>
             </div>
-            <div id="house" aria-hidden="true"></div>
-            <div class="foot">
-              <div class="foot-main">
-              {/* the kept half is far below on a phone: one quiet line says it's there */}
-              <p class="kept-pointer">What was replaced is kept below.</p>
-              <p id="how">Choose a word, type its replacement and press Enter. <span class="esc">Press Escape to cancel. </span>{how}</p>
-              {trace?.mode === "once" && trace.trace && (
-                <section aria-labelledby="trace-heading">
-                  <h2 id="trace-heading">Your trace</h2>
-                  <p role="status">
-                    {trace.trace.standing ? (
-                      <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
-                    ) : (
-                      <>
-                        Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
-                      </>
-                    )}
-                  </p>
-                </section>
-              )}
-              {trace?.mode === "settle" && trace.trace && (
-                <section aria-labelledby="trace-heading">
-                  <h2 id="trace-heading">Your trace</h2>
-                  {(() => {
-                    const parts = latestParts(trace.trace.latest);
-                    return (
-                      <p role="status">
-                        {parts.del ? (
-                          <>
-                            Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.kept} {parts.eligibility}
-                          </>
-                        ) : (
-                          <>
-                            Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
-                          </>
-                        )}
-                      </p>
-                    );
-                  })()}
-                  {trace.trace.otherStanding.length > 0 && (
-                    <ul class="trace-standing">
-                      {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
-                    </ul>
-                  )}
-                  {trace.trace.otherReplaced.length > 0 && (
-                    <ul class="trace-replaced">
-                      {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
-                    </ul>
-                  )}
-                </section>
-              )}
-              {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
-              <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>
-              </div>
-              <div class="foot-aside">
-              {/* two lines, each set on its own, so neither ends on a word alone */}
-              <p class="plate-note"><span class="line">Ten words. Ten parts.</span> <span class="line">Change a word, and its part is rebuilt.</span></p>
-              <p class="question">If every word and every part is replaced, is it still the same thing?</p>
-              </div>
-            </div>
-          </div>
-          <div class="half kept-half kept-plate blueprint" id="kept">
-            <div class="half-head">
-              <div class="head-row">
-                <p class="caps half-label kept-label">What was kept</p>
-                <a class="caps to-stands" href="#stands">Back to what stands ↑</a>
-              </div>
-            </div>
-            {/* the kept sentence is read as words; a gap shows, faint, the word still standing there, read as "still standing:" then the word
-                (src/lib/kept-sentence.ts redraws it the same way) */}
-            <div class="kept-text">
-              <p class="kept-sentence">
-                {kept.words.map((w, i) => {
-                  const word = kept.gaps[i] ? <><span class="sr-only">still standing: </span><span class="w gap">{w}</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
-                  return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
-                })}
-              </p>
-              {/* what the kept sentence is (28 October playtest: it was read as a quiz, or as the original); it lies over the
-                  kept house's empty top band, so it never grows the row both halves share */}
-              <p class="kept-note">Replaced words, back in their places. Faint words still stand.</p>
-            </div>
-            <div id="house-kept" aria-hidden="true"></div>
-            <div class="foot">
-              {/* the next house's words (decided 29 October): a replaced word that belongs to the next ship waits here,
-                  in place order with its place, read after the kept sentence; hidden when nothing waits
-                  (src/lib/kept-sentence.ts renderWaiting redraws it the same way) */}
-              <p class="waiting" hidden={!kept.next.some((w) => w !== null)}><span class="label caps">Waiting for the next house:</span> <span class="ws">{kept.next.flatMap((w, i) => (w === null ? [] : [<span class="w" data-n={String(i + 1).padStart(2, "0")}>{w}</span>, " "]))}</span></p>
-              <p class="plate-note">Replaced words are kept here: in this house, or waiting for the next.</p>
-              {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
-              {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-house" href={`?kept=${lastCompleted}`}>Earlier house</a></p>}
-            </div>
+            {/* the kept strip is below on a phone: one quiet line says it's there */}
+            <p class="kept-pointer">What was replaced is kept below.</p>
           </div>
         </div>
-        <svg id="thread" class="thread" aria-hidden="true"><path d=""></path><g class="tag"><circle r="10" cx="0" cy="0"></circle><text x="0" y="0"></text></g></svg>
+        </div>
+        <div id="kept" class="kept-strip strip">
+          <div class="head-row">
+            <p class="caps strip-label kept-label">The ship of old planks</p>
+            <a class="caps to-sentence" href="#sentence">Back to the sentence ↑</a>
+          </div>
+          {/* the kept sentence is read as words; a gap shows, faint, the word still standing there, read as "still standing:" then the word
+              (src/lib/kept-sentence.ts redraws it the same way) */}
+          <p class="kept-sentence">
+            {kept.words.map((w, i) => {
+              const word = kept.gaps[i] ? <><span class="sr-only">still standing: </span><span class="w gap">{w}</span></> : <span class="w">{keptMine.has(i) ? <mark>{w}</mark> : w}</span>;
+              return i < kept.words.length - 1 ? <>{word}{" "}</> : <span class="end">{word}.</span>;
+            })}
+          </p>
+          {/* what the kept sentence is (28 October playtest: it was read as a quiz, or as the original) */}
+          <p class="kept-note">Replaced words, back in their places. Faint words still stand.</p>
+          {/* the next ship's words (decided 29 October): a replaced word that belongs to the next ship waits here,
+              in place order with its place, read after the kept sentence; hidden when nothing waits
+              (src/lib/kept-sentence.ts renderWaiting redraws it the same way) */}
+          <p class="waiting" hidden={!kept.next.some((w) => w !== null)}><span class="label caps">Waiting for the next ship:</span> <span class="ws">{kept.next.flatMap((w, i) => (w === null ? [] : [<span class="w" data-n={String(i + 1).padStart(2, "0")}>{w}</span>, " "]))}</span></p>
+          <p class="plate-note">Replaced words are kept here: in this ship, or waiting for the next.</p>
+          {/* not rel=prev: on GET / that is the Earlier form's, by the HTTP contract */}
+          {lastCompleted > 0 && <p class="earlier caps"><a class="earlier-ship" href={`?kept=${lastCompleted}`}>Earlier ship</a></p>}
+        </div>
+        {/* the notes: the rule, your trace, the way back through the sentence's history, and the site's links last */}
+        <div class="notes foot">
+          <div class="foot-main">
+            <p id="how">Choose a word, type its replacement and press Enter. <span class="esc">Press Escape to cancel. </span>{how}</p>
+            {trace?.mode === "once" && trace.trace && (
+              <section aria-labelledby="trace-heading">
+                <h2 id="trace-heading">Your trace</h2>
+                <p role="status">
+                  {trace.trace.standing ? (
+                    <>Your word “{trace.trace.word}” still stands, marked in the sentence above.</>
+                  ) : (
+                    <>
+                      Your word “<del>{trace.trace.word}</del>” has since been replaced: “{trace.trace.now}” stands in its place now.
+                    </>
+                  )}
+                </p>
+              </section>
+            )}
+            {trace?.mode === "settle" && trace.trace && (
+              <section aria-labelledby="trace-heading">
+                <h2 id="trace-heading">Your trace</h2>
+                {(() => {
+                  const parts = latestParts(trace.trace.latest);
+                  return (
+                    <p role="status">
+                      {parts.del ? (
+                        <>
+                          Your word “<del>{parts.del}</del>” has since been replaced: “{parts.now}” stands in its place now. {parts.kept} {parts.eligibility}
+                        </>
+                      ) : (
+                        <>
+                          Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                        </>
+                      )}
+                    </p>
+                  );
+                })()}
+                {trace.trace.otherStanding.length > 0 && (
+                  <ul class="trace-standing">
+                    {trace.trace.otherStanding.map((item) => <li>{standingText(item)}</li>)}
+                  </ul>
+                )}
+                {trace.trace.otherReplaced.length > 0 && (
+                  <ul class="trace-replaced">
+                    {trace.trace.otherReplaced.map((item) => <li>{replacedText(item)}</li>)}
+                  </ul>
+                )}
+              </section>
+            )}
+            {changes > 0 && <p class="earlier caps"><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></p>}
+          </div>
+          <div class="foot-aside">
+            {/* two lines, each set on its own, so neither ends on a word alone */}
+            <p class="plate-note"><span class="line">Ten words. Ten planks.</span> <span class="line">Change a word, and its plank is rebuilt.</span></p>
+            <p class="question">If every plank is replaced, is it still the same ship?</p>
+          </div>
+          <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/ship/">How the planks are made</a></nav>
+        </div>
         <script>
           // Only the current sentence goes live; earlier forms never load this.
           import { attach, parseChange, parseSnapshot, type KeptShip, type Moment } from "../lib/live-client";
           import { classifyMoment } from "../lib/kept-moment";
           import { renderKeptSentence, waitingRow as waitingRowOf } from "../lib/kept-sentence";
           import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
-          import { BEAT_MS } from "../lib/house/kept-stage";
-          import { duration, leavesAt } from "../lib/house/motion";
-          import { mountCurrent, mountKept } from "../lib/house/page";
+          import { BEAT_MS } from "../lib/ship/kept-stage";
+          import { duration, leavesAt } from "../lib/ship/motion";
+          import { mountHarbour } from "../lib/ship/page";
 
-          // The moment of a replacement (docs/decisions/0003, Slice 5): a part that
-          // crosses from the standing house into the kept one; ship 1's completion,
-          // announced once, live; a later ship's quiet beat. Presentation only: what
-          // either house settles on is the kept ship the server derived.
+          // The moment of a replacement (docs/decisions/0003, 0005): a plank that flies from the live ship to its gap
+          // in the kept ship, or to the pallet for the next; ship 1's completion, announced once, live; a later
+          // ship's quiet beat. Presentation only: what either ship settles on is the kept ship the server derived.
           const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-          const standsHost = document.getElementById("house"), keptHost = document.getElementById("house-kept");
-          const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null;
           const keptLabel = document.querySelector(".kept-sentence");
-          const waitingRow = document.querySelector<HTMLElement>(".kept-half .waiting");
-          const keptHouse = mountKept(document);
-          let keptNow: KeptShip | null = keptHouse?.initial ?? null; // the kept ship the page shows
-          let crossing: Moment | null = null; // the moment the next exchange of the standing house belongs to
+          const waitingRow = document.querySelector<HTMLElement>(".kept-strip .waiting");
+          // the kept ship as GET / served it: the kept sentence's spans, a gap's word the live word standing there
+          const keptSpans = [...document.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+          const liveWords = [...document.querySelectorAll<HTMLElement>('.sentence-strip .sentence form[action="/replace"] label')].map((l) => l.textContent!.trim());
+          const next: (string | null)[] = Array(10).fill(null);
+          for (const w of document.querySelectorAll<HTMLElement>(".kept-strip .waiting .ws .w")) next[Number(w.dataset.n) - 1] = w.textContent!.trim();
+          let keptNow: KeptShip = { words: keptSpans.map((s, i) => (s.classList.contains("gap") ? liveWords[i] : s.textContent!.trim())), gaps: keptSpans.map((s) => s.classList.contains("gap")), next };
+          let pending: Moment | null = null; // the moment the next live change belongs to
           let beat = 0;
-          // the waiting row as the kept ship says, except a word whose part is still flying toward it
-          // (read from the row GET / served, so it stays live without a drawn house too)
-          const waiting = waitingRow
-            ? waitingRowOf(waitingRow, Array.from({ length: 10 }, (_, i) => waitingRow.querySelector<HTMLElement>(`.ws .w[data-n="${String(i + 1).padStart(2, "0")}"]`)?.textContent ?? null))
-            : null;
+          // the waiting row as the kept ship says, except a word whose plank is still flying toward the pallet
+          const waiting = waitingRow ? waitingRowOf(waitingRow, next) : null;
+          const drawn = () => !!document.querySelector("#harbour canvas");
 
           // your own replaced words in the kept ship shown (settle mode): as the server marked them, then from your trace
-          let mine = new Set<number>([...document.querySelectorAll(".kept-sentence .w")].flatMap((w, i) => (w.querySelector("mark") ? [i] : [])));
-          keptHouse?.mine([...mine][0] ?? null);
+          let mine = new Set<number>(keptSpans.flatMap((w, i) => (w.querySelector("mark") ? [i] : [])));
           function renderKept(k: KeptShip): void {
             if (keptLabel) renderKeptSentence(keptLabel, k, mine);
             waiting?.show(k.next);
@@ -308,91 +305,81 @@ const how =
               });
             });
           }
-
-          // Ship 1 complete: the one loud line, once, live, as the last part sets down.
-          // Never on a load, a reconnect or ?at=N. On a phone the pointer to the kept
-          // half also says that a part (or the whole first sentence) went below.
+          // Ship 1 complete: the one loud line, once, live, as the last plank sets down. Never on a load, a reconnect
+          // or ?at=N. On a phone the pointer to the kept strip also says that a plank (or the whole first ship) was kept.
           function acknowledge(moment: Moment): void {
             const delay = reduced() ? 0 : 2400;
-            // ship 1's acknowledgement stays until the line has gone
             if (moment.kind === "cross" || moment.kind === "first" || moment.kind === "wait") acknowledgeBelow(document, moment.kind, reduced(), moment.kind === "first" ? delay + LINE_MS + 1000 : ACK_MS);
             if (moment.kind === "first") setTimeout(() => showMomentLine(document, reduced()), delay);
           }
-
-          // a kept ship and the moment a change brought to it
+          // the kept sentence and waiting row for a kept ship and the moment a change brought to it (the harbour is told separately)
           function moveKept(k: KeptShip, moment: Moment | null): void {
-            // a snapshot telling what the page already shows (every load's first one) changes nothing, mid-motion included
-            if (!moment && keptNow && JSON.stringify(k) === JSON.stringify(keptNow)) return;
             clearTimeout(beat);
-            if (!moment || !keptHouse) {
-              keptHouse?.update(k);
+            const before = keptNow;
+            if (!moment) renderKept(k);
+            else if (moment.kind === "later") {
+              // the completed ship stands whole for its beat, in words as on the slipway; its waiting words still wait
+              renderKept({ words: before.words, gaps: before.gaps.map(() => false), next: before.next });
+              beat = window.setTimeout(() => { renderKept(k); moveUp(before.next); }, (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
+            } else if (before.gaps.every((g) => !g) && moment.kind === "cross") {
+              // ship 1 was held whole: the first change after it starts ship 2, whose waiting words rise into it
               renderKept(k);
-            } else {
-              const before = keptNow;
-              keptHouse.apply(k, moment, box(standsHost));
-              if (moment.kind === "later" && before) {
-                // the completed ship stands whole for its beat, in words as in its house; its waiting words still wait
-                renderKept({ words: before.words, gaps: before.gaps.map(() => false), next: before.next });
-                beat = window.setTimeout(() => { renderKept(k); moveUp(before.next); }, (reduced() ? 0 : duration("cross", false)) + BEAT_MS);
-              } else if (before && before.gaps.every((g) => !g) && moment.kind === "cross") {
-                // ship 1 was held whole: the first change after it starts ship 2, whose waiting words rise into it
-                renderKept(k);
-                moveUp(before.next);
-              } else if (moment.kind === "wait") {
-                // the word lands in the row when its part does: the standing house's part flies only if it's drawn
-                if (keptLabel) renderKeptSentence(keptLabel, k, mine);
-                waiting?.land(k.next, standsHost?.querySelector("canvas") ? leavesAt(reduced()) : 0);
-              } else renderKept(k);
-              acknowledge(moment);
-            }
+              moveUp(before.next);
+            } else if (moment.kind === "wait") {
+              // the word lands in the row when its plank lands on the pallet (only if a plank flies)
+              if (keptLabel) renderKeptSentence(keptLabel, k, mine);
+              waiting?.land(k.next, drawn() ? leavesAt(reduced()) : 0);
+            } else renderKept(k);
+            if (moment) acknowledge(moment);
             keptNow = k;
           }
 
-          // This visitor's own change, just made (Post/Redirect/Get): the kept ship
-          // the page showed when they submitted, read back once, if their word stands.
-          let own: Moment | null = null, ownBefore: KeptShip | null = null;
+          // This visitor's own change, just made (Post/Redirect/Get): the kept ship the page showed when they
+          // submitted, read back once, if their word stands.
+          let own: { position: number; moment: Moment; before: KeptShip } | null = null;
           try {
             const saved = sessionStorage.getItem("theseus:kept-before");
             sessionStorage.removeItem("theseus:kept-before");
-            if (saved && keptNow) {
+            if (saved) {
               const { position, kept } = JSON.parse(saved) as { position: number; kept: KeptShip };
-              if (document.querySelector(`label[for="word-${position}"] mark`)) {
-                own = classifyMoment(kept, keptNow, position);
-                ownBefore = kept;
-              }
+              const moment = document.querySelector(`label[for="word-${position}"] mark`) ? classifyMoment(kept, keptNow, position) : null;
+              if (moment) own = { position, moment, before: kept };
             }
-          } catch { /* no storage: no moment */ }
-          for (const form of document.querySelectorAll<HTMLFormElement>('.sentence form[action="/replace"]')) {
+          } catch { /* no storage: no flight */ }
+          for (const form of document.querySelectorAll<HTMLFormElement>('.sentence-strip .sentence form[action="/replace"]')) {
             form.addEventListener("submit", () => {
               const position = Number(form.querySelector<HTMLInputElement>('input[name="position"]')?.value);
-              try { if (keptNow) sessionStorage.setItem("theseus:kept-before", JSON.stringify({ position, kept: keptNow })); } catch { /* optional */ }
+              try { sessionStorage.setItem("theseus:kept-before", JSON.stringify({ position, kept: keptNow })); } catch { /* optional */ }
             });
           }
+          // the page's own change: its words move as the plank does
+          if (own) {
+            const { moment, before } = own, now = keptNow;
+            keptNow = before;
+            moveKept(now, moment);
+          }
 
-          const house = mountCurrent(document, (position) => {
-            if (!own || own.position !== position || !ownBefore) return null;
-            const now = keptNow!;
-            keptHouse?.update(ownBefore);
-            keptNow = ownBefore;
-            moveKept(now, own);
-            return { toward: box(own.kind === "wait" ? waitingRow : keptHost) };
-          });
+          const harbour = mountHarbour(document, keptNow, (position) => (own && own.position === position ? { moment: own.moment, before: own.before } : null));
+          harbour?.mine([...mine][0] ?? null);
           const page = attach(document, {
             onLatest: (change) => {
-              // a word for the next house leaves toward the waiting row (shown by then), the rest toward the kept house
-              const c = crossing && crossing.position === change.position ? { toward: box(crossing.kind === "wait" ? waitingRow : keptHost) } : null;
-              crossing = null;
-              house?.latest(change, c);
+              // a plank flies for the moment this change brought (told just before, by onKept), else it's simply rebuilt
+              const flight = pending && pending.position === change.position ? { moment: pending, kept: keptNow } : null;
+              pending = null;
+              harbour?.latest(change, flight);
             },
-            onHeld: (position, word) => house?.held(position, word),
+            onHeld: (position, word) => harbour?.held(position, word),
             onMine: (positions) => {
               mine = new Set(positions);
-              keptHouse?.mine(positions[0] ?? null);
-              if (keptNow) renderKept(keptNow);
+              harbour?.mine(positions[0] ?? null);
+              renderKept(keptNow);
             },
             onKept: (k, moment) => {
-              crossing = moment;
+              // a snapshot telling what the page already shows (every load's first one) changes nothing
+              if (!moment && JSON.stringify(k) === JSON.stringify(keptNow)) return;
+              pending = moment;
               moveKept(k, moment);
+              if (!moment) harbour?.keptShow(k);
             },
           });
           const events = new EventSource("/events");
@@ -408,5 +395,4 @@ const how =
       </>
     )
   }
-  {earlier && <nav class="about caps" aria-label="site"><a href="/readme/">About Theseus</a> · <a href="/house/">How the house reads a word</a></nav>}
 </Page>

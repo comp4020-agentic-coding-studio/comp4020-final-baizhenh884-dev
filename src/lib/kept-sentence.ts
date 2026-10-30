@@ -36,7 +36,7 @@ export function renderKeptSentence(el: Element, k: KeptShip, mine: ReadonlySet<n
   el.replaceChildren(...nodes);
 }
 
-// The waiting row, as a live page redraws it, in the shape GET / serves: the next house's words in place
+// The waiting row, as a live page redraws it, in the shape GET / serves: the next ship's words in place
 // order, each with its place (drawn from data-n, never read), as text; hidden when nothing waits. No count.
 export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]): void {
   const doc = row.ownerDocument;
@@ -56,7 +56,7 @@ export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]
   row.hidden = nodes.length === 0;
 }
 
-// The waiting row on a live page: `show` redraws it as the kept ship says; `land` brings a word for the next house
+// The waiting row on a live page: `show` redraws it as the kept ship says; `land` brings a word for the next ship
 // in once its part, flying toward the row, has got there (`inMs`; 0 when nothing flies). Until then that place is
 // held back, through any redraw; a place no longer waiting (the ship completed) is let go at once.
 export type WaitingRow = { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void };

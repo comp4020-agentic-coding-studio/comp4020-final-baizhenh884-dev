@@ -1,10 +1,10 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, inject, it, vi } from "vitest";
-import { foreseen, said } from "../src/lib/house/notation";
+import { foreseen, said } from "../src/lib/ship/notation";
 import { sizeStep } from "../src/lib/sentence-step";
 import { attach, deriveTotal, DRAFT_MS, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 import { waitingRow } from "../src/lib/kept-sentence";
-import { frameAt, leavesAt } from "../src/lib/house/motion";
+import { frameAt, leavesAt } from "../src/lib/ship/motion";
 
 // How an open current page (GET /) applies realtime state, checked against the
 // page the running app really serves: each check fetches GET /, parses it with
@@ -346,7 +346,7 @@ describe("live page reconciliation", () => {
   // word in hand it applies with the change. The page shows the step it would
   // render for the words now standing (GET / renders the same).
   describe("the sentence's size step", () => {
-    const step = (doc: Document) => doc.querySelector(".stands-half .sentence")?.getAttribute("data-step");
+    const step = (doc: Document) => doc.querySelector(".sentence-strip .sentence")?.getAttribute("data-step");
     const LONG = ["potato", "every", "ceremony", "that", "students", "will", "tythbvgbv", "whether", "it", "peel"];
     // a change to each position in turn, newer than shown, building the long sentence
     const lengthen = (page: ReturnType<typeof attach>, doc: Document) => {
@@ -647,7 +647,7 @@ describe("live page reconciliation", () => {
       otherStanding: [],
       otherReplaced: [],
     });
-    const withSettleTime = (doc: Document, ms: number) => doc.querySelector(".stands-half .sentence")!.setAttribute("data-settle-ms", String(ms));
+    const withSettleTime = (doc: Document, ms: number) => doc.querySelector(".sentence-strip .sentence")!.setAttribute("data-settle-ms", String(ms));
 
     localOnly("fills under the holding word only, from what has already elapsed to the end of the hold", async () => {
       const doc = await (await arrive()).page("/");
@@ -687,12 +687,12 @@ describe("live page reconciliation", () => {
     settleOnly("GET / carries the settle time on the live sentence under settle mode", async () => {
       const doc = await (await arrive()).page("/");
       const ms = Number(process.env.SETTLE_SECONDS ?? 300) * 1000;
-      expect(doc.querySelector(".stands-half .sentence")?.getAttribute("data-settle-ms"), "the page doesn't carry the settle time").toBe(String(ms));
+      expect(doc.querySelector(".sentence-strip .sentence")?.getAttribute("data-settle-ms"), "the page doesn't carry the settle time").toBe(String(ms));
     });
 
     onceOnly("GET / carries no settle time under once mode", async () => {
       const doc = await (await arrive()).page("/");
-      expect(doc.querySelector(".stands-half .sentence")?.hasAttribute("data-settle-ms"), "a once-mode page carries a settle time").toBe(false);
+      expect(doc.querySelector(".sentence-strip .sentence")?.hasAttribute("data-settle-ms"), "a once-mode page carries a settle time").toBe(false);
     });
 
     localOnly("is never added with reduced motion", async () => {
@@ -856,7 +856,7 @@ describe("live page reconciliation", () => {
   // at once. Words already waiting never leave the row meanwhile, and a
   // second change in flight never loses the first one's word.
   describe("a waiting word, landing", () => {
-    const rowDoc = () => new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next house:</span> <span class="ws"></span></p>').window.document;
+    const rowDoc = () => new JSDOM('<p class="waiting" hidden><span class="label">Waiting for the next ship:</span> <span class="ws"></span></p>').window.document;
     const next = (at: Record<number, string>) => Array.from({ length: 10 }, (_, i) => at[i] ?? null);
     const shown = (row: HTMLElement) => (row.hidden ? [] : [...row.querySelectorAll(".ws .w")].map((w) => w.textContent));
     afterEach(() => vi.useRealTimers());
@@ -952,7 +952,7 @@ describe("live page reconciliation", () => {
       expect(said, "the announcement names a time").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute/i);
     });
 
-    // the same family change the part notation shows, from the same code (src/lib/house/notation.ts)
+    // the same family change the part notation shows, from the same code (src/lib/ship/notation.ts)
     localOnly("says one change's family change, as the part notation does", async () => {
       const doc = await (await arrive()).page("/");
       vi.useFakeTimers(); // after the network: fake timers stall fetch
@@ -997,8 +997,8 @@ describe("live page reconciliation", () => {
       expect(region(doc).textContent?.trim(), "a stale change was announced").toBe("");
     });
 
-    // the replaced word waits for the next house: said in the same announcement, coalesced, never who or when
-    localOnly("says that a replaced word waits for the next house, in the same announcement", async () => {
+    // the replaced word waits for the next ship: said in the same announcement, coalesced, never who or when
+    localOnly("says that a replaced word waits for the next ship, in the same announcement", async () => {
       const doc = await (await arrive()).page("/");
       vi.useFakeTimers(); // after the network: fake timers stall fetch
       const shown: KeptShip = { words: Array(10).fill("w"), gaps: Array(10).fill(false).map((_, i) => i === 8), next: Array(10).fill(null) };
@@ -1010,7 +1010,7 @@ describe("live page reconciliation", () => {
       vi.advanceTimersByTime(2500);
       const text = region(doc).textContent ?? "";
       expect(text).toContain(said({ position, word, was }));
-      expect(text, "the announcement doesn't say the replaced word waits for the next house").toContain(`“${was}” waits for the next house`);
+      expect(text, "the announcement doesn't say the replaced word waits for the next ship").toContain(`“${was}” waits for the next ship`);
       expect(text, "the announcement names a time or a count").not.toMatch(/\d{1,2}:\d{2}|ago|second|minute|waiting words|\bof\b \d/i);
     });
 

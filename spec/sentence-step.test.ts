@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SIZE_STEPS, sizeStep } from "../src/lib/sentence-step";
-import { SENTENCES } from "./house-sentences";
+import { SENTENCES } from "./ship-sentences";
 
 // The live sentence's size step (docs: CLAUDE.md "Current design"): on a
 // desktop it steps down through a few fixed sizes, never a continuous one, so

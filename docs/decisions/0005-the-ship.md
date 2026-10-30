@@ -91,7 +91,7 @@ The fixed parts are unchanged:
 | 06 | mast |
 | 07 | sail |
 | 08 | oars |
-| 09 | steering oar |
+| 09 | rudder |
 | 10 | pennant |
 
 **The rules.** Each part reads one thing you can count in how the word is
@@ -107,7 +107,7 @@ spelled, never what it means:
 | mast | tall letters | the mast's height |
 | sail | every letter | one stripe per letter, vowels coloured |
 | oars | letters | one oar per letter, each side |
-| steering oar | hanging letters | how deep the steering oar reaches |
+| rudder | hanging letters | how deep the rudder reaches |
 | pennant | the word itself | the word, written on the pennant |
 
 - Every count is capped where the prototype caps it.

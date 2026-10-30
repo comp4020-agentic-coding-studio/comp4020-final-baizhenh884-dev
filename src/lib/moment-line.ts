@@ -1,9 +1,9 @@
 // Ship 1's one loud line, and the phone pointer's acknowledgement
 // (docs/decisions/0003-settle-and-kept-ships.md, Slice 5). Presentation
-// only: neither changes either house's state. Standalone (no imports), so
+// only: neither changes either ship's state. Standalone (no imports), so
 // spec/moment-line.test.ts runs this same code in headless Chrome.
 //
-// The line takes clear ground: both halves are veiled behind it (body
+// The line takes clear ground: the harbour and both strips are veiled behind it (body
 // .moment-on, never red), and it sits in the tallest band of the screen that
 // no live sentence word, draft notice or part notation occupies, a step
 // smaller if that band is short, so no live text is ever under it. The veil
@@ -39,7 +39,7 @@ function place(doc: Document, line: HTMLElement): void {
     size *= 0.92;
     line.style.fontSize = `${size}px`;
   }
-  // in the upper part of the band: under the sentence, over the houses, clear of the notes below them
+  // in the upper part of the band: clear of the sentence and the notes
   line.style.top = `${Math.max(top, top + (bottom - top - line.getBoundingClientRect().height) * 0.3)}px`;
 }
 
@@ -67,18 +67,17 @@ export function showMomentLine(doc: Document, reduced: boolean, ms = LINE_MS): H
   return line;
 }
 
-// On a phone the kept half is far below, so a part that crosses lands out of
-// view: the pointer to it says so for a moment, in ink rather than its quiet
+// On a phone the kept strip is below, and the slipway may be out of view: the pointer to it says so for a moment, in ink rather than its quiet
 // grey (never red), with a small nudge downward unless motion is reduced.
 const ACK = {
-  cross: "A replaced part was just kept below.",
-  wait: "A replaced word waits below, for the next house.",
-  first: "The whole first sentence is now kept below.",
+  cross: "A replaced plank was just kept on the slipway.",
+  wait: "A replaced plank waits on the slipway, for the next ship.",
+  first: "The whole first ship is now kept on the slipway.",
 };
 const restoring = new WeakMap<Element, { timer: number; text: string }>();
 
 export function acknowledgeBelow(doc: Document, kind: "cross" | "first" | "wait", reduced: boolean, ms = ACK_MS): void {
-  const pointer = doc.querySelector<HTMLElement>(".stands-half .kept-pointer");
+  const pointer = doc.querySelector<HTMLElement>(".sentence-strip .kept-pointer");
   if (!pointer) return;
   const win = doc.defaultView!;
   const pending = restoring.get(pointer);

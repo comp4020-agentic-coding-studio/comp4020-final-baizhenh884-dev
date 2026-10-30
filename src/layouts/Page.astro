@@ -1,9 +1,9 @@
 ---
 // The one page shell: language, viewport, title and the styles every view
-// shares, as a drawing sheet: the live half on drafting paper, the kept half a
-// blueprint, each ruled with a faint grid; the sentence set large in
-// Instrument Serif, every label lettered in IBM Plex Mono, the house as its
-// body beside it. Visitor words are only ever interpolated as text.
+// shares: the question on drafting paper, the harbour's sunlit scene, and the
+// sentence and the kept sentence on parchment strips (docs/decisions/0005);
+// the sentences set in Instrument Serif, every label lettered in IBM Plex
+// Mono. Visitor words are only ever interpolated as text.
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/instrument-serif/400.css";
@@ -15,7 +15,7 @@ interface Props {
   title: string;
   description?: string;
 }
-const DEFAULT_DESCRIPTION = "One shared sentence of ten words, and a house built from it. Anyone can replace a word, and its part of the house is rebuilt.";
+const DEFAULT_DESCRIPTION = "One shared sentence of ten words, and a ship built from it, a plank for each. Anyone can replace a word, and its plank is rebuilt; the old planks are kept.";
 const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
 // absolute, from the request itself, so a shared link is right wherever the app runs
 const url = new URL(Astro.url.pathname + Astro.url.search, Astro.url.origin).href;
@@ -41,7 +41,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
     <style is:global>
       /* red has one job, a body being rebuilt now; nothing in these styles is red */
       :root {
-        /* drafting paper and blueprint; labels and captions are legible on a grid line, not just the flat ground (spec/two-ships-layout.test.ts) */
+        /* drafting paper for the band and the notes; labels and captions are legible on a grid line, not just the flat ground */
         --field: #ece8df; --ink: #191714; --soft: #5a544b; --caption: #3f3a33; --faint: rgb(25 23 20 / 0.4); --hair: rgb(25 23 20 / 0.16);
         --kept-ground: #1d3350; --kept-ink: #eef3f8; --kept-soft: #9fb1c7; --kept-caption: #b9c7d8; --kept-gap: #dce6f2; --kept-faint: var(--kept-soft);
         --grid: rgb(25 23 20 / 0.045); --kept-grid: rgb(255 255 255 / 0.055); --frame: rgb(25 23 20 / 0.22); --kept-frame: rgb(255 255 255 / 0.22);
@@ -67,14 +67,10 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
       .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
       .mast .sub { color: var(--soft); }
-      /* the sentence sits in the middle of the page's height, level with the house */
-      .text { position: relative; z-index: 1; max-width: 46vw; margin: auto 0; padding: 2vh 0 4vh; }
-      /* the current sentence is read first, with its rules beneath it */
-      .text.current { display: flex; flex-direction: column; }
       /* the captions are read, not glanced at: 15px (14px on a phone), in --caption, 6.5:1 on the field */
       #how { margin: 1.3rem 0 0; font-size: 15px; line-height: 1.5; color: var(--caption); max-width: 52ch; }
 
-      /* the sentence: the protagonist, one column, set against the house like a plate and its caption */
+      /* the sentence: the protagonist, set on its strip over the harbour */
       .sentence { font: 400 clamp(40px, 4.6vw, 86px)/1.04 "Instrument Serif", serif; letter-spacing: -0.012em; margin: 0 0 1.2rem; }
       .sentence.past { font-style: italic; color: #3b3630; }
       /* the last word and the full stop: no line break between them, while the word itself wraps as any other */
@@ -89,6 +85,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .sentence form > label, .sentence form > input[name="word"] { grid-area: 1 / 1; min-width: 0; }
       .sentence input[name="word"] {
         width: 0; min-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0;
+        /* a line and its rule, at rest as when focused: an input's own height is taller than the sentence's line, and
+           the cell it shares with the word shrank when focus set this (spec/word-field.test.ts) */
+        height: calc(1lh + 1px);
         /* the label's own face, so the field is exactly the word's width and focusing it moves nothing */
         font: inherit; letter-spacing: inherit; color: inherit; background: transparent; opacity: 0; cursor: text;
       }
@@ -146,163 +145,175 @@ const image = new URL("/og.png", Astro.url.origin).href;
         padding-right: 0.4em; background: var(--field); overflow: hidden; text-overflow: ellipsis;
       }
 
-      /* the part a word stands for, only while it's in hand */
-      /* its line is always kept, so choosing a word never moves the centred column */
-      #part { margin: 0 0 1rem; color: var(--soft); min-height: 1.45em; }
-      #part[hidden] { display: block; visibility: hidden; }
-      /* An earlier form: one house, beside its sentence. */
-      main > #house { position: fixed; top: 0; right: 0; width: 56vw; height: 100vh; z-index: 0; }
-      #house canvas, #house-kept canvas { display: block; width: 100%; height: 100%; }
-
-      /* Two ships (docs/decisions/0003-settle-and-kept-ships.md), two equal halves:
-         what stands on the study field, what was kept on dark umber. Each half's
-         rows (heading, sentence, house, foot) are shared, so the two houses stand
-         level across the gutter. */
-      main:has(> .two) { padding: 0; }
-      /* The question first (spec/question-band.test.ts): a paper strip across both halves, the masthead, the
+      /* The question first (spec/question-band.test.ts): a paper strip above the harbour, the masthead, the
          question and Theseus's ship on the left, how to play on the right; folded, the masthead and the question
          on one line. Read, not decorative: the question is the page's h2. */
+      /* the band and the stage are the first screen, together: the stage takes what the band leaves */
+      main:has(> .first) { padding: 0; }
+      .first { display: flex; flex-direction: column; height: 100svh; min-height: 560px; }
+      .first > .stage { flex: 1 1 auto; }
       #question { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 4vw; align-items: end;
-        padding: 3vh 3.6vw 2.6vh; border-bottom: 1px solid var(--rule); }
+        padding: 2.2vh 3.6vw 2vh; border-bottom: 1px solid var(--rule); }
       #question .mast { max-width: none; margin: 0; border-bottom: 0; padding-bottom: 0; }
-      #question .question-line { margin: 1.6vh 0 0; font: italic 400 clamp(26px, 2.4vw, 40px)/1.12 "Instrument Serif", serif; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
-      #question .ship { margin: 0.8rem 0 0; font-size: 14px; line-height: 1.5; color: var(--caption); max-width: 62ch; text-wrap: pretty; }
-      #question .how h3 { margin: 0 0 0.6rem; color: var(--soft); }
-      #question .how-to-play { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.55rem; }
+      #question .question-line { margin: 1.2vh 0 0; font: italic 400 clamp(26px, 2.3vw, 40px)/1.12 "Instrument Serif", serif; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
+      #question .ship { margin: 0.6rem 0 0; font-size: 14px; line-height: 1.5; color: var(--caption); max-width: 62ch; text-wrap: pretty; }
+      #question .how h3 { margin: 0 0 0.5rem; color: var(--soft); }
+      #question .how-to-play { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.45rem; }
       #question .how-to-play li { counter-increment: step; display: flex; gap: 0.75rem; align-items: baseline; font-size: 14px; line-height: 1.4; color: var(--ink); }
       #question .how-to-play li::before { content: counter(step); flex: none; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid rgb(25 23 20 / 0.55); border-radius: 50%;
         font: 500 10.5px/20px var(--mono); text-align: center; color: var(--ink); transform: translateY(-1px); }
-      #question .stacked { display: none; }
       /* step 1: a touch screen taps, anything else clicks */
       #question .on-phone { display: none; }
       @media (pointer: coarse) { #question .on-phone { display: inline; } #question .on-desktop { display: none; } }
-      /* the band's way to how the house reads a word: with the question, so it stays once folded */
-      #question .band-house { margin-left: 1.2rem; color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
+      /* the band's way to how the planks are made: with the question, so it stays once folded */
+      #question .band-ship { margin-left: 1.2rem; color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
       /* folded: the masthead and the question on one line */
-      #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.4vh; padding-top: 2.2vh; }
+      #question.folded { display: flex; align-items: baseline; gap: 2vw; padding-bottom: 1.2vh; padding-top: 1.8vh; }
       #question.folded .question-main { display: flex; align-items: baseline; gap: 2vw; min-width: 0; }
       #question.folded .question-line { margin: 0; font-size: clamp(18px, 1.5vw, 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      /* the house row takes at least half the screen; the notes under it may fall below the first screen.
-         The first screen is the four rows the halves share (head, sentence, house, foot), held to the screen by
-         a spacer across them; the fifth row takes whatever the kept foot needs beyond the live one (the words
-         waiting for the next house), so the page grows longer and no house shrinks for it */
-      .two { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto minmax(50vh, 1fr) min-content auto; }
-      .two::before { content: ""; grid-column: 1 / -1; grid-row: 1 / 5; min-height: calc(100vh - 3.6vh); visibility: hidden; pointer-events: none; }
-      .kept-half > .foot { grid-row: 4 / span 2; align-self: start; }
-      .half { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; min-width: 0; padding: 3.4vh 3.6vw 3.6vh; }
-      .stands-half, .kept-half { position: relative; }
-      .kept-half { color: var(--kept-ink); }
-      /* each sheet's inset hairline frame (decorative) */
-      .half::before { content: ""; position: absolute; inset: 18px; border: 1px solid var(--frame); pointer-events: none; z-index: 0; }
-      .kept-half::before { border-color: var(--kept-frame); }
-      .half-head { display: flex; flex-direction: column; justify-content: end; }
-      .half-label { margin: 0 0 1.6vh; color: var(--soft); }
-      .kept-half .half-label { color: var(--kept-soft); }
-      /* a half's label row; on a phone it also names and links to the other half (hidden side by side) */
-      .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-      .to-kept, .to-stands { display: none; white-space: nowrap; color: var(--soft); text-decoration-color: var(--hair); }
-      .to-stands { color: var(--kept-soft); text-decoration-color: rgb(159 177 199 / 0.45); }
+
+      /* ---- the harbour (docs/decisions/0005-the-ship.md) ----
+         One stage: the harbour fills it, and the sentence strip lies over its foot, as the prototype's panel does.
+         The stage takes what the first screen leaves under the band, so the sentence is always on it; the harbour's
+         canvas lies over its host, which the stage sizes. Parchment and ink, as the prototype. */
+      :root { --parchment: #f6eedd; --parchment-edge: #dccaa6; --brown: #2a2019; --brown-soft: #5e4f3f; --brown-faint: rgb(42 32 25 / 0.42); --brown-hair: rgb(42 32 25 / 0.2); }
+      .stage { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; background: #e8d2ad; }
+      .harbour { position: absolute; inset: 0; overflow: hidden; touch-action: pan-y; }
+      .harbour canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+      /* without WebGL the harbour gives way: the strips are the page */
+      .harbour.no-webgl { display: none; }
+      .stage:has(> .harbour.no-webgl) { min-height: 0; background: none; }
+      .strip { position: relative; z-index: 2; background: var(--parchment); color: var(--brown); border: 1px solid var(--parchment-edge); }
+      .sentence-strip { margin: 0 auto 1.6vh; width: min(1180px, calc(100% - 2 * 3.6vw)); border-radius: 6px; box-shadow: 0 18px 50px rgb(40 25 10 / 0.28); padding: 1rem 1.6rem 0.8rem; }
+      .strip-label { margin: 0; color: var(--brown-soft); }
+      .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.4rem; }
+      .to-kept, .to-sentence { display: none; white-space: nowrap; color: var(--brown-soft); text-decoration-color: var(--brown-hair); }
       html { scroll-behavior: smooth; }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-      .stands-half .text { max-width: none; }
-      /* the live sentence, set to its half: still the largest thing on the page */
-      /* side by side, a long sentence steps down through fixed sizes to stay on two lines (src/lib/sentence-step.ts) */
-      .two .sentence { --step: 1; font-size: calc(clamp(36px, 3.8vw, 72px) * var(--step)); }
-      .two .sentence[data-step="1"] { --step: 0.92; }
-      .two .sentence[data-step="2"] { --step: 0.85; }
-      .two .sentence[data-step="3"] { --step: 0.8; }
-      .stands-half .text { margin: 0; padding: 0; }
-      /* the part notation lies over the house's own empty top band, which no house at rest reaches
-         (spec/two-ships-layout.test.ts), so no line is held between the sentence and its house */
-      .stands-half #part, .stands-half .invite-row { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; }
-      /* at rest: the invitation, and beside it the way to how the house reads a word (spec/two-ships-layout.test.ts) */
-      .stands-half .invite-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.6rem; row-gap: 0.3rem; }
-      .stands-half .invite { margin: 0; color: var(--caption); white-space: nowrap; }
-      .stands-half .invite-house { color: var(--soft); white-space: nowrap; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
-      .stands-half #part:not([hidden]) ~ .invite-row { visibility: hidden; }
+      /* the live sentence: still the largest text on the page, stepping down through fixed sizes to stay on two lines (src/lib/sentence-step.ts) */
+      .sentence-strip .sentence { --step: 1; font-size: calc(clamp(30px, 2.95vw, 56px) * var(--step)); color: var(--brown); margin: 0; line-height: 1.02; }
+      .sentence-strip .sentence[data-step="1"] { --step: 0.92; }
+      .sentence-strip .sentence[data-step="2"] { --step: 0.85; }
+      .sentence-strip .sentence[data-step="3"] { --step: 0.8; }
+      .sentence-strip .sentence input[name="word"]::placeholder { color: var(--brown-faint); }
+      .sentence-strip .sentence label:not(:has(mark)) { text-decoration-color: var(--brown-hair); }
+      body.selecting .sentence-strip .sentence .pos:not(.selected) label, body.pointing .sentence-strip .sentence .pos:not(.pointed) label { color: var(--brown-faint); }
+      @media (hover: hover) {
+        .sentence-strip .sentence .pos:hover label:not(:has(mark)), .sentence-strip .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(42 32 25 / 0.7); }
+      }
+      .sentence-strip .sentence .changed > span { background: var(--parchment); }
+      @supports not (field-sizing: content) { .sentence-strip .sentence form:focus-within input[name="word"] { background: var(--parchment); } }
+      .sentence-strip .sentence input:focus-visible { outline-color: var(--brown); }
+      /* each word's place and part, "01 · Ram", small above it: navigation, drawn, never read (spec/numbering.test.ts) */
+      .sentence-strip .sentence { counter-reset: word; }
+      /* a word is at least as wide as its index ("02 · Hull", --tag characters of the 9.5px mono, 0.61em each, and a
+         gap), so two short words' indices never run into each other (spec/numbering.test.ts) */
+      .sentence-strip .sentence .pos { counter-increment: word; padding-top: 13px; padding-bottom: 0.1em; vertical-align: baseline; min-width: calc(var(--tag, 0) * 9.5px * 0.61 + 8px); }
+      .sentence-strip .sentence .pos::before {
+        content: counter(word, decimal-leading-zero) " · " attr(data-part) / ""; position: absolute; left: 1px; top: 1px;
+        font: 500 9.5px/1 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--brown-soft); white-space: nowrap; pointer-events: none;
+      }
+      /* the notation's slot under the sentence: at rest the invitation and the way to /ship/; a word in hand, the notation */
+      .sentence-strip .slot { position: relative; margin-top: 0.35rem; min-height: 1.45em; }
+      #part, .sentence-strip .invite-row { margin: 0; color: var(--brown-soft); }
+      #part { position: absolute; inset: 0 0 auto 0; }
+      #part[hidden] { display: block; visibility: hidden; }
+      .sentence-strip .invite-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.6rem; row-gap: 0.3rem; }
+      .sentence-strip .invite { margin: 0; color: var(--brown-soft); white-space: nowrap; }
+      .sentence-strip .invite-ship { color: var(--brown-soft); white-space: nowrap; text-decoration-color: var(--brown-hair); text-underline-offset: 0.2em; }
+      #part:not([hidden]) ~ .invite-row { visibility: hidden; }
       /* while a replacement is typed: one line, the replaced word struck, and only a word shortened when long; the prediction is never cut */
       #part:has(> del) { display: flex; white-space: pre; }
       #part > span { flex: none; }
       #part > del, #part > b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-      #part > del { text-decoration-thickness: 1px; }
-      #part > b { font-weight: inherit; min-width: 4.5ch; }
-      /* in the stale line the struck word is the only thing saying what was replaced: the new word gives way, down to
-         a few letters; on a desktop the struck word never does. A phone can't hold two 24-letter words whole, so
-         there a long struck word is held to the room the rest leaves */
+      #part > del { text-decoration-thickness: 1px; color: var(--brown); }
+      #part > b { font-weight: inherit; min-width: 4.5ch; color: var(--brown); }
       #part:has(> b) > del { flex-shrink: 0; }
-      /* the row decides a house's size, never its canvas: the canvas lies over its host */
-      #house, #house-kept { position: relative; min-height: 0; margin: 0 -3.6vw; overflow: hidden; }
-      .half #house canvas, .half #house-kept canvas { position: absolute; inset: 0; }
-      /* the kept sentence: a sentence in its own right, a step below the live one, which stays primary */
-      .kept-sentence { font: italic 400 clamp(28px, 2.85vw, 54px)/1.16 "Instrument Serif", serif; letter-spacing: -0.01em; margin: 0 0 1.2rem; color: var(--kept-ink); }
+      .sentence-strip .sentence .settling { background: var(--brown-soft); }
+      .sentence-strip mark { text-decoration-color: var(--brown-soft); }
+      /* only when the strips stack: the kept strip is below, so say so */
+      .kept-pointer { display: none; margin: 0.3rem 0 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--brown-soft); }
+      .kept-pointer.ack { color: var(--brown); position: relative; z-index: 4; }
+
+      /* the tags: each ship's part pointed at or chosen, "08 · Oars", on the canvas (a desktop; never at rest) */
+      .part-tag { position: absolute; left: 0; top: 0; z-index: 3; margin: 0; pointer-events: none; white-space: nowrap;
+        background: #fffaf0; color: var(--brown); border: 1px solid var(--brown); border-radius: 4px; padding: 5px 9px; box-shadow: 0 6px 16px rgb(30 20 10 / 0.25); }
+      .part-tag[hidden] { display: none; }
+      .part-tag[data-ship="kept"] { background: #23324a; color: #eef3f8; border-color: #eef3f8; }
+      .part-tag.red { border-color: #c3331c; }
+      /* the way back to the harbour's fixed view, once a drag has moved it (a desktop) */
+      #home { position: absolute; top: 1.4vh; right: 3.6vw; z-index: 3; min-height: 34px; padding: 9px 13px; border-radius: 999px; cursor: pointer;
+        border: 1px solid #fffaf0; background: rgb(42 32 25 / 0.55); color: #fffaf0; }
+      #home[hidden] { display: none; }
+      #home:focus-visible { outline: 2px solid #fffaf0; outline-offset: 3px; }
+
+      /* the kept strip: the ship of old planks in words, a step below the live sentence, which stays primary */
+      .kept-strip { margin: 0 auto; width: min(1180px, calc(100% - 2 * 3.6vw)); border-radius: 6px; margin-top: 2.4vh; padding: 1rem 1.6rem 1.1rem; display: flex; flex-direction: column; gap: 0.7rem; }
+      .kept-sentence { font: italic 400 clamp(24px, 2.1vw, 38px)/1.18 "Instrument Serif", serif; letter-spacing: -0.01em; margin: 0; color: var(--brown); }
       .kept-sentence .end { white-space: nowrap; }
-      /* your own kept word, for you only: the same dotted hairline as in the live sentence, in the kept half's own ink */
-      .kept-sentence mark { text-decoration-color: var(--kept-soft); }
-      /* a gap: a blank in the sentence, waiting for the word that stands there now */
-      /* a gap: the word still standing at this position, faint, over a dashed line (a second cue, not lightness alone:
-         a kept word has no line, your own kept word a dotted one). Legible as text, clearly fainter than a kept word
-         (spec/two-ships-layout.test.ts) */
-      .kept-sentence .gap { color: var(--kept-faint); text-decoration: underline dashed 1px var(--kept-faint); text-underline-offset: 0.14em; }
-      /* what the kept sentence is, under its label */
-      .kept-text { position: relative; z-index: 1; min-width: 0; }
-      .kept-note { position: absolute; top: calc(100% - 0.5rem); left: 0; right: 0; margin: 0; font-size: 15px; line-height: 1.45; color: var(--kept-caption); white-space: nowrap; }
-      /* The drawing sheet's numbering (spec/numbering.test.ts): each word's and each gap's position, 01 to 10, small
-         above it, in the leading over its letters. It names a position, like "05 — entry", never a count, and it's
-         drawn, not read: its alternative text is empty, so the sentences are read as their words. */
-      .two .sentence { counter-reset: word; }
-      /* room above each word for its index; on its baseline, so the full stop still sits on the last word's line */
-      .two .sentence .pos { counter-increment: word; padding-top: 12px; margin-top: -6px; padding-bottom: 0.12em; vertical-align: baseline; }
+      .kept-sentence mark { text-decoration-color: var(--brown-soft); }
+      /* a gap: the word still standing at its place, faint, over a dashed line (a second cue besides lightness: a kept word
+         has no line, your own kept word a dotted one). Legible as text, clearly fainter than a kept word */
+      .kept-sentence .gap { color: #7a6a57; text-decoration: underline dashed 1px #7a6a57; text-underline-offset: 0.14em; }
+      .kept-note { margin: 0; font-size: 15px; line-height: 1.45; color: #4a3d30; text-wrap: pretty; }
       .kept-sentence { counter-reset: kept; }
       .kept-sentence .w { position: relative; display: inline-block; padding-top: 12px; counter-increment: kept; }
-      .two .sentence .pos::before, .kept-sentence .w::before {
-        position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em;
-        color: var(--soft); pointer-events: none; white-space: nowrap; text-decoration: none;
-      }
-      .two .sentence .pos::before { content: counter(word, decimal-leading-zero) / ""; top: 1px; }
-      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; color: var(--kept-soft); }
-      /* a gap stands as tall as a word over the baseline (its 12px strip and the letters' ascent), so its number
-         is level with the words' numbers on its line; only its foot is drawn */
+      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); pointer-events: none; white-space: nowrap; text-decoration: none; }
+      /* a gap stands as tall as a word over the baseline, so its number is level with the words' on its line */
       .kept-sentence .gap { box-sizing: content-box; height: calc(0.907em - 2px); }
       .kept-sentence .gap::before { left: 0; }
-      /* a small laptop: a smaller index in a narrower strip, so the longest words still leave the house on the first screen */
-      @media (min-width: 901px) and (max-width: 1365px) {
-        .two .sentence .pos { padding-top: 11px; }
-        .two .sentence .pos::before { font-size: 9px; top: 4px; }
-      }
-      .foot { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 1rem; }
-      .kept-half .plate-note { color: var(--kept-ink); }
-      /* the next house's waiting words (decided 29 October): under the kept house, above the plate note; each word
-         carries its place small above it, like the kept sentence's, drawn, never read */
-      .waiting { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.1rem; row-gap: 0.2rem; }
+      /* the next ship's waiting words, each with its place small above it, drawn, never read */
+      .waiting { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.1rem; row-gap: 0.2rem; border-top: 1px solid var(--parchment-edge); padding-top: 0.6rem; }
       .waiting[hidden] { display: none; }
-      .waiting .label { color: var(--kept-soft); margin-right: 0.1rem; }
+      .waiting .label { color: var(--brown-soft); margin-right: 0.1rem; }
       .waiting .ws { display: contents; }
-      .waiting .w { position: relative; display: inline-block; padding-top: 12px; font: italic 400 clamp(20px, 1.5vw, 24px)/1.2 "Instrument Serif", serif; color: var(--kept-ink); overflow-wrap: anywhere; min-width: 0; }
-      .waiting .w::before { content: attr(data-n) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--kept-soft); }
-      .kept-half .earlier { color: var(--kept-soft); }
-      .kept-half .earlier a { text-decoration-color: rgb(159 177 199 / 0.45); }
-      /* the live half's notes sit in its foot, under its house, so a long trace never pushes the house away */
-      .foot #how { margin: 0; }
-      .foot section[aria-labelledby="trace-heading"] { margin-top: 0.4rem; }
-      .foot .earlier { margin: 0; }
-      /* only when the halves stack: the kept half is far below, so say so */
-      .kept-pointer { display: none; margin: 0; font: italic 400 1.05rem/1.3 "Instrument Serif", serif; color: var(--soft); }
+      .waiting .w { position: relative; display: inline-block; padding-top: 12px; font: italic 400 clamp(20px, 1.5vw, 24px)/1.2 "Instrument Serif", serif; color: var(--brown); overflow-wrap: anywhere; min-width: 0; }
+      .waiting .w::before { content: attr(data-n) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); }
+      .kept-strip .earlier { margin: 0; color: var(--brown-soft); }
 
-      /* an earlier house (/?kept=k): the kept ship alone on its own ground, read-only */
-      main:has(> .lone-house) { background-color: var(--kept-ground); background-image: linear-gradient(var(--kept-grid) 1px, transparent 1px), linear-gradient(90deg, var(--kept-grid) 1px, transparent 1px); background-size: 24px 24px; color: var(--kept-ink); }
-      .lone-house { display: flex; flex-direction: column; min-height: calc(100vh - 8.8vh); color: var(--kept-ink); }
-      .lone-house .mast { border-bottom-color: var(--kept-rule); max-width: none; }
-      .lone-house .mast .sub, .lone-house .half-label, .lone-house .history, .lone-house .about { color: var(--kept-soft); }
-      .lone-house .kept-sentence { max-width: 30ch; }
-      .lone-house #house-kept { position: relative; flex: 1; min-height: 48vh; }
-      .lone-house #house-kept canvas { position: absolute; inset: 0; }
-      .lone-house .history a, .lone-house .about a { text-decoration-color: rgb(159 177 199 / 0.45); }
-      .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 1.5rem 0; }
+      /* the notes, under the kept strip: the rule, your trace, Earlier form, the captions, the site's links last */
+      .notes { margin: 0 auto; width: min(1180px, calc(100% - 2 * 3.6vw)); padding: 1.6rem 0 2.4rem; display: flex; flex-direction: column; gap: 0.9rem; }
+      .foot-main, .foot-aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+      .notes #how { margin: 0; }
+      .notes section[aria-labelledby="trace-heading"] { margin-top: 0; }
+      .notes .earlier { margin: 0; }
+      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
+      .kept-strip .plate-note { color: var(--brown); font-size: clamp(19px, 1.45vw, 24px); }
+      .plate-note .line { display: block; text-wrap: balance; }
+      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
+      #how, section[aria-labelledby="trace-heading"] [role="status"], .question { text-wrap: pretty; }
+      .notes .about { margin: 0; }
+      .about a { white-space: nowrap; }
+      @media (min-width: 901px) {
+        /* a title block: the rule, your trace and Earlier on the left, the captions on the right, the links across */
+        .notes { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 3vw; row-gap: 0; align-items: start; border-top: 1px solid var(--rule); margin-top: 2.4vh; }
+        .notes .foot-main { grid-column: 1; }
+        .notes .foot-aside { grid-column: 2; border-left: 1px solid var(--rule); padding-left: 1.6vw; }
+        .notes .question { border-top: 1px solid var(--rule); padding-top: 0.8rem; }
+        .notes .about { grid-column: 1 / -1; padding-top: 0.8rem; border-top: 1px solid var(--rule); margin-top: 1.4rem; }
+      }
+
+      /* an earlier form and an earlier ship: the ship alone, the sentence on its strip over the scene's foot */
+      main:has(> .harbour) { position: relative; min-height: 100svh; padding: 0; display: flex; flex-direction: column; }
+      main:has(> .harbour) > .mast { position: relative; z-index: 2; margin: 0; padding: 1.4rem 3.6vw 0.7rem; max-width: none; background: var(--field); }
+      main:has(> .harbour) > .harbour { position: relative; flex: 1; min-height: 46vh; }
+      .earlier-strip { margin: -12vh auto 0; width: min(1180px, calc(100% - 2 * 3.6vw)); border-radius: 6px; padding: 1rem 1.6rem 0.9rem; box-shadow: 0 18px 50px rgb(40 25 10 / 0.28); }
+      .earlier-strip .sentence { font-size: clamp(30px, 2.95vw, 56px); color: var(--brown); margin: 0.2rem 0 0; }
+      .earlier-strip .form-state, .earlier-strip .history { color: var(--brown-soft); }
+      main:has(> .harbour) > .about { position: relative; z-index: 2; margin: 1.2rem auto 1.6rem; width: min(1180px, calc(100% - 2 * 3.6vw)); }
+      .lone-ship { position: relative; display: flex; flex-direction: column; min-height: 100svh; }
+      .lone-ship > .mast { position: relative; z-index: 2; margin: 0; padding: 1.4rem 3.6vw 0.7rem; max-width: none; }
+      .lone-ship > .harbour { position: relative; flex: 1; min-height: 46vh; }
+      .kept-strip-lone { margin: -10vh auto 0; width: min(1180px, calc(100% - 2 * 3.6vw)); border-radius: 6px; padding: 1rem 1.6rem 0.9rem; box-shadow: 0 18px 50px rgb(40 25 10 / 0.28); }
+      .kept-strip-lone .strip-label, .kept-strip-lone .history { color: var(--brown-soft); }
+      .lone-ship > .about { margin: 1.2rem auto 1.6rem; width: min(1180px, calc(100% - 2 * 3.6vw)); }
+      .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 0.9rem 0 0; }
       .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
+      .strip .history a, .strip .earlier a { text-decoration-color: var(--brown-hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
-      .form-state { color: var(--soft); margin: 0 0 1.2rem; }
+      .form-state { color: var(--soft); margin: 0 0 0.4rem; }
       /* your trace: a quiet footnote to the shared sentence, not a panel */
-      section[aria-labelledby="trace-heading"] { margin-top: 2rem; padding-top: 0.8rem; border-top: 1px solid var(--hair); max-width: 42ch; }
+      section[aria-labelledby="trace-heading"] { padding-top: 0.8rem; border-top: 1px solid var(--hair); max-width: 52ch; }
       #trace-heading { margin: 0 0 0.3rem; font-size: 0.66rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
       section[aria-labelledby="trace-heading"] [role="status"] { margin: 0; font-size: 15px; line-height: 1.5; color: var(--caption); }
       section[aria-labelledby="trace-heading"] del { font: italic 400 1.1rem/1 "Instrument Serif", serif; color: var(--ink); text-decoration-thickness: 1px; }
@@ -311,147 +322,76 @@ const image = new URL("/og.png", Astro.url.origin).href;
       section[aria-labelledby="trace-heading"] li { margin: 0.25rem 0; }
       [role="alert"] { font: 400 1.6rem/1.25 "Instrument Serif", serif; max-width: 30ch; }
 
-      /* ---- word and territory as one selection ---- */
-      /* pointing at a word, the house or your trace: the other words step back, as when one is chosen */
-      body.pointing .sentence .pos:not(.pointed) label { color: var(--faint); }
-      @media (hover: hover) {
-        .sentence .pos.pointed label:not(:has(mark)) { text-decoration-color: rgb(25 23 20 / 0.7); }
-      }
-      /* the one hairline from the chosen word to its territory; red is only the rebuilding of that territory */
-      .thread { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 0.18s; }
-      .thread.on { opacity: 1; }
-      .thread path { fill: none; stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 1; vector-effect: non-scaling-stroke; }
-      /* the territory's numbered tag: the line's end, and alone where a word is only pointed at */
-      .thread .tag circle { fill: var(--field); stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; }
-      .thread .tag text { font: 500 10px var(--mono); letter-spacing: 0.04em; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
-      .thread.red path { stroke: #c3331c; stroke-opacity: 0.85; }
-      .thread.red .tag circle { stroke: #c3331c; stroke-opacity: 0.9; }
-
-      /* the plate's caption, under the house; and the question, at the foot beside About */
-      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
-      .plate-note .line { display: block; text-wrap: balance; }
-      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
-      /* the captions end on more than one word (spec/two-ships-layout.test.ts) */
-      #how, section[aria-labelledby="trace-heading"] [role="status"], .question { text-wrap: pretty; }
-      .foot .about { margin: 0; }
-      /* each link reads as one unit, never broken inside itself */
-      .about a { white-space: nowrap; }
-      /* Side by side, the live half's notes fold into two columns, each its own stack: the rule, your trace
-         and the links on the left, the captions on the right. The foot gets shorter, so the house's row,
-         which takes what's left, gets taller (spec/two-ships-layout.test.ts). Stacked (a phone), the two
-         columns dissolve and the notes read in one column, the links last.
-         Side by side, the links take a row of their own across both columns, so "How the house reads a
-         word" never breaks in the narrow left one; placed here, still last in the markup. */
-      .foot-main, .foot-aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
-      @media (min-width: 901px) {
-        /* rows: the rule, your trace, Earlier, a spacer the captions grow into, the links */
-        .stands-half .foot { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto; column-gap: 3vw; row-gap: 0; align-items: start; }
-        .stands-half .foot-main { display: contents; }
-        .stands-half .foot-main > * { grid-column: 1; }
-        .stands-half .foot #how { grid-row: 1; }
-        .stands-half .foot section[aria-labelledby="trace-heading"] { grid-row: 2; margin-top: 1.3rem; }
-        .stands-half .foot .earlier { grid-row: 3; margin-top: 0.9rem; }
-        .stands-half .foot-aside { grid-column: 2; grid-row: 1 / 5; }
-        .stands-half .foot .about { grid-column: 1 / -1; grid-row: 5; margin-top: 1.1rem; }
-        /* a drawing's title block: the foot ruled off from the sheet, its columns divided by a hairline,
-           the question under a rule of its own (decorative: the rules are borders, the reading order is the markup's) */
-        .half > .foot { margin: 0 -1.6vw; padding: 1rem 1.6vw 0.4rem; border-top: 1px solid var(--rule); }
-        .kept-half > .foot { border-top-color: var(--kept-rule); }
-        .stands-half .foot { column-gap: 0; }
-        .stands-half .foot-main > * { padding-right: 1.6vw; }
-        .stands-half .foot-aside { border-left: 1px solid var(--rule); padding-left: 1.6vw; }
-        .stands-half .foot .question { border-top: 1px solid var(--rule); padding-top: 0.8rem; }
-        .stands-half .foot .about { padding-top: 0.8rem; border-top: 1px solid var(--rule); margin-top: 1rem; }
-      }
-      @media (max-width: 900px) {
-        .foot-main, .foot-aside { display: contents; }
-        .foot .about { order: 1; }
-      }
-
-      /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once, across both
-         halves. Not red (red is only a part being rebuilt): pale, in difference, so it reads
-         as ink on the study field and as light on the kept ground. src/lib/moment-line.ts
-         sets its top in the clear band of the screen; both halves are veiled behind it. */
+      /* Ship 1 complete (docs/decisions/0003): the one loud line, live, once. Not red (red is only a part being
+         rebuilt): pale, in difference. src/lib/moment-line.ts sets its top in the clear band of the screen; the
+         harbour and both strips are veiled behind it. */
       .moment {
-        position: fixed; left: 0; right: 0; top: 38%; z-index: 4; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
+        position: fixed; left: 0; right: 0; top: 38%; z-index: 5; margin: 0; padding: 0 6vw; text-align: center; pointer-events: none;
         font: italic 400 clamp(34px, 5.4vw, 104px)/1.02 "Instrument Serif", serif; letter-spacing: -0.015em; text-wrap: balance;
         color: #fff; mix-blend-mode: difference; opacity: 0; transition: opacity 0.7s;
       }
       .moment.on { opacity: 1; }
-      /* the veil: each half recedes into its own ground behind the line, and comes back when it goes */
-      .half { position: relative; }
-      .half::after { content: ""; position: absolute; inset: 0; z-index: 3; background: inherit; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
-      body.moment-on .half::after { opacity: 0.86; }
-      /* the phone pointer, acknowledging a part just kept below: ink rather than grey, never red */
-      .kept-pointer.ack { color: var(--ink); position: relative; z-index: 4; /* above the veil, so it reads while the line is up */ }
+      .harbour::after, .strip::after { content: ""; position: absolute; inset: 0; z-index: 4; background: #e8d2ad; opacity: 0; pointer-events: none; transition: opacity 0.6s; border-radius: inherit; }
+      .strip::after { background: var(--parchment); }
+      body.moment-on .harbour::after, body.moment-on .strip::after { opacity: 0.86; }
 
       @media (max-width: 900px) {
-        /* on a phone the house sits under the sentence, and a line between them would cut through the text: selection alone carries it */
-        .thread { display: none; }
-        /* a struck word takes no more than what the rest of the stale line leaves: its number, separators and "choose
-           again", and the new word's few letters, measured at 38ch in the notation's tracked caps */
+        /* a struck word takes no more than what the rest of the stale line leaves */
         #part:has(> b) > del { max-width: calc(100% - 39.5ch); }
         main { padding: 1.1rem 1rem 1.4rem; }
-        .mast, .text { max-width: none; }
-        .text { margin: 0; padding: 0; }
-        .mast { flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
-        /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play in a ruled box */
-        #question { display: block; padding: 0.9rem 1rem 1rem; }
-        #question .mast { margin: 0; padding-bottom: 0.55rem; border-bottom: 1px solid var(--rule); flex-wrap: nowrap; }
-        /* the masthead's row holds the name and the way to how the house reads a word; the subtitle steps aside for it */
+        .mast { max-width: none; flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
+        /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play */
+        #question { display: block; padding: 0.8rem 1rem 0.9rem; }
+        #question .mast { margin: 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--rule); flex-wrap: nowrap; }
         #question .mast .sub { display: none; }
-        #question .band-house { margin-left: auto; }
-        /* no room beside the invitation here, and a line of its own would reach the tallest house: the band and the foot carry it */
-        .stands-half .invite-house { display: none; }
-        #question .question-line { margin-top: 0.7rem; font-size: 24px; line-height: 1.1; }
-        #question .ship { margin-top: 0.45rem; font-size: 13px; line-height: 1.42; }
-        #question .how { margin-top: 0.7rem; }
-        #question .how h3 { margin-bottom: 0.4rem; }
-        #question .how-to-play { gap: 0.3rem; }
-        #question .how-to-play li { font-size: 13px; line-height: 1.38; gap: 0.6rem; }
+        #question .band-ship { margin-left: auto; }
+        #question .question-line { margin-top: 0.6rem; font-size: 23px; line-height: 1.1; }
+        #question .ship { margin-top: 0.4rem; font-size: 13px; line-height: 1.4; }
+        #question .how { margin-top: 0.6rem; }
+        #question .how h3 { margin-bottom: 0.35rem; }
+        #question .how-to-play { gap: 0.25rem; }
+        #question .how-to-play li { font-size: 13px; line-height: 1.36; gap: 0.6rem; }
         #question .how-to-play li::before { width: 19px; height: 19px; font-size: 9.5px; line-height: 17px; }
-        #question .side-by-side { display: none; }
-        #question .stacked { display: inline; }
         #question.folded, #question.folded .question-main { display: block; }
-        #question.folded .question-line { margin-top: 0.8rem; font-size: 20px; white-space: normal; }
-        .sentence { font-size: 34px; line-height: 1.32; }
-        /* the index takes the room the leading gave the words here */
-        .two .sentence { line-height: 1.1; }
-        .two .sentence .pos { margin-top: -8px; }
+        #question.folded .question-line { margin-top: 0.6rem; font-size: 20px; white-space: normal; }
+        /* stacked: the sentence strip first, then the harbour under it, then the kept strip and the notes */
+        .first { height: auto; min-height: 0; }
+        .stage { min-height: 0; flex-direction: column; background: none; }
+        .harbour { position: relative; order: 2; height: min(90vw, 360px); margin: 0; }
+        .sentence-strip { order: 1; width: auto; margin: 0; border-radius: 0; border-width: 0 0 1px; box-shadow: none; padding: 0.7rem 1rem 0.6rem; }
+        .sentence-strip .head-row { margin-bottom: 0.2rem; }
+        .sentence-strip .strip-label { display: none; }
+        .to-kept, .to-sentence { display: inline; }
+        .kept-pointer { display: block; }
+        .sentence-strip .head-row { justify-content: flex-end; }
+        .sentence-strip .sentence { font-size: 30px; line-height: 1.04; }
+        .sentence-strip .sentence .pos { padding-top: 11px; }
+        .sentence-strip .sentence .pos::before { font-size: 8.5px; }
+        .sentence-strip .sentence .pos { min-width: calc(var(--tag, 0) * 8.5px * 0.61 + 6px); }
+        .sentence-strip .invite-ship { display: none; }
+        .part-tag { display: none !important; }
+        #home { display: none !important; }
+        .kept-strip { width: auto; margin: 0; border-radius: 0; border-width: 1px 0; padding: 1rem 1rem 1.2rem; }
+        .kept-sentence { font-size: 25px; line-height: 1.3; }
+        .kept-sentence .gap { height: calc(0.96em - 2px); }
+        .notes { width: auto; padding: 1.2rem 1rem 2rem; }
+        .foot-main, .foot-aside { display: contents; }
+        .notes .about { order: 1; }
         #how, section[aria-labelledby="trace-heading"] [role="status"], .kept-note { font-size: 14px; }
         /* no Escape key on a phone: the instructions' Escape sentence is read, not shown */
         #how .esc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-        /* the words sit ~5px apart here: the focus outline hugs its word so it never touches the one beside or below */
         .sentence input[name="word"]:focus-visible { outline-offset: 1px; }
-        /* a word's target is as tall as its form (44px) and a little wider than the word, into the
-           space beside it and no further: two short words side by side ("if it") used to have 46px
-           targets that overlapped, and a tap on the first went to the second */
+        /* a word's target is as tall as its form (44px) and a little wider than the word, no further */
         .sentence label { position: relative; }
         .sentence label::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: calc(100% + 0.16em); transform: translateX(-50%); }
         .sentence form { min-height: 44px; }
-        /* the two halves stack: what stands, then what was kept, each a band of its own ground */
-        .two { display: block; min-height: 0; }
-        .two::before { display: none; }
-        .kept-pointer { display: block; }
-        .half { display: flex; flex-direction: column; padding: 1.1rem 1rem 1.6rem; }
-        /* the frame sits in the gutter, outside the text, never through it */
-        .half::before { inset: 6px; }
-        .half-label { margin-bottom: 0.8rem; }
-        .to-kept, .to-stands { display: inline; }
-        main > #house { position: relative; width: auto; height: min(80vw, 420px); margin: 0.6rem -1rem 0; touch-action: pan-y; }
-        #house { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
-        #house-kept { height: min(80vw, 420px); margin: 0 -1rem; touch-action: pan-y; }
-        .two .sentence { font-size: 34px; }
-        .kept-sentence { font-size: 26px; line-height: 1.3; }
-        /* stacked, no row is shared: the line takes its two lines in the flow, under the sentence, and the kept house follows */
-        .kept-note { position: static; white-space: normal; margin: -0.4rem 0 1rem; text-wrap: pretty; }
-        /* the looser leading here sets a word's letters lower in its line: the gap stands as tall */
-        .kept-sentence .gap { height: calc(0.96em - 2px); }
+        main:has(> .harbour) > .harbour, .lone-ship > .harbour { flex: none; height: min(62vw, 300px); min-height: 0; }
+        .earlier-strip, .kept-strip-lone { margin: 0; width: auto; border-radius: 0; box-shadow: none; }
+        main:has(> .harbour) > .mast, .lone-ship > .mast { padding: 1rem 1rem 0.6rem; }
       }
       @media (prefers-reduced-motion: reduce) {
         .sentence label { transition: none; }
-        .thread { transition: none; }
-        .moment, .half::after { transition: none; }
+        .moment, .harbour::after, .strip::after { transition: none; }
       }
     </style>
   </head>
