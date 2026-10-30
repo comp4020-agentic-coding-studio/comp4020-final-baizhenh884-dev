@@ -54,3 +54,7 @@ export function sizeStep(words: readonly string[]): number {
   const i = SIZE_STEPS.findIndex((s) => lines(words, s) <= 2);
   return i < 0 ? SIZE_STEPS.length - 1 : i;
 }
+
+// stub: the label rows' spec lands first (spec/sentence-step.test.ts)
+export type LabelRow = 1 | 2 | "room";
+export const labelRows = (words: readonly string[], _layout: "desktop" | "phone"): LabelRow[] => words.map(() => 1);

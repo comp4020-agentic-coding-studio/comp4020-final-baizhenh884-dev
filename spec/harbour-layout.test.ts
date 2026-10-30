@@ -233,7 +233,7 @@ describe("the harbour on GET /", () => {
     }, 90_000);
   }
 
-  // Each live word carries "01 · Ram" above it; nothing is shown under a word
+  // Each live word carries "01·Ram" above it; nothing is shown under a word
   for (const [name, size] of [DESKTOPS[0], PHONE]) {
     it(`names each word's position and part above it, and shows nothing under it (${name})`, async () => {
       const m = (await measureIn(await staged({ words: LONG13 }), `(async () => {
@@ -247,10 +247,33 @@ describe("the harbour on GET /", () => {
       const parts = ["Ram", "Hull", "Prow", "Stern", "Shields", "Mast", "Sail", "Oars", "Rudder", "Pennant"];
       m.forEach((p, i) => {
         // the number from the sentence's own counter (01 to 10, spec/numbering.test.ts), the part's name after it; Chrome reports attr() resolved
-        expect(p.tag, `word ${i + 1} doesn't carry its number and part`).toMatch(new RegExp(`^counter\\(\\w+, decimal-leading-zero\\) " · ${parts[i]}" / ""$`));
+        expect(p.tag, `word ${i + 1} doesn't carry its number and part`).toMatch(new RegExp(`^counter\\(\\w+, decimal-leading-zero\\) "·${parts[i]}" / ""$`));
         expect(p.above, `word ${i + 1}'s part isn't above it`).toBe(true);
         expect(p.under, `something is shown under "${p.word}"`).toEqual([]);
       });
+    }, 90_000);
+  }
+
+  // A label narrower than most words, so a short word between long ones keeps its ordinary spacing (the maker,
+  // 30 October: "all ⎵⎵⎵ ceremony" on the live page). A sentence of that shape, composed for the check: no gap
+  // between two words' letters is more than about twice an ordinary word space, at 1440 and 390.
+  const SHORT_AMONG_LONG = ["harbour", "all", "ceremony", "this", "students", "will", "wonder", "whether", "it", "sail"];
+  for (const [name, size] of [DESKTOPS[1], PHONE]) {
+    it(`keeps a short word's spacing ordinary, its label no wider than the gap allows (${name})`, async () => {
+      const m = (await measureIn(await staged({ words: SHORT_AMONG_LONG }), `(async () => {
+        await document.fonts.ready;
+        const sent = document.querySelector('.sentence-strip .sentence');
+        const letters = [...sent.querySelectorAll('label')].map((l) => { const r = document.createRange(); r.selectNodeContents(l); return r.getBoundingClientRect(); });
+        // an ordinary word space at this size: the width of a space in the sentence's own face
+        const probe = document.createElement('span'); probe.textContent = 'a a'; probe.style.whiteSpace = 'pre'; sent.append(probe);
+        const one = document.createElement('span'); one.textContent = 'aa'; sent.append(one);
+        const space = probe.getBoundingClientRect().width - one.getBoundingClientRect().width; probe.remove(); one.remove();
+        const gaps = [];
+        for (let i = 1; i < letters.length; i++) if (Math.abs(letters[i].top - letters[i - 1].top) < 4) gaps.push({ i, gap: letters[i].left - letters[i - 1].right });
+        return { space, gaps };
+      })()`, [size[0], size[1]])) as { space: number; gaps: { i: number; gap: number }[] };
+      expect(m.gaps.length, "no two words share a line").toBeGreaterThan(0);
+      for (const g of m.gaps) expect(g.gap, `the gap before "${SHORT_AMONG_LONG[g.i]}" is ${g.gap.toFixed(0)}px, an ordinary space ${m.space.toFixed(0)}px`).toBeLessThanOrEqual(m.space * 2.2);
     }, 90_000);
   }
 

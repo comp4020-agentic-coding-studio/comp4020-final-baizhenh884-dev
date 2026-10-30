@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JSDOM } from "jsdom";
-import { sizeStep } from "../src/lib/sentence-step";
+import { labelRows, sizeStep } from "../src/lib/sentence-step";
 import { renderKeptSentence, renderWaiting } from "../src/lib/kept-sentence";
 
 // Layout checks: jsdom has no layout, so these build a page from the app's own
@@ -204,6 +204,9 @@ export function stageWords(doc: Document, words: string[]): void {
     f.querySelector<HTMLInputElement>('input[name="word"]')!.setAttribute("placeholder", words[i]);
   });
   doc.querySelector(".sentence-strip .sentence")?.setAttribute("data-step", String(sizeStep(words)));
+  // and each label's row, per layout, as GET / sets them for these words
+  const desktop = labelRows(words, "desktop"), phone = labelRows(words, "phone");
+  forms.forEach((f, i) => { const pos = f.closest(".pos")!; pos.setAttribute("data-row-desktop", String(desktop[i])); pos.setAttribute("data-row-phone", String(phone[i])); });
 }
 
 // The whole state a harbour layout check measures, set in a served copy of
