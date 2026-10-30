@@ -126,11 +126,50 @@ export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector
   return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
 }
 
-// The carry and the shipwrights (docs/decisions/0005, amended 31 October): stubs until they're built, so their
-// checks fail for their reason.
+// The carry and the shipwrights (docs/decisions/0005, amended 31 October). The quay the slipway and the rack stand
+// on (scene.ts draws it from these numbers): its deck, and its edge toward the live ship, where a tossed plank is
+// caught. A shipwright only ever stands or walks on it.
+export const QUAY = { x: [KEPT_POSE.position[0] - 7.6, KEPT_POSE.position[0] + 9.4], z: [KEPT_POSE.position[2] - 5.3, KEPT_POSE.position[2] + 10.7], deck: 1.08 } as const;
+const MARGIN = 0.35;
+export const onQuay = (x: number, z: number): boolean => x >= QUAY.x[0] + MARGIN - 1e-9 && x <= QUAY.x[1] - MARGIN + 1e-9 && z >= QUAY.z[0] + MARGIN - 1e-9 && z <= QUAY.z[1] - MARGIN + 1e-9;
+// how high a shipwright holds a plank above the deck
+const HOLD = 1.55;
+
+// Where the plank from `position` is caught: on the quay toward the live ship, just past its bow (its ram reaches
+// x 1.8), level with where it stood, at hand height.
+export function catchPoint(position: number): THREE.Vector3 {
+  const z = Math.min(QUAY.z[1] - 1, Math.max(QUAY.z[0] + 1, partHome(position, LIVE_POSE).z - 0.6));
+  return new THREE.Vector3(2.4, QUAY.deck + HOLD, z);
+}
+
+// The toss, `k` (0..1): a short arc out of the live ship to the catch (smoothstep, so it's seen leaving and caught).
+export function tossAt(from: THREE.Vector3, to: THREE.Vector3, k: number): THREE.Vector3 {
+  const t = Math.min(1, Math.max(0, k)), e = t * t * (3 - 2 * t);
+  const p = new THREE.Vector3().lerpVectors(from, to, e);
+  p.y += Math.sin(Math.PI * e) * 2.0;
+  return p;
+}
+
+// The carry, `c` (0..1): the shipwright walks from the catch to beside the plank's place, the plank held at hand
+// height, then lifts it into place (to the kept ship's gap, or down onto the rack) over the last stretch. Both
+// stay over the quay all the way. Walking a little behind the line keeps the walker on the deck.
+const WALK = 0.82;
+export function carryPath(from: THREE.Vector3, to: THREE.Vector3, c: number): { plank: THREE.Vector3; figure: THREE.Vector3 } {
+  const t = Math.min(1, Math.max(0, c));
+  const stand = new THREE.Vector3(to.x, QUAY.deck, to.z + (to.y > QUAY.deck + 2.2 ? 1.6 : 1.3));
+  stand.x = Math.min(QUAY.x[1] - MARGIN - 0.1, Math.max(QUAY.x[0] + MARGIN + 0.1, stand.x));
+  stand.z = Math.min(QUAY.z[1] - MARGIN - 0.1, Math.max(QUAY.z[0] + MARGIN + 0.1, stand.z));
+  const start = new THREE.Vector3(from.x - 0.3, QUAY.deck, from.z);
+  const w = Math.min(1, t / WALK), e = w * w * (3 - 2 * w);
+  const figure = new THREE.Vector3().lerpVectors(start, stand, e);
+  const held = figure.clone().add(new THREE.Vector3(0.3, HOLD, 0));
+  if (t <= WALK) return { plank: held, figure };
+  const s = (t - WALK) / (1 - WALK), f = s * s * (3 - 2 * s);
+  return { plank: new THREE.Vector3().lerpVectors(held, to, f), figure };
+}
+
+// Where the shipwrights wait, at most CREW_MAX of them: along the quay's front, between the catch and the rack,
+// clear of the live ship, each in its own place.
 export const CREW_MAX = 8;
-export const onQuay = (_x: number, _z: number): boolean => false;
-export const catchPoint = (_position: number): THREE.Vector3 => new THREE.Vector3();
-export const tossAt = (from: THREE.Vector3, _to: THREE.Vector3, _k: number): THREE.Vector3 => from.clone();
-export const crewSpots = (_n: number): THREE.Vector3[] => [];
-export const carryPath = (from: THREE.Vector3, _to: THREE.Vector3, _c: number): { plank: THREE.Vector3; figure: THREE.Vector3 } => ({ plank: from.clone(), figure: from.clone() });
+const SPOTS: THREE.Vector3[] = Array.from({ length: CREW_MAX }, (_, i) => new THREE.Vector3(QUAY.x[0] + 1.6 + (i % 4) * 1.5 + (i >= 4 ? 0.75 : 0), QUAY.deck, QUAY.z[1] - 0.9 - (i >= 4 ? 1.3 : 0)));
+export const crewSpots = (n: number): THREE.Vector3[] => SPOTS.slice(0, Math.max(0, Math.min(CREW_MAX, Math.floor(n)))).map((v) => v.clone());
