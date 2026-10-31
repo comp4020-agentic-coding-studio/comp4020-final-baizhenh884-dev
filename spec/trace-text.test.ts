@@ -23,6 +23,13 @@ describe("the trace's eligibility sentence", () => {
     expect(latestParts({ position: 9, word: "ship", standing: false, now: "boat", kept: "later" }).eligibility).toContain("place 10,");
   });
 
+  // The hold, said only when it applies (the maker, 31 October): the rule paragraph no longer explains holding to
+  // everyone, so a holding word's own line says what the hold is: how long, and where the next word may go.
+  it("says, while the word holds the place, how long the hold is and that the next word goes elsewhere", () => {
+    const parts = latestParts({ position: 2, word: "ship", standing: true, settled: false, settlesInMs: 9000 }, "20 seconds");
+    expect(parts.eligibility).toBe("“ship” is holding your place: until it's replaced or has stood 20 seconds, you can't make another. Your next word has to go somewhere else.");
+  });
+
   it("never names a part of the house", () => {
     for (let position = 0; position < 10; position++) {
       const { eligibility } = latestParts({ position, word: "ship", standing: true, settled: true });

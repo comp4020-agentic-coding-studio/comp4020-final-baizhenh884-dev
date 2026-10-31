@@ -429,7 +429,7 @@ describe("the harbour on GET /", () => {
   }
 
   // The kept strip: the kept sentence (gaps faint over a dashed line, within the 4.5 floor and 60% ceiling),
-  // the kept note, the waiting row, the plate note; legible on its ground; never wider than the page
+  // the kept note, the waiting row; legible on its ground; never wider than the page
   for (const [name, size] of ALL) {
     it(`sets the kept strip legible: kept words, faint gaps with a dashed line, the note and the waiting row (${name})`, async () => {
       const m = (await measureIn(await staged(), `(async () => {
@@ -440,7 +440,7 @@ describe("the harbour on GET /", () => {
         const gaps = [...k.querySelectorAll('.w.gap')].map((g) => { const s = getComputedStyle(g); return { text: g.textContent, contrast: inkOn(g), cue: s.textDecorationLine.includes('underline') ? s.textDecorationStyle : (parseFloat(s.borderBottomWidth) > 0 ? s.borderBottomStyle : 'none') }; });
         const note = q('.kept-strip .kept-note'), row = q('.kept-strip .waiting');
         return { words, gaps, note: { text: note.textContent.trim(), contrast: inkOn(note) }, row: { shown: !row.hidden && row.getBoundingClientRect().height > 0, label: row.querySelector('.label').textContent.trim(), words: [...row.querySelectorAll('.ws .w')].map((w) => ({ text: w.textContent, contrast: inkOn(w), n: getComputedStyle(w, '::before').content })) },
-          plate: q('.kept-strip .plate-note').textContent.trim(), strip: box(q('.kept-strip')), vw: innerWidth };
+          strip: box(q('.kept-strip')), vw: innerWidth };
       })()`, [size[0], size[1]])) as any;
       expect(m.words.length).toBeGreaterThan(0);
       for (const c of m.words) expect(c, "a kept word is too faint").toBeGreaterThanOrEqual(4.5);
@@ -456,9 +456,40 @@ describe("the harbour on GET /", () => {
       expect(m.row.label).toBe("Waiting for the next ship:");
       expect(m.row.words.map((w: any) => w.text)).toEqual(["ceremony", "wonder"]);
       for (const w of m.row.words) { expect(w.contrast).toBeGreaterThanOrEqual(6); expect(w.n).toMatch(/0[37]/); }
-      expect(m.plate).toBe("Replaced words are kept here: in this ship, or waiting for the next.");
       expect(m.strip.right, "the kept strip runs out of the page").toBeLessThanOrEqual(m.vw + 1);
     }, 90_000);
+  }
+
+  // Below the harbour, one column, three sections, each saying one thing once (the maker, 31 October: the page
+  // repeated itself): the ship of old planks (its sentence, one caption, the last plank, the waiting row), your plank
+  // (the rule in a sentence or two, and your trace), the log; then the foot: How the planks are made · Earlier form.
+  // No side column; the question is asked once, in the band; nothing said twice.
+  it("says each thing once below the harbour, in one column: the ship of old planks, your plank, the log", async () => {
+    const doc = new JSDOM(await (await fetch(new URL("/", baseUrl))).text()).window.document;
+    const order = ["#kept", "#your-plank", "#log", ".page-foot"].map((sel) => doc.querySelector(sel));
+    for (const [i, el] of order.entries()) expect(el, `there's no ${["ship of old planks", "your plank", "log", "foot"][i]} section`).not.toBeNull();
+    for (let i = 1; i < order.length; i++) expect(order[i - 1]!.compareDocumentPosition(order[i]!) & 4, "the sections aren't in order").toBeTruthy();
+    expect(doc.querySelector("#your-plank #how"), "the rule isn't in your plank").not.toBeNull();
+    expect(doc.querySelector("#your-plank")!.querySelector("h2")?.textContent?.trim()).toBe("Your plank");
+    expect(doc.querySelector(".foot-aside, .notes"), "the side column is still there").toBeNull();
+    const text = (doc.body.textContent ?? "").replace(/\s+/g, " ");
+    const count = (t: string) => text.split(t).length - 1;
+    expect(count("If every plank is replaced, is it still the same ship?"), "the question is asked more than once").toBe(1);
+    expect(count("Ten words. Ten planks."), "the band's title is repeated").toBe(0);
+    expect(count("Replaced words are kept here"), "the kept strip says what it is twice").toBe(0);
+    expect(count("Replaced words, back in their places. Faint words still stand."), "the kept note isn't said once").toBe(1);
+    const foot = [...doc.querySelectorAll(".page-foot .foot-links a")].map((a) => a.textContent?.trim());
+    expect(foot[0], "the foot doesn't lead to how the planks are made").toBe("How the planks are made");
+  });
+  for (const [name, size] of [DESKTOPS[1], PHONE]) {
+    it(`lays the sections below the harbour in one column (${name})`, async () => {
+      const m = (await measureIn(await staged({ earlierForm: 3 }), `(async () => {
+        await document.fonts.ready;
+        return ['#kept', '#your-plank', '#log', '.page-foot'].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
+      })()`, [size[0], size[1]])) as { top: number; bottom: number; left: number; right: number }[];
+      for (let i = 1; i < m.length; i++) expect(m[i].top, "a section sits beside another, not below it").toBeGreaterThanOrEqual(m[i - 1].bottom - 1);
+      for (const r of m) expect(r.right, "a section runs out of the page").toBeLessThanOrEqual(size[0] + 1);
+    }, 60_000);
   }
 
   // The captions: large and dark enough to read on their ground
@@ -482,7 +513,7 @@ describe("the harbour on GET /", () => {
   // No caption ends on a lone word; the site's links stay whole and last in reading order
   for (const [name, size] of ALL) {
     it(`ends no caption on a lone word, and keeps the site's links whole (${name})`, async () => {
-      const m = (await measureIn(await staged({ trace: { status: "Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands." } }), `(async () => {
+      const m = (await measureIn(await staged({ earlierForm: 3, trace: { status: "Your word “ferry” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands." } }), `(async () => {
         await document.fonts.ready;
         const lone = (el) => {
           const words = [], walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -491,18 +522,17 @@ describe("the harbour on GET /", () => {
           const top = ([n, a, b]) => { const r = document.createRange(); r.setStart(n, a); r.setEnd(n, b); return r.getClientRects()[0].top; };
           return Math.abs(top(words.at(-1)) - top(words.at(-2))) > 2;
         };
-        const captions = [['the plate note', '.notes .plate-note'], ['the kept plate note', '.kept-strip .plate-note'], ['the instructions', '#how'],
-          ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept note', '.kept-strip .kept-note'], ['the question', '.foot .question']]
+        const captions = [['the instructions', '#how'], ['the trace', 'section[aria-labelledby="trace-heading"] [role="status"]'], ['the kept note', '.kept-strip .kept-note']]
           .map(([what, sel]) => ({ what, lone: document.querySelector(sel) ? lone(document.querySelector(sel)) : 'missing' }));
-        const nav = document.querySelector('.foot .about');
+        const nav = document.querySelector('.page-foot');
         const links = [...nav.querySelectorAll('a')].map((a) => ({ text: a.textContent, lines: a.getClientRects().length, top: a.getBoundingClientRect().top }));
         const after = (sel) => { const el = document.querySelector(sel); return !el || !!(el.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING); };
-        return { captions, links, last: after('#how') && after('.notes .earlier') && after('.kept-strip .waiting') };
+        return { captions, links, last: after('#how') && after('.kept-strip .waiting') && after('#log') };
       })()`, [size[0], size[1]])) as any;
       for (const c of m.captions) expect(c.lone, `${c.what} ends on a lone word`).toBe(false);
-      expect(m.links.map((l: any) => l.text), "the foot's links").toEqual(["About Theseus", "How the planks are made"]);
+      // the page's foot (the maker, 31 October): How the planks are made · Earlier form, then the site's About
+      expect(m.links.map((l: any) => l.text), "the foot's links").toEqual(["How the planks are made", "Earlier form", "About Theseus"]);
       for (const l of m.links) expect(l.lines, `"${l.text}" breaks across lines`).toBe(1);
-      if (!isPhone(size)) expect(Math.abs(m.links[0].top - m.links[1].top), "the site's links don't share one line").toBeLessThanOrEqual(1);
       expect(m.last, "the site's links aren't last in reading order").toBe(true);
     }, 90_000);
   }

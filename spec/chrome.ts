@@ -275,26 +275,26 @@ export function stageHarbour(doc: Document, state: HarbourState): void {
   } else if (band.classList.contains("folded")) throw new Error("the served band is folded; stage a full band from a page served to a new visitor");
   doc.body.classList.toggle("band-folded", (state.band ?? "full") === "folded");
   doc.querySelector("main")?.classList.toggle("band-folded", (state.band ?? "full") === "folded");
-  // the trace, as GET / renders it under the rule paragraph
+  // the trace, as GET / renders it in "Your plank", under the rule paragraph
   doc.querySelector('section[aria-labelledby="trace-heading"]')?.remove();
   if (state.trace) {
     const sec = doc.createElement("section");
     sec.setAttribute("aria-labelledby", "trace-heading");
-    const h = doc.createElement("h2"); h.id = "trace-heading"; h.textContent = "Your trace";
+    const h = doc.createElement("h3"); h.id = "trace-heading"; h.className = "sr-only"; h.textContent = "Your trace";
     const p = doc.createElement("p"); p.setAttribute("role", "status"); p.textContent = state.trace.status;
     sec.append(h, p);
     if (state.trace.items?.length) { const ul = doc.createElement("ul"); ul.className = "trace-standing"; for (const t of state.trace.items) { const li = doc.createElement("li"); li.textContent = t; ul.append(li); } sec.append(ul); }
     doc.querySelector("#how")!.after(sec);
   }
-  // the ways back: Earlier form in the notes (rel=prev, the HTTP contract), Earlier ship under the kept sentence
-  const form = doc.querySelector('.notes a[rel="prev"]')?.closest("p");
-  if (state.earlierForm == null) form?.remove();
-  else if (form) form.querySelector("a")!.setAttribute("href", `?at=${state.earlierForm}`);
-  else {
-    const p = doc.createElement("p"); p.className = "earlier caps";
+  // the ways back: Earlier form in the page's foot (rel=prev, the HTTP contract), Earlier ship under the kept sentence
+  // (the foot's links: "How the planks are made", then " · Earlier form" once the sentence has changed)
+  doc.querySelector('a[rel="prev"][href*="at="]')?.closest(".earlier, .foot-links > *, a")?.remove();
+  doc.querySelector(".page-foot .sep-form")?.remove();
+  if (state.earlierForm != null) {
     const a = doc.createElement("a"); a.setAttribute("rel", "prev"); a.setAttribute("href", `?at=${state.earlierForm}`); a.textContent = "Earlier form";
-    p.append(a);
-    (doc.querySelector('.notes section[aria-labelledby="trace-heading"]') ?? doc.querySelector("#how"))!.after(p);
+    const foot = doc.querySelector(".page-foot .foot-links");
+    if (foot) { const sep = doc.createElement("span"); sep.className = "sep-form"; sep.textContent = " · "; foot.append(sep, a); }
+    else { const p = doc.createElement("p"); p.className = "earlier caps"; p.append(a); doc.querySelector("#how")!.after(p); }
   }
   const ship = doc.querySelector(".kept-strip a.earlier-ship")?.closest("p");
   if (state.earlierShip == null) ship?.remove();
@@ -303,6 +303,6 @@ export function stageHarbour(doc: Document, state: HarbourState): void {
     const p = doc.createElement("p"); p.className = "earlier caps";
     const a = doc.createElement("a"); a.className = "earlier-ship caps"; a.setAttribute("href", `?kept=${state.earlierShip}`); a.textContent = "Earlier ship";
     p.append(a);
-    doc.querySelector(".kept-strip .plate-note")!.after(p);
+    (doc.querySelector(".kept-strip .plate-note") ?? doc.querySelector(".kept-strip .waiting"))!.after(p);
   }
 }

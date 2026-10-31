@@ -345,8 +345,7 @@ describe("Kept ship markup on GET /", () => {
 
   // The waiting row (decided 29 October) in the kept half's foot: real text,
   // read after the kept sentence, the next house's words in place order, each
-  // with its place; hidden when nothing waits. The plate note says where
-  // replaced words go, both ways.
+  // with its place; hidden when nothing waits.
   it("serves the next house's waiting words under the kept house, as words in place order, after the kept sentence", async () => {
     const doc = await new Visitor().page();
     const row = doc.querySelector<HTMLElement>(".kept-strip .waiting");
@@ -360,7 +359,8 @@ describe("Kept ship markup on GET /", () => {
     expect(places, "waiting words aren't in place order").toEqual([...places].sort((a, b) => a - b));
     expect(new Set(places).size, "more than one word waits at a place").toBe(places.length);
     if (ws.length) expect(readable(row!)).toBe(`Waiting for the next ship: ${ws.map((w) => w.textContent).join(" ")}`);
-    expect(doc.querySelector(".kept-strip .plate-note")?.textContent?.trim()).toBe("Replaced words are kept here: in this ship, or waiting for the next.");
+    // the kept note says what the strip is, once (the maker, 31 October: "Replaced words are kept here…" said it again)
+    expect(doc.body.textContent, "the kept strip says what it is twice").not.toContain("Replaced words are kept here");
   });
 
   // The shared sentence accumulates every other spec file's replacements, so

@@ -31,7 +31,8 @@ export const keptPhrase = (where: KeptWhere): string => KEPT[where];
 // a place by the sentence's own number ("place 01"), never the part of the ship it builds
 const place = (position: number): string => `place ${String(position + 1).padStart(2, "0")}`;
 
-export function latestParts(latest: SettleTrace["latest"]): LatestParts {
+// `hold`: how long a word holds the place (settleSecondsPhrase), said in the holding line (a stub until it's used)
+export function latestParts(latest: SettleTrace["latest"], _hold = "a while"): LatestParts {
   if (!latest.standing) {
     return {
       word: latest.word,
