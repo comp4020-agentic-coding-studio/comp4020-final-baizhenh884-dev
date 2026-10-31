@@ -353,15 +353,12 @@ describe("Your trace", () => {
     );
   });
 
-  settleOnly("explains the settle rule under settle mode, honestly", async () => {
+  // Under settle mode the rule paragraph says only what always applies (the maker, 31 October); the hold is said in
+  // the visitor's own holding line, only while it holds (spec/trace-text.test.ts).
+  settleOnly("explains the settle rule under settle mode, honestly, and the hold only where it applies", async () => {
     const v = await arrive();
     const { doc } = await v.page("/");
     const how = doc.querySelector("#how");
-    const text = how?.textContent ?? "";
-    expect(text, "#how still claims one change that can't be undone").not.toMatch(/one change/i);
-    expect(text, "#how still claims the change can't be undone").not.toMatch(/can't be undone/i);
-    expect(text, "#how doesn't explain settling or moving on").toMatch(/settl|hold|stand/i);
-    // every word field is described by #how: it says how to back out, as well as how to replace
-    expect(text, "#how doesn't say how to cancel").toContain("press Enter. Press Escape to cancel.");
+    expect(how?.textContent?.trim()).toBe("Choose a word, type its replacement and press Enter. Press Escape to cancel. Anyone can change any word, yours too.");
   });
 });

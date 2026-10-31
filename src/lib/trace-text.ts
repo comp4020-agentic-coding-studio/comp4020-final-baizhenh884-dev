@@ -15,6 +15,7 @@ export type LatestParts = {
   word: string;
   del?: string; // present when replaced: the word that's gone (the <del> text)
   now?: string; // present when replaced: what stands there now
+  holding?: boolean; // present while the word holds the place (not yet settled)
   kept?: string; // present when replaced: where it's kept, a sentence
   eligibility: string; // appended sentence: what the visitor may do next
 };
@@ -31,7 +32,9 @@ export const keptPhrase = (where: KeptWhere): string => KEPT[where];
 // a place by the sentence's own number ("place 01"), never the part of the ship it builds
 const place = (position: number): string => `place ${String(position + 1).padStart(2, "0")}`;
 
-export function latestParts(latest: SettleTrace["latest"]): LatestParts {
+// `hold`: how long a word holds the place (settleSecondsPhrase); the holding line is the one place the hold is
+// explained (the maker, 31 October: the rule paragraph says only what always applies)
+export function latestParts(latest: SettleTrace["latest"], hold = "a while"): LatestParts {
   if (!latest.standing) {
     return {
       word: latest.word,
@@ -44,7 +47,8 @@ export function latestParts(latest: SettleTrace["latest"]): LatestParts {
   if (!latest.settled) {
     return {
       word: latest.word,
-      eligibility: `“${latest.word}” is holding your place: until it's replaced or has stood a while, you can't make another.`,
+      holding: true,
+      eligibility: `Until it's replaced or has stood ${hold}, you can't make another; then your next word goes somewhere else.`,
     };
   }
   return {
@@ -58,10 +62,15 @@ export const standingText = (item: StandingItem): string => `“${item.word}” 
 export const replacedText = (item: ReplacedItem): string => `“${item.word}” was replaced by “${item.now}”, ${keptPhrase(item.kept)}.`;
 
 // Seconds under a minute spelled out, otherwise rounded minutes — used only
-// by #how's settle-mode paragraph, which names the rule in general terms,
-// never the visitor's own remaining time.
+// by the holding line, which names the rule's hold in general terms, never
+// the visitor's own remaining time.
 export function settleSecondsPhrase(seconds: number): string {
   if (seconds < 60) return `${seconds} second${seconds === 1 ? "" : "s"}`;
   const minutes = Math.round(seconds / 60);
   return `about ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
+
+// the line for a word of yours that still stands, shown by GET / and the live page alike; while it holds your place
+// it names the word once and the hold follows on (the maker, 31 October)
+export const standingLine = (parts: LatestParts): string =>
+  `Your word “${parts.word}” still stands, marked ${parts.holding ? "above" : "in the sentence above"}. ${parts.eligibility}`;

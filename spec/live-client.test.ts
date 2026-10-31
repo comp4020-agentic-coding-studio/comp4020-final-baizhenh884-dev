@@ -146,7 +146,11 @@ function asIfNoChanges(doc: Document): void {
   for (const form of doc.querySelectorAll('form[action="/replace"]')) {
     form.querySelector<HTMLInputElement>('input[name="version"]')!.value = "1";
   }
-  doc.querySelector('a[rel~="prev"]')?.closest("p")?.remove();
+  // the served Earlier link alone, and its separator in the page's foot (the foot itself stays)
+  const prev = doc.querySelector('a[rel~="prev"]');
+  if (prev?.previousElementSibling?.classList.contains("sep-form")) prev.previousElementSibling.remove();
+  if (prev?.parentElement?.matches("p.earlier")) prev.parentElement.remove();
+  else prev?.remove();
 }
 const traceStatus = (doc: Document) => doc.querySelector('section [role="status"], aside [role="status"]');
 
@@ -597,7 +601,8 @@ describe("live page reconciliation", () => {
       page.applySnapshot({ positions: positionsOf(doc), trace });
 
       const before = traceStatus(doc)!.textContent;
-      expect(before, "a holding trace shows the settled wording already").toMatch(/holding/i);
+      // holding: you can't make another yet (the wording names the word once, the maker, 31 October)
+      expect(before, "a holding trace shows the settled wording already").toMatch(/can't make another/i);
 
       vi.advanceTimersByTime(2999);
       expect(traceStatus(doc)!.textContent, "the trace settled before its timer elapsed").toBe(before);
@@ -605,7 +610,7 @@ describe("live page reconciliation", () => {
       vi.advanceTimersByTime(2);
       const after = traceStatus(doc)!.textContent;
       expect(after, "the trace never flipped once its timer elapsed").not.toBe(before);
-      expect(after, "the settled trace still claims it's holding").not.toMatch(/holding/i);
+      expect(after, "the settled trace still claims it's holding").not.toMatch(/can't make another/i);
       expect(slot(doc, a.position).label.querySelector("mark"), "the settled word is no longer marked as standing").not.toBeNull();
     });
 
@@ -702,7 +707,7 @@ describe("live page reconciliation", () => {
       const [a] = positionsOf(doc);
       attach(doc).applySnapshot({ positions: positionsOf(doc), trace: holding(a.position, 4000) });
       expect(fills(doc), "reduced motion still shows a moving line").toHaveLength(0);
-      expect(traceStatus(doc)!.textContent, "the trace text no longer says it's holding").toMatch(/holding/i);
+      expect(traceStatus(doc)!.textContent, "the trace text no longer says it's holding").toMatch(/can't make another/i);
     });
   });
 

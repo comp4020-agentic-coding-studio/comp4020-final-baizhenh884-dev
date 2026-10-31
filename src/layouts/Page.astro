@@ -290,27 +290,17 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .waiting .w::before { content: attr(data-n) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); }
       .kept-strip .earlier { margin: 0; color: var(--brown-soft); }
 
-      /* the notes, under the kept strip: the rule, your trace, Earlier form, the captions, the site's links last */
-      .notes { margin: 0 auto; width: min(1180px, calc(100% - 2 * 3.6vw)); padding: 1.6rem 0 2.4rem; display: flex; flex-direction: column; gap: 0.9rem; }
-      .foot-main, .foot-aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
-      .notes #how { margin: 0; }
-      .notes section[aria-labelledby="trace-heading"] { margin-top: 0; }
-      .notes .earlier { margin: 0; }
-      .plate-note { font: italic 400 clamp(20px, 1.7vw, 28px)/1.22 "Instrument Serif", serif; color: var(--ink); margin: 0; letter-spacing: -0.005em; text-wrap: balance; }
-      .kept-strip .plate-note { color: var(--brown); font-size: clamp(19px, 1.45vw, 24px); }
-      .plate-note .line { display: block; text-wrap: balance; }
-      .question { font: italic 400 clamp(15px, 1.15vw, 19px)/1.35 "Instrument Serif", serif; color: var(--soft); margin: 0; max-width: 34ch; }
-      #how, section[aria-labelledby="trace-heading"] [role="status"], .question { text-wrap: pretty; }
-      .notes .about { margin: 0; }
-      .about a { white-space: nowrap; }
-      @media (min-width: 901px) {
-        /* a title block: the rule, your trace and Earlier on the left, the captions on the right, the links across */
-        .notes { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 3vw; row-gap: 0; align-items: start; border-top: 1px solid var(--rule); margin-top: 2.4vh; }
-        .notes .foot-main { grid-column: 1; }
-        .notes .foot-aside { grid-column: 2; border-left: 1px solid var(--rule); padding-left: 1.6vw; }
-        .notes .question { border-top: 1px solid var(--rule); padding-top: 0.8rem; }
-        .notes .about { grid-column: 1 / -1; padding-top: 0.8rem; border-top: 1px solid var(--rule); margin-top: 1.4rem; }
-      }
+      /* below the kept strip, one column (the maker, 31 October): your plank, the log, then the page's foot */
+      .below, .page-foot { margin: 0 auto; width: min(1180px, calc(100% - 2 * 3.6vw)); }
+      .below { padding: 1.4rem 0 0; display: flex; flex-direction: column; gap: 0.7rem; }
+      .below[hidden] { display: none; }
+      .below > h2 { margin: 0; color: var(--caption); }
+      #your-plank #how { margin: 0; }
+      #your-plank section[aria-labelledby="trace-heading"] { margin: 0; }
+      #how, section[aria-labelledby="trace-heading"] [role="status"] { text-wrap: pretty; }
+      .page-foot { margin-top: 2rem; padding: 0.8rem 0 2.4rem; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.6rem 2rem; }
+      .page-foot p, .page-foot nav { margin: 0; }
+      .page-foot a, .about a { white-space: nowrap; }
 
       /* an earlier form and an earlier ship: the ship alone, the sentence on its strip over the scene's foot */
       main:has(> .harbour) { position: relative; min-height: 100svh; padding: 0; display: flex; flex-direction: column; }
@@ -327,7 +317,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .kept-strip-lone .strip-label, .kept-strip-lone .history { color: var(--brown-soft); }
       .lone-ship > .about { margin: 1.2rem auto 1.6rem; width: min(1180px, calc(100% - 2 * 3.6vw)); }
       .history { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 0.9rem 0 0; }
-      .history a, .earlier a, .about a { text-decoration-color: var(--hair); }
+      .history a, .earlier a, .about a, .page-foot a { text-decoration-color: var(--hair); }
       .strip .history a, .strip .earlier a { text-decoration-color: var(--brown-hair); }
       .earlier, .about { margin: 1.2rem 0 0; color: var(--soft); }
       .form-state { color: var(--soft); margin: 0 0 0.4rem; }
