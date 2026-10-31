@@ -46,8 +46,11 @@ playtest's "what is this?", built ahead of the informal try that would test it.
   of text each. No new art, no new model, no new sound.
   1. Wide on the harbour: "Athens kept the ship of Theseus in its harbour for
      centuries."
-  2. In on the live ship; one part flashes red and is rebuilt as it was: "As
-     its planks rotted, they were replaced, one by one."
+  2. In on the live ship; three small parts (shields, then oars, then stern)
+     are rebuilt in turn, each red only while it's rebuilt and exactly as it
+     was: "As its planks rotted, they were replaced, one by one." (Amended
+     31 October after the maker saw the frames: the whole hull turning red
+     read as the whole ship replaced, not one by one.)
   3. Hold on it: "Until none of the first planks were left. Philosophers
      argued over it: was it still the same ship?", with a small source line,
      "Plutarch, Life of Theseus 23": a citation of what he reports, not a
@@ -61,7 +64,7 @@ playtest's "what is this?", built ahead of the informal try that would test it.
 - **Nothing in it is live data.** The lines are fixed text: no counts, names,
   words from the sentence or anything from the stream. The scene behind them
   is the harbour as it stands (the ships and shipwrights the page already
-  draws). Beat 2's flash rebuilds the part *as it was*: the ship still
+  draws). Beat 2 rebuilds each part *as it was*: the ship still
   represents the sentence, nothing is previewed, and live equals fresh.
 - **First visit only, remembered in the browser.** A flag in `localStorage`
   is set when the story opens. If storage fails (private window, blocked

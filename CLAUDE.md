@@ -568,8 +568,9 @@ What the code must hold to. The README says why; don't restate it here.
   `GET /`, a first visit in this browser plays five beats over the
   harbour as it stands: camera moves and one or two fixed lines each, no
   new art. No counts, names, words from the sentence or anything from
-  the stream; beat 2 rebuilds one part exactly as it was (red only while
-  it's rebuilt), so the ship still represents the sentence. Remembered in
+  the stream; beat 2 rebuilds three small parts in turn (shields, oars,
+  stern), each exactly as it was and red only while it's rebuilt, so the
+  ship still represents the sentence. Remembered in
   `localStorage` only (the server never knows); if storage fails, once
   per load, never blocking the page. Skip is always visible, Escape skips;
   click, tap, Enter, Space or → advance, ← goes back; it never traps
