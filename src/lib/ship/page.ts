@@ -11,6 +11,7 @@ import { TIMING, type Kind } from "./motion";
 import { drafting, notation, showDrafting } from "./notation";
 import { PARTS } from "./rules";
 import { tagged } from "./tag";
+import type { Shot } from "../story";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fine = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -51,6 +52,9 @@ export type CurrentHarbour = {
   mine(position: number | null): void;
   // the shipwrights: the stream's anonymous total of open views, drawn as figures, one of them this visitor's
   crew(total: number): void;
+  // the opening story (decision 0007): the camera to a shot (null: back to the fixed view), one part rebuilt as it stands
+  storyShot(shot: Shot | null): void;
+  storyFlash(position: number): void;
 };
 
 // `own`: this visitor's own change, just made (Post/Redirect/Get), with its moment and the kept ship before it
@@ -255,6 +259,8 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
     keptApply: (k, moment) => view.keptApply(k, moment),
     mine: (position) => view.trace(position),
     crew: (total) => { view.crewSet(total); view.crewMine(true); },
+    storyShot: (shot) => view.storyShot(shot),
+    storyFlash: (position) => view.storyFlash(position, words),
   };
 }
 
