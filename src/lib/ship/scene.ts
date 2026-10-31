@@ -5,7 +5,7 @@
 // (docs/exploration/ship-prototype/theseus-harbour.html), not copied.
 
 import * as THREE from "three";
-import { KEPT_POSE, PALLET } from "./stage";
+import { KEPT_POSE, PALLET, QUAY, SHORE } from "./stage";
 
 export type Harbour = { scene: THREE.Scene; sun: THREE.DirectionalLight; waves(t: number): void; dispose(): void };
 
@@ -73,11 +73,13 @@ export function buildHarbour(): Harbour {
 
   // the shore of Athens behind the harbour, the quay along it, the slipway out over the water
   const stone = 0xd9c49c, quay = 0xc9ad80, white = 0xf3ede2, blue = 0x2f5f8c, dark = 0x4a3b2e, green = 0x4b6640, wood = 0x8a633f;
-  box(110, 3, 34, stone, 0, -0.5, -24);
-  box(110, 1.2, 1.2, quay, 0, 0.45, -7.2);
+  // the shore, its quay along it, and the slipway's quay, from the boxes the live ship is moored clear of (stage.ts)
+  const [sx0, sx1] = SHORE.x, sz1 = SHORE.z[1], [qx0, qx1] = QUAY.x, [qz0, qz1] = QUAY.z;
+  box(sx1 - sx0, 3, 34, stone, (sx0 + sx1) / 2, -0.5, sz1 - 0.4 - 17);
+  box(sx1 - sx0, 1.2, 1.2, quay, (sx0 + sx1) / 2, 0.45, sz1 - 0.6);
   const [kx, , kz] = KEPT_POSE.position;
-  box(17, 1.6, 16, quay, kx + 0.9, 0.2, kz + 2.7);
-  box(16.2, 0.08, 15.2, 0xd6bf93, kx + 0.9, 1.04, kz + 2.7);
+  box(qx1 - qx0, 1.6, qz1 - qz0, quay, (qx0 + qx1) / 2, 0.2, (qz0 + qz1) / 2);
+  box(qx1 - qx0 - 0.8, 0.08, qz1 - qz0 - 0.8, 0xd6bf93, (qx0 + qx1) / 2, 1.04, (qz0 + qz1) / 2);
   // the kept ship's cradle, and the shed's posts and its crane
   for (const x of [-4, -1.4, 1.2, 3.8]) box(0.6, 0.95, 2, wood, kx + x, 1.45, kz);
   for (const [x, z] of [[-6, 3.7], [-6, -3.7], [6.4, 3.7], [6.4, -3.7]]) post(new THREE.Vector3(kx + x, 1, kz + z), new THREE.Vector3(kx + x, 7.2, kz + z), 0.08, wood);
