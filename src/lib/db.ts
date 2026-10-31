@@ -90,6 +90,14 @@ const keptChanges = () =>
     fromWord: string;
   }[];
 
+// The log's record (decision 0006): the newest replacements as place, old word and new, oldest first; never the
+// visitor or the time, which the log never shows. A bounded read: the log shows 50, and this leaves room for lines
+// the blocklist hides.
+const latestChanges = client.prepare("SELECT position, from_word AS fromWord, to_word AS toWord FROM changes ORDER BY id DESC LIMIT 200");
+export function logRows(): { position: number; fromWord: string; toWord: string }[] {
+  return (latestChanges.all() as { position: number; fromWord: string; toWord: string }[]).reverse();
+}
+
 export function keptShipAt(): KeptShip {
   return deriveKeptShip(keptChanges(), currentPositions().map(({ word, version }) => ({ word, version })));
 }

@@ -2,7 +2,9 @@
 import EarlierShip from "../components/EarlierShip.astro";
 import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
-import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, logRows, sentenceAt, SETTLE_SECONDS } from "../lib/db";
+import { isBlocked } from "../lib/blocklist";
+import { logLine, logOf } from "../lib/log-record";
 import { latestParts, replacedText, settleSecondsPhrase, standingLine, standingText } from "../lib/trace-text";
 import { lastPlank } from "../lib/kept-sentence";
 import { labelRows, sizeStep } from "../lib/sentence-step";
@@ -65,6 +67,8 @@ const keptMine = new Set<number>(
       ]
     : [],
 );
+// the log's record, on the current page only (decision 0006)
+const log = earlier || lone ? [] : logOf(logRows(), isBlocked);
 // the rule after the keys; "Press Escape to cancel." sits between them, in its own span (a phone has no Escape key)
 const how =
   trace?.mode === "settle"
@@ -260,8 +264,14 @@ const how =
               </section>
             )}
         </section>
-        {/* the log of every replacement (its own slice): its place in the page */}
-        <section id="log" class="below" hidden></section>
+        {/* the log (decision 0006): the ship's record, newest first, place and part, old word → new; nothing that says
+            when or who; the latest 50, the blocklist applied here (src/lib/log-record.ts; the live page adds lines) */}
+        <section id="log" class="below" aria-labelledby="log-heading" hidden={log.length === 0}>
+          <h2 id="log-heading" class="caps strip-label">The log</h2>
+          <ol class="log-lines">
+            {log.map((line) => <li><span class="place">{logLine(line).place}</span> <span class="from">{line.from}</span> <span class="arrow">→</span> <span class="to">{line.to}</span></li>)}
+          </ol>
+        </section>
         {/* the page's foot: how the planks are made, the way back through the sentence's history, then the site's About */}
         <footer class="page-foot">
           <p class="foot-links caps"><a href="/ship/">How the planks are made</a>{changes > 0 && <><span class="sep-form"> · </span><a rel="prev" href={`?at=${changes - 1}`}>Earlier form</a></>}</p>
