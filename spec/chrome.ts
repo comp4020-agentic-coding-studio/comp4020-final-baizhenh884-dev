@@ -84,7 +84,16 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     let id = 0;
     const pending = new Map<number, (m: any) => void>();
     ws.onmessage = (m) => { const x = JSON.parse(String(m.data)); if (x.id && pending.has(x.id)) { pending.get(x.id)!(x); pending.delete(x.id); } };
-    const send = (method: string, params: object = {}) => new Promise<any>((r) => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
+    // Every call to Chrome is bounded: one that never answers (a stalled headless Chrome, seen locally) throws here,
+    // so the finally below still closes Chrome. Unbounded, the test runner's own timeout abandoned the check with
+    // Chrome left running, and later checks slowed behind it. Well above any one measurement's own wait.
+    const CALL_MS = 45_000;
+    const send = (method: string, params: object = {}) => new Promise<any>((resolve, reject) => {
+      const n = ++id;
+      const timer = setTimeout(() => { pending.delete(n); reject(new Error(`Chrome didn't answer ${method} within ${CALL_MS / 1000}s`)); }, CALL_MS);
+      pending.set(n, (m) => { clearTimeout(timer); resolve(m); });
+      ws.send(JSON.stringify({ id: n, method, params }));
+    });
     // A phone-sized viewport (the app's own breakpoint, 900px) is measured the
     // way the marking environment actually sees it: Chrome DevTools' device
     // toolbar, which emulates a touch device (mobile: true) for every phone
