@@ -31,8 +31,9 @@ export const keptPhrase = (where: KeptWhere): string => KEPT[where];
 // a place by the sentence's own number ("place 01"), never the part of the ship it builds
 const place = (position: number): string => `place ${String(position + 1).padStart(2, "0")}`;
 
-// `hold`: how long a word holds the place (settleSecondsPhrase), said in the holding line (a stub until it's used)
-export function latestParts(latest: SettleTrace["latest"], _hold = "a while"): LatestParts {
+// `hold`: how long a word holds the place (settleSecondsPhrase); the holding line is the one place the hold is
+// explained (the maker, 31 October: the rule paragraph says only what always applies)
+export function latestParts(latest: SettleTrace["latest"], hold = "a while"): LatestParts {
   if (!latest.standing) {
     return {
       word: latest.word,
@@ -45,7 +46,7 @@ export function latestParts(latest: SettleTrace["latest"], _hold = "a while"): L
   if (!latest.settled) {
     return {
       word: latest.word,
-      eligibility: `“${latest.word}” is holding your place: until it's replaced or has stood a while, you can't make another.`,
+      eligibility: `“${latest.word}” is holding your place: until it's replaced or has stood ${hold}, you can't make another. Your next word has to go somewhere else.`,
     };
   }
   return {
@@ -59,8 +60,8 @@ export const standingText = (item: StandingItem): string => `“${item.word}” 
 export const replacedText = (item: ReplacedItem): string => `“${item.word}” was replaced by “${item.now}”, ${keptPhrase(item.kept)}.`;
 
 // Seconds under a minute spelled out, otherwise rounded minutes — used only
-// by #how's settle-mode paragraph, which names the rule in general terms,
-// never the visitor's own remaining time.
+// by the holding line, which names the rule's hold in general terms, never
+// the visitor's own remaining time.
 export function settleSecondsPhrase(seconds: number): string {
   if (seconds < 60) return `${seconds} second${seconds === 1 ? "" : "s"}`;
   const minutes = Math.round(seconds / 60);

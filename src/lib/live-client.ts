@@ -1,6 +1,6 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
 import { foreseen, said as saidOne } from "./ship/notation";
-import { latestParts, replacedText, standingText } from "./trace-text";
+import { latestParts, replacedText, settleSecondsPhrase, standingText } from "./trace-text";
 import { labelRows, sizeStep } from "./sentence-step";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
@@ -319,13 +319,15 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     if (!sentence) return null;
     const section = doc.createElement("section");
     section.setAttribute("aria-labelledby", "trace-heading");
-    const heading = doc.createElement("h2");
+    // in "Your plank", whose heading is the one seen: this one names the trace for a screen reader, as GET / does
+    const heading = doc.createElement("h3");
     heading.id = "trace-heading";
+    heading.className = "sr-only";
     heading.textContent = "Your trace";
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
     section.append(heading, status);
-    // where GET / renders it: under the how-text, in the live half's foot
+    // where GET / renders it: under the rule, in "Your plank"
     (doc.getElementById("how") ?? sentence).after(section);
     return section;
   }
@@ -381,7 +383,9 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       }
       return;
     }
-    const parts = latestParts(trace.latest);
+    // how long a word holds the place, as GET / says it (the page's settle setting, the rule's configuration)
+    const holdMs = Number(doc.querySelector(".sentence")?.getAttribute("data-settle-ms") ?? 0);
+    const parts = latestParts(trace.latest, holdMs > 0 ? settleSecondsPhrase(holdMs / 1000) : undefined);
     if (parts.del) {
       const del = doc.createElement("del");
       del.textContent = parts.del;
@@ -434,18 +438,17 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     if (total === 0) return;
     let link = doc.querySelector<HTMLAnchorElement>('a[rel~="prev"]');
     if (!link) {
-      const p = doc.createElement("p");
-      p.className = "earlier caps";
       link = doc.createElement("a");
       link.rel = "prev";
       link.textContent = "Earlier form";
-      p.append(link);
-      // where GET / renders it: after the trace, or the how-text
-      const after = doc.querySelector('section[aria-labelledby="trace-heading"]') ?? doc.getElementById("how");
-      const readme = doc.querySelector('a[href="/readme/"]')?.closest("p");
-      if (after) after.after(p);
-      else if (readme) readme.before(p);
-      else doc.querySelector("main")?.append(p);
+      // where GET / renders it: in the page's foot, after "How the planks are made"
+      const foot = doc.querySelector(".page-foot .foot-links");
+      if (foot) {
+        const sep = doc.createElement("span");
+        sep.className = "sep-form";
+        sep.textContent = " · ";
+        foot.append(sep, link);
+      } else doc.querySelector("main")?.append(link);
     }
     link.setAttribute("href", `?at=${total - 1}`);
   }
