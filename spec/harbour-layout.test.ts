@@ -569,7 +569,10 @@ describe("the harbour on GET /", () => {
     }
     // on the live page, once its harbour is drawn (they're dead without one: no script or no WebGL shows none)
     const SHOWN = `(() => { const b = document.querySelector('#zoom-in'); return !!b && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().width > 0; })()`;
-    expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [1440, 900], { steps: [DRAWN] }), "a desktop doesn't show the zoom buttons at rest").toBe(true);
+    // on failure, say what the page saw, so a difference between machines can be read from the message
+    const SEEN = `(() => { const b = document.querySelector('#zoom-in'), g = document.querySelector('.view-controls'); return { shown: ${SHOWN}, fine: matchMedia('(pointer: fine)').matches, hover: matchMedia('(hover: hover)').matches, ready: document.querySelector('#harbour').hasAttribute('data-ready'), canvas: !!document.querySelector('#harbour canvas'), group: g && getComputedStyle(g).display, button: b && getComputedStyle(b).display, width: innerWidth }; })()`;
+    const desk = (await liveIn(new URL("/", baseUrl).href, SEEN, [1440, 900], { steps: [DRAWN] })) as { shown: boolean };
+    expect(desk.shown, `a desktop doesn't show the zoom buttons at rest: ${JSON.stringify(desk)}`).toBe(true);
     expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [390, 844], { steps: [DRAWN] }), "a phone shows the zoom buttons").toBe(false);
     expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [1440, 900], { noScript: true }), "the zoom buttons show with nothing to zoom (no script)").toBe(false);
   }, 90_000);
