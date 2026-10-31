@@ -15,7 +15,8 @@ import { LiveBody } from "./live-body";
 import { arrivalAt, carryAt, carryEnd, landsAt, newPartRed, plankColour, type Kind } from "./motion";
 import { Crew, type Figure } from "./crew";
 import { buildHarbour, swell } from "./scene";
-import { carriedScale, carryPath, heldAt, zoomBy, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
+import { carriedScale, carryPath, heldAt, zoomBy, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, storyBetween, storyView, tossAt, type Layout, type View } from "./stage";
+import { STORY_MOVE_MS, type Shot } from "../story";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -64,6 +65,8 @@ export class HarbourView {
   private next: (string | null)[] = Array(10).fill(null);
   // a waiting plank still in flight to the pallet isn't drawn there yet
   private landing = new Set<number>();
+  // the opening story's camera, moving from one shot to the next (release: back to the fixed view, then let go)
+  private shot: { from: View; to: View; start: number; release: boolean } | null = null;
   onMoved: (moved: boolean) => void = () => {};
 
   constructor(private host: HTMLElement, private scene: Scene, private layout: () => Layout) {
@@ -227,6 +230,23 @@ export class HarbourView {
     this.controls.update();
     if (!this.moved) { this.moved = true; this.onMoved(true); }
     this.requestFrame();
+  }
+
+  // The opening story's camera (decision 0007): from wherever it is to this shot, eased; `null` brings it back to
+  // the fixed view and lets go. With reduced motion it never moves. While a shot is held the orbit and a phone's
+  // follow stand aside.
+  storyShot(shot: Shot | null): void {
+    if (this.reduced) return;
+    const now = performance.now(), layout = this.layout();
+    const from = this.shot ? storyBetween(this.shot.from, this.shot.to, (now - this.shot.start) / STORY_MOVE_MS) : { position: this.camera.position.toArray() as [number, number, number], target: (this.controls?.target ?? this.homeTarget()).toArray() as [number, number, number], fov: this.camera.fov };
+    this.shot = { from, to: storyView(layout, shot ?? "wide"), start: now, release: shot === null };
+    this.requestFrame();
+  }
+  // one part of the live ship rebuilt exactly as it stands: red while it's set down, then as the rest
+  storyFlash(position: number, words: readonly string[]): void {
+    if (this.reduced || !this.live) return;
+    this.live.change(position, words, "own", performance.now());
+    this.paint();
   }
 
   home(): void {
@@ -470,9 +490,24 @@ export class HarbourView {
       if (t >= fl.lands && !fl.landed) { fl.landed = true; fl.done(); }
       if (t >= fl.end) this.endFlight(fl);
     }
-    // on a phone the camera follows the plank there and back (a desktop keeps its view, or the visitor's orbit)
-    const followed = this.layout() === "phone" && !this.reduced ? this.flights[0] : undefined;
-    if (followed) {
+    // on a phone the camera follows the plank there and back (a desktop keeps its view, or the visitor's orbit);
+    // the opening story's camera comes first
+    const followed = this.layout() === "phone" && !this.reduced && !this.shot ? this.flights[0] : undefined;
+    let shotMoving = false;
+    if (this.shot) {
+      const k = (now - this.shot.start) / STORY_MOVE_MS, v = storyBetween(this.shot.from, this.shot.to, k);
+      const w = this.host.clientWidth, h = this.host.clientHeight;
+      place(this.camera, this.layout(), w / h);
+      this.camera.position.set(...v.position);
+      this.camera.lookAt(...v.target);
+      this.camera.updateMatrixWorld(true);
+      shotMoving = k < 1;
+      if (!shotMoving && this.shot.release) {
+        this.shot = null;
+        if (this.controls) { this.controls.target.copy(this.homeTarget()); }
+        this.resize();
+      }
+    } else if (followed) {
       const w = this.host.clientWidth, h = this.host.clientHeight;
       const v = followView("phone", followed.from, followed.to, Math.min(1, (now - followed.start) / followed.end));
       place(this.camera, "phone", w / h);
@@ -483,9 +518,9 @@ export class HarbourView {
     } else if (this.following) { this.following = false; this.resize(); }
     // the end of a motion: everything back to neutral
     if (animating && !((this.live?.animating ?? false) || (this.stage?.animating ?? false) || this.flights.length)) this.paint();
-    this.controls?.update();
+    if (!this.shot) this.controls?.update();
     this.renderer.render(this.harbour.scene, this.camera);
-    if (animating) this.requestFrame();
+    if (animating || shotMoving) this.requestFrame();
   }
 }
 

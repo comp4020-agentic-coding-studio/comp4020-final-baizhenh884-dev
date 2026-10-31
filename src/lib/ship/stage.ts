@@ -21,7 +21,7 @@ export const PALLET: [number, number, number] = [8.0, 1.12, 3.8];
 // a desktop drag turns the view about its target, never pans, within these
 export const ORBIT = { minDistance: 14, maxDistance: 60, minPolar: 0.55, maxPolar: 1.32 };
 
-type View = { position: [number, number, number]; target: [number, number, number]; fov: number };
+export type View = { position: [number, number, number]; target: [number, number, number]; fov: number };
 // Both ships and the pallet, seen from the harbour mouth. On a desktop the sentence strip lies over the
 // scene's lower left, so the ships stand in its upper two thirds; on a phone the strip is above the scene.
 const VIEWS: Record<Layout, View> = {
@@ -126,6 +126,27 @@ export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector
   const offset = pos.clone().sub(tgt).multiplyScalar(1 - NEAR * w);
   const position = target.clone().add(offset);
   return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
+}
+
+// The opening story's shots (decision 0007): wide is the fixed view; in on a ship, the camera keeps the fixed
+// view's direction and comes nearer, looking at that ship a little above its deck (a phone, narrower, less near).
+// Looking just above the ship's keel keeps the whole ship, mast to oars, in the part of the frame the desktop's
+// sentence strip leaves clear.
+const STORY_NEAR: Record<Layout, number> = { desktop: 0.45, phone: 0.4 };
+const STORY_LOOK: Record<Layout, number> = { desktop: 0.2, phone: 2.6 };
+export function storyView(layout: Layout, shot: "wide" | "live" | "kept"): View {
+  const h = home(layout);
+  if (shot === "wide") return { ...h, position: [...h.position], target: [...h.target] };
+  const pose = shot === "live" ? LIVE_POSE : KEPT_POSE;
+  const target = new THREE.Vector3(pose.position[0], pose.position[1] + STORY_LOOK[layout], pose.position[2]);
+  const offset = new THREE.Vector3(...h.position).sub(new THREE.Vector3(...h.target)).multiplyScalar(1 - STORY_NEAR[layout]);
+  return { position: target.clone().add(offset).toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
+}
+// from one shot to the next, eased, `k` 0..1
+export function storyBetween(a: View, b: View, k: number): View {
+  const t = Math.min(1, Math.max(0, k)), e = t * t * (3 - 2 * t);
+  const mix = (p: readonly number[], q: readonly number[]) => p.map((v, i) => v + (q[i] - v) * e) as [number, number, number];
+  return { position: mix(a.position, b.position), target: mix(a.target, b.target), fov: a.fov + (b.fov - a.fov) * e };
 }
 
 // The carry and the shipwrights (docs/decisions/0005, amended 31 October). The quay the slipway and the rack stand

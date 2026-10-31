@@ -286,6 +286,10 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
   loudly when CI's own environment should have declared it and didn't. CI
   must declare every such variable explicitly on every run it does — never
   leave it unset and rely on a check's default to paper over the gap.
+- The checks' browser is always a first visit, so the harness marks the
+  opening story as seen for every check except the story's own
+  (`spec/opening-story.test.ts`); a check never skips the story by
+  clicking through it.
 - Don't replace judgement with a proxy: no keyword checks, and no fields added
   only so something can be tested.
 
@@ -560,6 +564,23 @@ What the code must hold to. The README says why; don't restate it here.
   text is never logged, only a reason category. A broadcast's reach is
   logged as a count of streams notified, never a per-stream identity.
   Nothing from the logs reaches any public response, stream, or API.
+- The opening story (decision 0007, making 0005's lines concrete): on
+  `GET /`, a first visit in this browser plays five beats over the
+  harbour as it stands: camera moves and one or two fixed lines each, no
+  new art. No counts, names, words from the sentence or anything from
+  the stream; beat 2 rebuilds three small parts in turn (shields, oars,
+  stern), each exactly as it was and red only while it's rebuilt, so the
+  ship still represents the sentence. Remembered in
+  `localStorage` only (the server never knows); if storage fails, once
+  per load, never blocking the page. Skip is always visible, Escape skips;
+  click, tap, Enter, Space or → advance, ← goes back; it never traps
+  focus (focus leaving it ends it). Begin or Skip puts focus on the
+  sentence strip, never a word field. "The story" in `GET /`'s masthead
+  replays it; not on `?at=N`, `?kept=k` or `/ship/`. Reduced motion: no
+  camera moves or flash, the text only. No WebGL: the same five lines as
+  text, the same controls. No JavaScript: no story and no button. Live
+  changes go on underneath. A labelled, non-modal dialog; the canvas stays
+  decorative (`spec/opening-story.test.ts`).
 
 ### Current design (revisable)
 
@@ -606,8 +627,8 @@ hold.
   its plank is rebuilt from how the word is spelled, not what it means; step
   3 says replaced words are kept on the slipway: in the ship of old planks,
   or waiting for the next. Its copy claims nothing the rules don't do
-  (`spec/question-band.test.ts`). Kept until slice 4, which decides with
-  evidence whether the opening story replaces the three steps.
+  (`spec/question-band.test.ts`). Kept alongside the opening story
+  (maker, 31 October; decision 0007).
 - Every word at rest carries a faint solid underline on every device, so a
   word reads as clickable before it's pointed at; pointing darkens it
   (`spec/harbour-layout.test.ts`). (Reason: at the 28 October playtest,
