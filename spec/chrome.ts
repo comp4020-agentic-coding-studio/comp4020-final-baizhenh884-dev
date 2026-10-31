@@ -61,7 +61,12 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
   // WebGL as a visitor's browser has it: headless Chrome with no GPU offers none unless its software renderer
   // is allowed (probed: no context without the flag, the harbour drawn with it). A check that refuses WebGL
   // passes its own flags, which come after and win.
-  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--enable-unsafe-swiftshader", ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+  // The pointer the size stands for, whatever machine runs the check: a desktop's mouse (fine, hovers), a phone's
+  // finger (coarse, no hover). Without it a desktop check follows the machine: a Mac's headless Chrome reports its
+  // trackpad, CI's Linux runner no pointer at all, and the zoom buttons (shown for a fine pointer) failed only in CI.
+  // Set where Blink reads it, at launch (CDP's emulated pointer media wasn't honoured on CI's runner).
+  const pointer = size[0] <= 900 ? "primaryPointerType=2,primaryHoverType=1,availablePointerTypes=2,availableHoverTypes=1" : "primaryPointerType=4,primaryHoverType=2,availablePointerTypes=4,availableHoverTypes=2";
+  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--enable-unsafe-swiftshader", `--blink-settings=${pointer}`, ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
   let socket: WebSocket | undefined;
   try {
     let port = 0;
@@ -91,11 +96,7 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     await send("Emulation.setDeviceMetricsOverride", { width: size[0], height: size[1], deviceScaleFactor: 1, mobile });
     if (mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     if (opts.noScript) await send("Emulation.setScriptExecutionDisabled", { value: true });
-    // the pointer the size stands for, whatever machine runs the check: a desktop's mouse (fine, hovers), a phone's
-    // finger (coarse, no hover). Without it a desktop check follows the machine: a Mac's headless Chrome reports its
-    // trackpad, CI's Linux reports no pointer, and the zoom buttons (shown for a fine pointer) failed only in CI.
-    const pointer = mobile ? [{ name: "pointer", value: "coarse" }, { name: "hover", value: "none" }] : [{ name: "pointer", value: "fine" }, { name: "hover", value: "hover" }];
-    await send("Emulation.setEmulatedMedia", { features: [...pointer, ...(opts.reducedMotion ? [{ name: "prefers-reduced-motion", value: "reduce" }] : [])] });
+    if (opts.reducedMotion) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
     // navigated only once the device is set, so the page loads as this device would load it
     const page = live ? new URL(file).href : new URL(`file://${file}`).href;
     await send("Page.enable");
