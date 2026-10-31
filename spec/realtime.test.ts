@@ -70,7 +70,10 @@ const CONNECT_MS = 2000; // headers and the opening snapshot, not the realtime r
 const LIVE_MS = 1000; // "within about a second" of the replacement succeeding
 
 const POSITION_KEYS = ["position", "version", "word"];
-const SNAPSHOT_KEYS = ["keptShip", "positions", "trace"];
+// `log`: the record of planks (decision 0006), so a reconnect catches up: the latest lines as place, old and new
+// word only, never who or when
+const SNAPSHOT_KEYS = ["keptShip", "log", "positions", "trace"];
+const LOG_LINE_KEYS = ["from", "position", "to"];
 // a change event carries the kept ship too (it's global, not per-visitor, so
 // every open stream needs it on every change — no follow-up snapshot)
 const CHANGE_KEYS = ["keptShip", "position", "version", "word"];
@@ -308,7 +311,16 @@ function asKeptShip(data: unknown): KeptShip {
 
 function asSnapshot(data: unknown): Snapshot {
   expect(data, "the snapshot isn't a JSON object").toBeTypeOf("object");
-  expect(keysOf(data), "the snapshot isn't exactly { positions, trace, keptShip }").toEqual(SNAPSHOT_KEYS);
+  expect(keysOf(data), "the snapshot isn't exactly { positions, trace, keptShip, log }").toEqual(SNAPSHOT_KEYS);
+  const { log } = data as { log: unknown };
+  expect(Array.isArray(log), "the snapshot's log isn't a list").toBe(true);
+  expect((log as unknown[]).length, "the snapshot's log runs past its latest lines").toBeLessThanOrEqual(50);
+  for (const line of log as unknown[]) {
+    expect(keysOf(line), "a log line carries more than its place, old word and new: no who, no when").toEqual(LOG_LINE_KEYS);
+    const { position, from, to } = line as { position: unknown; from: unknown; to: unknown };
+    expect(Number.isInteger(position) && (position as number) >= 0 && (position as number) <= 9, "a log line's place isn't 0–9").toBe(true);
+    expect(typeof from === "string" && typeof to === "string", "a log line's words aren't text").toBe(true);
+  }
   const { positions, trace, keptShip } = data as { positions: unknown; trace: unknown; keptShip: unknown };
   expect(Array.isArray(positions), "the snapshot has no positions list").toBe(true);
   for (const p of positions as unknown[]) {

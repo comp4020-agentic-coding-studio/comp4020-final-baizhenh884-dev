@@ -54,7 +54,9 @@ export const ANNOUNCE_MS = 2500;
 // how long typing pauses before the draft's prediction is said
 export const DRAFT_MS = 700;
 
-export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
+// `log`: the record of planks (decision 0006), the latest lines as place, old word and new
+export type LogEntry = { position: number; from: string; to: string };
+export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip; log?: LogEntry[] };
 
 export interface LivePage {
   applySnapshot(snapshot: Snapshot): void;
