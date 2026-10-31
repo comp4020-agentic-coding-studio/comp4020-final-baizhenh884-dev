@@ -45,7 +45,8 @@ from what `README.md` argues "good" means (see "Product contract").
   the ship, in one harbour)"): an anonymous total of open streams, drawn as
   figures, never shown as a number; and the log (decision 0006): each
   change adds its line to the record of planks, from the change event the
-  stream already sends, nothing new on the wire.
+  stream already sends (unchanged); the snapshot carries the record, so a
+  reconnect catches up.
   Catch-up after a disconnect is a fresh read from SQLite, never a replay
   log, a queue, or any durable pub/sub.
 

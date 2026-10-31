@@ -57,9 +57,13 @@ planks with neither isn't what 0001 turned down.
   says; the log never lists ships.
 - **Live** over the existing stream: each change event adds its line at the
   top, for every open `GET /`; a load, a snapshot or a reconnect shows the
-  record as it stands, from SQLite. No new event, no new field: the change
-  event already carries the position and the new word, and the old word is
-  the one the page showed there.
+  record as it stands, from SQLite. The change event is unchanged: it already
+  carries the position and the new word, and the old word is the one the page
+  showed there. The snapshot carries the record (`log`: the latest lines, as
+  place, old word and new, the blocklist applied on the server), so a page
+  that reconnects after missing changes catches up without a reload, as the
+  sentence does (amended 31 October, before it was built: the decision first
+  said nothing new on the wire, which left a reconnect unable to catch up).
 - **The latest 50 lines.** The whole history stays in SQLite and stays
   reachable one form at a time under Earlier form.
 - **The maker's blocklist applies to the log.** A line whose old or new word is
