@@ -485,7 +485,8 @@ describe("the harbour on GET /", () => {
     it(`lays the sections below the harbour in one column (${name})`, async () => {
       const m = (await measureIn(await staged({ earlierForm: 3 }), `(async () => {
         await document.fonts.ready;
-        return ['#kept', '#your-plank', '#log', '.page-foot'].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
+        // the sections shown (the log keeps its place hidden until it has lines)
+        return ['#kept', '#your-plank', '#log', '.page-foot'].map((s) => document.querySelector(s)).filter((el) => !el.hidden).map((el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
       })()`, [size[0], size[1]])) as { top: number; bottom: number; left: number; right: number }[];
       for (let i = 1; i < m.length; i++) expect(m[i].top, "a section sits beside another, not below it").toBeGreaterThanOrEqual(m[i - 1].bottom - 1);
       for (const r of m) expect(r.right, "a section runs out of the page").toBeLessThanOrEqual(size[0] + 1);
