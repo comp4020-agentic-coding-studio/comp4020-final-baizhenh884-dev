@@ -249,11 +249,17 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .part-tag[hidden] { display: none; }
       .part-tag[data-ship="kept"] { background: #23324a; color: #eef3f8; border-color: #eef3f8; }
       .part-tag.red { border-color: #c3331c; }
-      /* the way back to the harbour's fixed view, once a drag has moved it (a desktop) */
-      #home { position: absolute; top: 1.4vh; right: 3.6vw; z-index: 3; min-height: 34px; padding: 9px 13px; border-radius: 999px; cursor: pointer;
-        border: 1px solid #fffaf0; background: rgb(42 32 25 / 0.55); color: #fffaf0; }
+      /* the camera's controls (a desktop): + and − to zoom, always there to be found, and the way back to the fixed
+         view once a drag or a zoom has moved it */
+      .view-controls { position: absolute; top: 1.4vh; right: 3.6vw; z-index: 3; display: flex; gap: 6px; }
+      .view-controls button { min-height: 34px; min-width: 34px; padding: 9px 13px; border-radius: 999px; cursor: pointer;
+        border: 1px solid #fffaf0; background: rgb(42 32 25 / 0.55); color: #fffaf0; font: 500 15px/1 var(--mono); }
+      #home { font-size: inherit; }
       #home[hidden] { display: none; }
-      #home:focus-visible { outline: 2px solid #fffaf0; outline-offset: 3px; }
+      .view-controls button:focus-visible { outline: 2px solid #fffaf0; outline-offset: 3px; }
+      /* only where they work: a drawn harbour (no script or no WebGL draws none) and a fine pointer, as the orbit */
+      .stage:not(:has(#harbour[data-ready])) .view-controls { display: none; }
+      @media not ((hover: hover) and (pointer: fine)) { .view-controls { display: none; } }
 
       /* the kept strip: the ship of old planks in words, a step below the live sentence, which stays primary */
       .kept-strip { margin: 0 auto; width: min(1180px, calc(100% - 2 * 3.6vw)); border-radius: 6px; margin-top: 2.4vh; padding: 1rem 1.6rem 1.1rem; display: flex; flex-direction: column; gap: 0.7rem; }
@@ -388,7 +394,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .sentence-strip .sentence .pos[data-row-phone="room"] { min-width: calc(var(--tag-ch) * var(--tag-size) * 0.57 + 4px); }
         .sentence-strip .invite-ship { display: none; }
         .part-tag { display: none !important; }
-        #home { display: none !important; }
+        .view-controls { display: none !important; }
         .kept-strip { width: auto; margin: 0; border-radius: 0; border-width: 1px 0; padding: 1rem 1rem 1.2rem; }
         .kept-sentence { font-size: 25px; line-height: 1.3; }
         .kept-sentence .gap { height: calc(0.96em - 2px); }

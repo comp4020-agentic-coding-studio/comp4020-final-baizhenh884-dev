@@ -48,7 +48,9 @@ function chrome(): string {
 // `then`: once the steps have run (the page is ready), node does this (a second browser's change, say), and only
 // then is the expression measured; the expression may start before it resolves via `while` (run in the page
 // first, its promise awaited after `then`), so the page watches while the change happens.
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown> };
+// `wheel`: after the steps, a real wheel gesture at this point (CSS px in the viewport), through Chrome's input
+// pipeline as a visitor's mouse or trackpad sends it, so default actions (scrolling) run unless a page handler stops them
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number } };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -59,7 +61,12 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
   // WebGL as a visitor's browser has it: headless Chrome with no GPU offers none unless its software renderer
   // is allowed (probed: no context without the flag, the harbour drawn with it). A check that refuses WebGL
   // passes its own flags, which come after and win.
-  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--enable-unsafe-swiftshader", ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+  // The pointer the size stands for, whatever machine runs the check: a desktop's mouse (fine, hovers), a phone's
+  // finger (coarse, no hover). Without it a desktop check follows the machine: a Mac's headless Chrome reports its
+  // trackpad, CI's Linux runner no pointer at all, and the zoom buttons (shown for a fine pointer) failed only in CI.
+  // Set where Blink reads it, at launch (CDP's emulated pointer media wasn't honoured on CI's runner).
+  const pointer = size[0] <= 900 ? "primaryPointerType=2,primaryHoverType=1,availablePointerTypes=2,availableHoverTypes=1" : "primaryPointerType=4,primaryHoverType=2,availablePointerTypes=4,availableHoverTypes=2";
+  const proc = spawn(chrome(), ["--headless=new", "--disable-gpu", "--no-sandbox", "--enable-unsafe-swiftshader", `--blink-settings=${pointer}`, ...(opts.flags ?? []), "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
   let socket: WebSocket | undefined;
   try {
     let port = 0;
@@ -111,6 +118,12 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     for (const step of opts.steps ?? []) {
       const r = await send("Runtime.evaluate", { expression: step, awaitPromise: true, returnByValue: true });
       if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text);
+    }
+    if (opts.wheel) {
+      const { x, y, dy } = opts.wheel;
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+      for (let i = 0; i < 4; i++) await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy / 4 });
+      await sleep(400);
     }
     // the expression starts watching first; node acts while it watches; then its result is awaited
     const watching = send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });

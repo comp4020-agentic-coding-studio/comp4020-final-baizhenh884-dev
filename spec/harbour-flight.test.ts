@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, inject, it } from "vitest";
 import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
-import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, heldAt, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt } from "../src/lib/ship/stage";
+import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, heldAt, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, ORBIT, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt, zoomBy } from "../src/lib/ship/stage";
 import { arrivalAt, carryAt, landsAt } from "../src/lib/ship/motion";
 import { liveIn } from "./chrome";
 
@@ -457,4 +457,25 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     expect(m.ready, "the harbour never drew").toBe(true);
     expect(m.flying, "a plank is flying on a fresh load").toBeNull();
   }, 60_000);
+});
+
+// Zoom is the + and − buttons, never the wheel (the maker, 31 October): each step moves the camera nearer or
+// farther along its own line to the target, and never past the orbit's limits the layout was checked within.
+describe("the zoom buttons", () => {
+  it("step the camera nearer and farther, within the orbit's limits, along its own line", () => {
+    const target = new THREE.Vector3(...home("desktop").target);
+    let at = new THREE.Vector3(...home("desktop").position);
+    const dir = at.clone().sub(target).normalize();
+    for (let i = 0; i < 40; i++) {
+      const next = zoomBy(at, target, -1);
+      expect(next.distanceTo(target), "zooming in passed the nearest the layout allows").toBeGreaterThanOrEqual(ORBIT.minDistance - 1e-6);
+      expect(next.clone().sub(target).normalize().distanceTo(dir), "zooming turned the camera").toBeLessThan(1e-6);
+      at = next;
+    }
+    expect(at.distanceTo(target), "zooming in never reached the nearest").toBeCloseTo(ORBIT.minDistance, 5);
+    for (let i = 0; i < 40; i++) at = zoomBy(at, target, 1);
+    expect(at.distanceTo(target), "zooming out never reached the farthest").toBeCloseTo(ORBIT.maxDistance, 5);
+    const one = zoomBy(new THREE.Vector3(...home("desktop").position), target, -1);
+    expect(one.distanceTo(new THREE.Vector3(...home("desktop").position)), "a step does nothing").toBeGreaterThan(0.5);
+  });
 });

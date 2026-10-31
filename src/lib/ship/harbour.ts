@@ -15,7 +15,7 @@ import { LiveBody } from "./live-body";
 import { arrivalAt, carryAt, carryEnd, landsAt, newPartRed, plankColour, type Kind } from "./motion";
 import { Crew, type Figure } from "./crew";
 import { buildHarbour, swell } from "./scene";
-import { carriedScale, carryPath, heldAt, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
+import { carriedScale, carryPath, heldAt, zoomBy, catchPoint, flightTarget, followView, home, PALLET_PLANK, KEPT_POSE, LIVE_POSE, ORBIT, palletSlot, place, posed, tossAt, type Layout } from "./stage";
 
 const RED = 0xc3331c;
 const GLOW = 0x6b3a08;
@@ -207,8 +207,8 @@ export class HarbourView {
       c.maxDistance = ORBIT.maxDistance;
       c.minPolarAngle = ORBIT.minPolar;
       c.maxPolarAngle = ORBIT.maxPolar;
-      c.enableZoom = true;
-      c.zoomToCursor = false;
+      // the wheel and a pinch scroll the page, never the camera (the + and − buttons zoom: zoom())
+      c.enableZoom = false;
       c.target.copy(this.homeTarget());
       c.addEventListener("change", () => this.requestFrame());
       c.addEventListener("start", () => { if (!this.moved) { this.moved = true; this.onMoved(true); } });
@@ -218,6 +218,15 @@ export class HarbourView {
       this.controls = null;
       this.home();
     }
+  }
+
+  // a step nearer (-1) or farther (1), within the orbit's limits (a desktop, with the orbit on)
+  zoom(dir: -1 | 1): void {
+    if (!this.controls) return;
+    this.camera.position.copy(zoomBy(this.camera.position, this.controls.target, dir));
+    this.controls.update();
+    if (!this.moved) { this.moved = true; this.onMoved(true); }
+    this.requestFrame();
   }
 
   home(): void {

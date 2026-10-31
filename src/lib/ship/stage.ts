@@ -200,3 +200,12 @@ export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, numbe
 
 // the shore and its quay along it, behind the harbour (scene.ts draws them from these)
 export const SHORE = { x: [-55, 55], z: [-41, -6.6], top: 1.05 } as const; // its block's front at z -7, its quay's at -6.6
+
+// Zoom by the + and − buttons (the maker, 31 October: never the wheel, which scrolls the page): a step nearer (-1) or
+// farther (1) along the camera's own line to its target, a share of the distance, never past the orbit's limits.
+const ZOOM_STEP = 0.15;
+export function zoomBy(at: THREE.Vector3, target: THREE.Vector3, dir: -1 | 1): THREE.Vector3 {
+  const off = at.clone().sub(target), d = off.length();
+  const next = Math.min(ORBIT.maxDistance, Math.max(ORBIT.minDistance, d * (1 + dir * ZOOM_STEP)));
+  return target.clone().add(off.multiplyScalar(next / d));
+}
