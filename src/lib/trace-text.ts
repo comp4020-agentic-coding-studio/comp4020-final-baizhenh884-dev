@@ -15,6 +15,7 @@ export type LatestParts = {
   word: string;
   del?: string; // present when replaced: the word that's gone (the <del> text)
   now?: string; // present when replaced: what stands there now
+  holding?: boolean; // present while the word holds the place (not yet settled)
   kept?: string; // present when replaced: where it's kept, a sentence
   eligibility: string; // appended sentence: what the visitor may do next
 };
@@ -46,7 +47,8 @@ export function latestParts(latest: SettleTrace["latest"], hold = "a while"): La
   if (!latest.settled) {
     return {
       word: latest.word,
-      eligibility: `“${latest.word}” is holding your place: until it's replaced or has stood ${hold}, you can't make another. Your next word has to go somewhere else.`,
+      holding: true,
+      eligibility: `Until it's replaced or has stood ${hold}, you can't make another; then your next word goes somewhere else.`,
     };
   }
   return {
@@ -68,5 +70,7 @@ export function settleSecondsPhrase(seconds: number): string {
   return `about ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
-// the line for a word of yours that still stands (a stub until GET / and the live page both use it)
-export const standingLine = (parts: LatestParts): string => `Your word “${parts.word}” still stands, marked in the sentence above. ${parts.eligibility}`;
+// the line for a word of yours that still stands, shown by GET / and the live page alike; while it holds your place
+// it names the word once and the hold follows on (the maker, 31 October)
+export const standingLine = (parts: LatestParts): string =>
+  `Your word “${parts.word}” still stands, marked ${parts.holding ? "above" : "in the sentence above"}. ${parts.eligibility}`;

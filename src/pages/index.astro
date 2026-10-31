@@ -3,7 +3,7 @@ import EarlierShip from "../components/EarlierShip.astro";
 import WordSlot from "../components/WordSlot.astro";
 import Page from "../layouts/Page.astro";
 import { changeCount, completedShipAt, currentPositions, currentTrace, keptShipAt, sentenceAt, SETTLE_SECONDS } from "../lib/db";
-import { latestParts, replacedText, settleSecondsPhrase, standingText } from "../lib/trace-text";
+import { latestParts, replacedText, settleSecondsPhrase, standingLine, standingText } from "../lib/trace-text";
 import { lastPlank } from "../lib/kept-sentence";
 import { labelRows, sizeStep } from "../lib/sentence-step";
 import { ensureVisitor } from "../lib/visitor";
@@ -241,7 +241,7 @@ const how =
                         </>
                       ) : (
                         <>
-                          Your word “{parts.word}” still stands, marked in the sentence above. {parts.eligibility}
+                          {standingLine(parts)}
                         </>
                       )}
                     </p>

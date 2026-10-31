@@ -1,6 +1,6 @@
 import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
 import { foreseen, said as saidOne } from "./ship/notation";
-import { latestParts, replacedText, settleSecondsPhrase, standingText } from "./trace-text";
+import { latestParts, replacedText, settleSecondsPhrase, standingLine, standingText } from "./trace-text";
 import { labelRows, sizeStep } from "./sentence-step";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
@@ -395,7 +395,7 @@ export function attach(doc: Document, options: Options = {}): LivePage {
         `” has since been replaced: “${parts.now}” stands in its place now. ${parts.kept} ${parts.eligibility}`,
       );
     } else {
-      status.textContent = `Your word “${parts.word}” still stands, marked in the sentence above. ${parts.eligibility}`;
+      status.textContent = standingLine(parts);
     }
     renderList(section, "trace-standing", trace.otherStanding.map(standingText));
     renderList(section, "trace-replaced", trace.otherReplaced.map(replacedText));
