@@ -200,3 +200,6 @@ export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, numbe
 
 // the shore and its quay along it, behind the harbour (scene.ts draws them from these)
 export const SHORE = { x: [-55, 55], z: [-41, -6.6], top: 1.05 } as const; // its block's front at z -7, its quay's at -6.6
+
+// zoom by the buttons (the maker, 31 October): a stub until built, so its check fails for its reason
+export const zoomBy = (at: THREE.Vector3, _target: THREE.Vector3, _dir: -1 | 1): THREE.Vector3 => at.clone();

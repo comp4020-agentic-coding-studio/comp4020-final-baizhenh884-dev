@@ -48,7 +48,9 @@ function chrome(): string {
 // `then`: once the steps have run (the page is ready), node does this (a second browser's change, say), and only
 // then is the expression measured; the expression may start before it resolves via `while` (run in the page
 // first, its promise awaited after `then`), so the page watches while the change happens.
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown> };
+// `wheel`: after the steps, a real wheel gesture at this point (CSS px in the viewport), through Chrome's input
+// pipeline as a visitor's mouse or trackpad sends it, so default actions (scrolling) run unless a page handler stops them
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number } };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -111,6 +113,12 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     for (const step of opts.steps ?? []) {
       const r = await send("Runtime.evaluate", { expression: step, awaitPromise: true, returnByValue: true });
       if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text);
+    }
+    if (opts.wheel) {
+      const { x, y, dy } = opts.wheel;
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+      for (let i = 0; i < 4; i++) await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy / 4 });
+      await sleep(400);
     }
     // the expression starts watching first; node acts while it watches; then its result is awaited
     const watching = send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });

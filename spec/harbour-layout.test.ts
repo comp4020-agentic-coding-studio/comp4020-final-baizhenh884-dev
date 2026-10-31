@@ -6,7 +6,7 @@ import { drafting, showDrafting } from "../src/lib/ship/notation";
 import { KEPT_POSE, LIVE_POSE, place, posed } from "../src/lib/ship/stage";
 import { SIZE_STEPS, sizeStep } from "../src/lib/sentence-step";
 import { STARTING_WORDS } from "../src/lib/sentence";
-import { measureIn, QUERY_JS, servedPage, stageHarbour, type HarbourState } from "./chrome";
+import { liveIn, measureIn, QUERY_JS, servedPage, stageHarbour, type HarbourState } from "./chrome";
 import { EXTREMES, SENTENCES } from "./ship-sentences";
 
 // GET / as one harbour (docs/decisions/0005-the-ship.md), measured in headless
@@ -116,6 +116,8 @@ const FRAME = `(async () => {
     lines: new Set(labels.map((l) => Math.round(l.getBoundingClientRect().top))).size, step: sent.getAttribute('data-step'),
     liveSize: parseFloat(getComputedStyle(sent).fontSize), keptSize: parseFloat(getComputedStyle(q('.kept-sentence')).fontSize) };
 })()`;
+// the live page's harbour drawn (a canvas in it, and its first frame painted)
+const DRAWN = `(async () => { const h = document.querySelector('#harbour'); for (let i = 0; i < 150 && !h.hasAttribute('data-ready'); i++) await new Promise((r) => setTimeout(r, 100)); if (!h.hasAttribute('data-ready')) throw new Error('the harbour never drew'); await new Promise((r) => setTimeout(r, 600)); })()`;
 const frame = async (doc: Document, size: readonly [number, number]) => (await measureIn(doc, FRAME, [size[0], size[1]])) as Frame;
 
 describe("the harbour on GET /", () => {
@@ -538,6 +540,37 @@ describe("the harbour on GET /", () => {
 
   // Orbit on a desktop only, within the prototype's limits, with a way back to the fixed view; a phone never
   // takes the page's scroll over the canvas. "Back to the harbour" is a real button, hidden until the view has moved.
+  // The wheel and touch scroll the page, never the camera (the maker, 31 October: the wheel over the scene zoomed,
+  // so people didn't find the page below): a real wheel gesture over the drawn canvas moves the page down and
+  // leaves the camera where it was. Zoom is the + and − buttons beside the way back, real buttons, shown on a
+  // desktop at rest (so they can be found) and never on a phone.
+  for (const size of [[1440, 900], [390, 844]] as const) {
+    it(`scrolls the page, never the camera, for a wheel over the harbour (${size[0]}×${size[1]})`, async () => {
+      // the harbour's middle, in the first screen: where the wheel lands
+      const at = (await liveIn(new URL("/", baseUrl).href, `(() => { const r = document.querySelector('#harbour').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(Math.max(r.top + 40, Math.min(r.bottom - 40, innerHeight / 2)))]; })()`, [size[0], size[1]], { steps: [DRAWN] })) as [number, number];
+      // what's under the wheel before it turns (the canvas, not a strip over it), then how far the page moved; the
+      // sea moves every frame, so the canvas's pixels are no evidence about the camera, the page's scroll is
+      const m = (await liveIn(new URL("/", baseUrl).href, `(() => ({ on: window.__on, scroll: scrollY }))()`, [size[0], size[1]], {
+        steps: [DRAWN, `(() => { window.__on = document.elementFromPoint(${at[0]}, ${at[1]})?.tagName === 'CANVAS'; })()`],
+        wheel: { x: at[0], y: at[1], dy: 400 },
+      })) as { on: boolean; scroll: number };
+      expect(m.on, "the wheel didn't land on the harbour's canvas").toBe(true);
+      expect(m.scroll, "a wheel over the harbour didn't scroll the page").toBeGreaterThan(100);
+    }, 120_000);
+  }
+  it("zooms by + and − beside the way back, real buttons, on a desktop only", async () => {
+    const doc = new JSDOM(await (await fetch(new URL("/", baseUrl))).text()).window.document;
+    for (const [id, name] of [["zoom-in", "Zoom in"], ["zoom-out", "Zoom out"]] as const) {
+      const b = doc.querySelector<HTMLButtonElement>(`button#${id}`);
+      expect(b, `there's no ${name} button`).not.toBeNull();
+      expect(b!.type).toBe("button");
+      expect(b!.getAttribute("aria-label"), `the ${name} button isn't named`).toBe(name);
+      expect(b!.closest('[aria-hidden="true"]'), `${name} is hidden from assistive technology`).toBeNull();
+    }
+    const shown = async (size: [number, number]) => (await measureIn(await staged(), `(async () => { await document.fonts.ready; const b = document.querySelector('#zoom-in'); return !!b && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().width > 0; })()`, size)) as boolean;
+    expect(await shown([1440, 900]), "a desktop doesn't show the zoom buttons at rest").toBe(true);
+    expect(await shown([390, 844]), "a phone shows the zoom buttons").toBe(false);
+  }, 90_000);
   it("offers a way back to the harbour's fixed view, a real button hidden at rest", async () => {
     const doc = new JSDOM(await (await fetch(new URL("/", baseUrl))).text()).window.document;
     const home = doc.querySelector<HTMLButtonElement>("button#home");
