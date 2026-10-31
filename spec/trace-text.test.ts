@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latestParts } from "../src/lib/trace-text";
+import { latestParts, standingLine } from "../src/lib/trace-text";
 
 // The trace's eligibility sentence under rule mode `settle` names the place
 // the visitor can't act at by its number, as the sentence's own notation does
@@ -25,9 +25,15 @@ describe("the trace's eligibility sentence", () => {
 
   // The hold, said only when it applies (the maker, 31 October): the rule paragraph no longer explains holding to
   // everyone, so a holding word's own line says what the hold is: how long, and where the next word may go.
-  it("says, while the word holds the place, how long the hold is and that the next word goes elsewhere", () => {
-    const parts = latestParts({ position: 2, word: "ship", standing: true, settled: false, settlesInMs: 9000 }, "20 seconds");
-    expect(parts.eligibility).toBe("“ship” is holding your place: until it's replaced or has stood 20 seconds, you can't make another. Your next word has to go somewhere else.");
+  // naming the word once (the maker, 31 October), in the one line GET / and the live page both show
+  it("says, while the word holds the place, how long the hold is and that the next word goes elsewhere, naming the word once", () => {
+    const parts = latestParts({ position: 2, word: "rudderless", standing: true, settled: false, settlesInMs: 9000 }, "20 seconds");
+    expect(standingLine(parts)).toBe("Your word “rudderless” still stands, marked above. Until it's replaced or has stood 20 seconds, you can't make another; then your next word goes somewhere else.");
+  });
+
+  it("keeps a settled word's line as it was", () => {
+    const parts = latestParts({ position: 0, word: "ship", standing: true, settled: true });
+    expect(standingLine(parts)).toBe("Your word “ship” still stands, marked in the sentence above. You can act again, anywhere but place 01, where it stands.");
   });
 
   it("never names a part of the house", () => {

@@ -67,3 +67,6 @@ export function settleSecondsPhrase(seconds: number): string {
   const minutes = Math.round(seconds / 60);
   return `about ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
+
+// the line for a word of yours that still stands (a stub until GET / and the live page both use it)
+export const standingLine = (parts: LatestParts): string => `Your word “${parts.word}” still stands, marked in the sentence above. ${parts.eligibility}`;
