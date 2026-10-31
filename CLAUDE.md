@@ -139,7 +139,10 @@ the scene and the rules, never code to copy.
   carry still under way at once (the plank set down, its kept part and
   waiting word in place), so live always equals fresh. The camera's fixed
   view is the default; on a desktop a drag orbits it within the prototype's
-  limits (no pan, distance and angle clamped), with a way back; a phone has
+  limits (no pan, distance and angle clamped), and + and − zoom it. "Reset
+  view" shows whenever an orbit or a zoom has moved the view from its fixed
+  one, puts the camera back on it (eased; at once with reduced motion) and
+  hides once it's there (`spec/harbour-layout.test.ts`); a phone has
   no orbit, so the canvas never takes the page's scroll, and instead its
   camera follows the plank to where it's set down and comes back (never with
   reduced motion). With reduced motion nothing is tossed or carried: the
