@@ -602,14 +602,18 @@ hold.
   number and name; a focused or selected word keeps its parts lit and shows
   the notation. No tag at rest. An accepted change draws the rebuilt part
   red while it is exchanged, then everything returns to neutral. A phone has
-  no tag on the canvas; the notation and the strip say the part. Under the
-  sentence: "Ten words. Ten planks. Change a word, and its plank is rebuilt."
-  Under the kept sentence: "Replaced words are kept here: in this ship, or
-  waiting for the next." The question, as the band's headline and at the
-  foot beside About: "If every plank is replaced, is it still the same
-  ship?" With reduced motion
-  nothing flies: the parts swap, the new one outlined in red for a moment,
-  then not.
+  no tag on the canvas; the notation and the strip say the part. The
+  question, as the band's headline: "If every plank is replaced, is it
+  still the same ship?" With reduced motion nothing flies: the parts swap,
+  the new one outlined in red for a moment, then not.
+- Below the harbour, one column (maker, 31 October: the page repeated
+  itself), each section saying one thing once: the ship of old planks (its
+  sentence, its one caption, the last plank, the waiting row, Earlier
+  ship); your plank (the rule in a sentence or two, and your trace; under
+  settle mode the hold is said only in a holding word's own line); the
+  log; then the foot: How the planks are made · Earlier form, then About.
+  No side column; the question is asked once, in the band
+  (`spec/harbour-layout.test.ts`, `spec/trace.test.ts`).
 - Your plank (decision 0005): when another visitor replaces a word that is
   yours, its plank glows as it flies, on your page only, and one line says
   "Your plank was carried to the slipway. It's kept." in the notation's
