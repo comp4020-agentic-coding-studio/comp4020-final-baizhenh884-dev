@@ -74,7 +74,7 @@ describe("where a plank flies", () => {
 // The carry as a visitor sees it, through the page's own camera at 1440×900 and 390×844 (the harbour's box at
 // each, measured on the served page: 1440×722 under a new visitor's full band, the smaller of the two, and
 // 390×351 on a phone): at the end of its toss the plank is at the quay's edge, out of the live ship and its own
-// size, and the gap it goes to is still an outline; while it's carried it's over the quay, never the water, and
+// size, and the gap it goes to is still a ghost; while it's carried it's over the quay, never the water, and
 // the shipwright carrying it stands on the quay too.
 const HARBOURS = [["1440×900", "desktop", 1440, 722], ["390×844", "phone", 390, 351]] as const;
 function onScreen(cam: THREE.PerspectiveCamera, p: THREE.Vector3) { const v = p.clone().project(cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; }
@@ -91,7 +91,7 @@ describe("the carry, step by step", () => {
       const from = partHome(position, LIVE_POSE), to = dest === "slipway" ? partHome(position, KEPT_POSE) : PALLET_SLOTS[0];
       const caught = catchPoint(position);
 
-      it(`tosses ${what} out of the live ship to the quay's edge, a short arc, the gap still an outline (to the ${dest})`, () => {
+      it(`tosses ${what} out of the live ship to the quay's edge, a short arc, the gap still a ghost (to the ${dest})`, () => {
         const live = liveBox();
         expect(tossAt(from, caught, 0).distanceTo(from), "the toss doesn't start where the part stood").toBeLessThan(1e-6);
         expect(tossAt(from, caught, 1).distanceTo(caught), "the toss doesn't end at the catch").toBeLessThan(1e-6);
