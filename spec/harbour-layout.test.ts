@@ -570,7 +570,7 @@ describe("the harbour on GET /", () => {
   }, 90_000);
 
   // Orbit on a desktop only, within the prototype's limits, with a way back to the fixed view; a phone never
-  // takes the page's scroll over the canvas. "Back to the harbour" is a real button, hidden until the view has moved.
+  // takes the page's scroll over the canvas. "Reset view" is a real button, hidden until the view has moved.
   // The wheel and touch scroll the page, never the camera (the maker, 31 October: the wheel over the scene zoomed,
   // so people didn't find the page below): a real wheel gesture over the drawn canvas moves the page down and
   // leaves the camera where it was. Zoom is the + and − buttons beside the way back, real buttons, shown on a
@@ -612,10 +612,70 @@ describe("the harbour on GET /", () => {
     const home = doc.querySelector<HTMLButtonElement>("button#home");
     expect(home, "there's no way back to the fixed view").not.toBeNull();
     expect(home!.type).toBe("button");
-    expect(home!.textContent?.trim()).toBe("Back to the harbour");
+    // "Back to the harbour" read as leaving somewhere (a classmate, 1 November): you never leave the harbour
+    expect(home!.textContent?.trim()).toBe("Reset view");
     expect(home!.hidden, "the way back shows at rest").toBe(true);
     expect(home!.closest('[aria-hidden="true"]'), "the way back is hidden from assistive technology").toBeNull();
   });
+  // Reset view puts the camera back (a classmate, 1 November: after an orbit it hid itself and left the camera where
+  // it was; a zoom alone never showed it). As a visitor at 1440: a real drag, the + button, or both; the button
+  // shows; Reset view; the camera is back on the fixed view and stays there, the canvas changed, the button hidden.
+  // The camera is read through the page's own part tags: each is placed over its part's real geometry, projected
+  // through the camera, so the same tags mean the same view. The kept ship's tags: it doesn't ride the swell.
+  {
+    const TAGS = `
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const shown = (el) => !!el && !el.hidden && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+      const tags = async () => { const out = [];
+        for (const p of [0, 4, 9]) {
+          const pos = document.querySelectorAll('.sentence-strip .pos')[p];
+          pos.dispatchEvent(new PointerEvent('pointerenter')); await sleep(120);
+          const t = document.querySelector('.part-tag[data-ship="kept"]').style.transform.match(/translate\\((-?[\\d.]+)px, (-?[\\d.]+)px\\)/);
+          out.push(t ? [+t[1], +t[2]] : null);
+          pos.dispatchEvent(new PointerEvent('pointerleave')); await sleep(60);
+        }
+        return out; };
+      const sample = () => { const c = document.querySelector('#harbour canvas'), o = document.createElement('canvas'); o.width = 96; o.height = 60; const g = o.getContext('2d'); g.drawImage(c, 0, 0, 96, 60); return Array.from(g.getImageData(0, 0, 96, 60).data); };
+      const changed = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 40) n++; return n / (a.length / 4); };`;
+    // the fixed view's tags, before anything moves it: a step, so it's taken before the drag
+    const REST = `(async () => { ${TAGS} window.__rest = await tags(); window.__onCanvas = document.elementFromPoint(560, 220)?.tagName === 'CANVAS'; })()`;
+    const RESET = (zoom: boolean) => `(async () => { ${TAGS}
+      await sleep(1200); // the orbit's own drift, settled
+      ${zoom ? "document.querySelector('#zoom-in').click(); await sleep(150); document.querySelector('#zoom-in').click(); await sleep(800);" : ""}
+      const shownMoved = shown(document.querySelector('#home'));
+      const moved = await tags();
+      const a = sample(); await sleep(1500); const sea = changed(a, sample());
+      const b = sample();
+      document.querySelector('#home').click();
+      await sleep(1800);
+      const back = await tags(), c = sample();
+      await sleep(1200);
+      const later = await tags();
+      return { onCanvas: window.__onCanvas, rest: window.__rest, shownMoved, moved, back, later, sea, reset: changed(b, c), hidden: !shown(document.querySelector('#home')) };
+    })()`;
+    const far = (a: number[][], b: number[][]) => Math.max(...a.map((p, i) => Math.hypot(p[0] - b[i][0], p[1] - b[i][1])));
+    for (const [how, opts] of [
+      ["an orbit", { drag: true, zoom: false }],
+      ["a zoom", { drag: false, zoom: true }],
+      ["an orbit and a zoom", { drag: true, zoom: true }],
+    ] as const) {
+      it(`Reset view brings the camera back to the fixed view after ${how}, and hides (1440×900)`, async () => {
+        const m = (await liveIn(new URL("/", baseUrl).href, RESET(opts.zoom), [1440, 900], {
+          steps: [DRAWN, REST],
+          ...(opts.drag ? { drag: { from: [560, 220] as [number, number], to: [820, 260] as [number, number] } } : {}),
+        })) as { onCanvas: boolean; rest: number[][]; shownMoved: boolean; moved: number[][]; back: number[][]; later: number[][]; sea: number; reset: number; hidden: boolean };
+        expect(m.onCanvas, "the drag doesn't start on the harbour's canvas").toBe(true);
+        expect(m.rest.every(Boolean) && m.moved.every(Boolean) && m.back.every(Boolean) && m.later.every(Boolean), "a part's tag wasn't placed").toBe(true);
+        expect(far(m.moved, m.rest), `${how} didn't move the camera`).toBeGreaterThan(20);
+        expect(m.shownMoved, `Reset view isn't shown after ${how}`).toBe(true);
+        expect(far(m.back, m.rest), "Reset view left the camera off the fixed view").toBeLessThanOrEqual(2);
+        expect(far(m.later, m.rest), "the camera drifted off the fixed view after Reset view").toBeLessThanOrEqual(2);
+        expect(m.reset, "Reset view didn't change the canvas beyond the sea's own motion").toBeGreaterThan(Math.max(0.05, 3 * m.sea));
+        expect(m.hidden, "Reset view still shows once the view is back").toBe(true);
+      }, 120_000);
+    }
+  }
+
   it("never takes a phone's page scroll over the harbour (390×844)", async () => {
     const m = (await measureIn(await staged(), `(async () => { await document.fonts.ready; const h = document.querySelector('#harbour'); return getComputedStyle(h).touchAction; })()`, [390, 844])) as string;
     expect(m, "the harbour takes a phone's vertical scroll").toMatch(/pan-y|auto|manipulation/);

@@ -54,7 +54,9 @@ function chrome(): string {
 // `firstVisit`: the browser of someone who has never been here. Every other check's browser has seen the opening
 // story (decision 0007), as a returning visitor's has, so it never covers the page they measure; only the story's
 // own checks (spec/opening-story.test.ts) open a first visit. `init`: a script run in the page before its own.
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number }; firstVisit?: boolean; init?: string };
+// `drag`: after the steps (and the wheel), a real left-button drag between two points, as a visitor's mouse makes it,
+// and the expression runs once it has been let go.
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number }; drag?: { from: [number, number]; to: [number, number] }; firstVisit?: boolean; init?: string };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -140,6 +142,16 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
       await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
       for (let i = 0; i < 4; i++) await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy / 4 });
       await sleep(400);
+    }
+    if (opts.drag) {
+      const { from: [x0, y0], to: [x1, y1] } = opts.drag;
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0, y: y0 });
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y: y0, button: "left", buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 12; i++) {
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0 + ((x1 - x0) * i) / 12, y: y0 + ((y1 - y0) * i) / 12, button: "left", buttons: 1 });
+        await sleep(16);
+      }
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x1, y: y1, button: "left", buttons: 0, clickCount: 1 });
     }
     // the expression starts watching first; node acts while it watches; then its result is awaited
     const watching = send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
