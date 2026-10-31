@@ -12,8 +12,9 @@ import type { KeptShip, Moment } from "../kept-moment";
 export type Layout = "desktop" | "phone";
 export type Pose = { position: [number, number, number]; rotationY: number; scale: number };
 
-// the live ship on the water; the kept ship on its slipway, on the quay to the right; the pallet beside it
-export const LIVE_POSE: Pose = { position: [-4.2, 0, 4.2], rotationY: -0.22, scale: 1.3 };
+// the live ship on the water, moored clear of the quay with water between (spec/harbour-moorings.test.ts); the kept
+// ship on its slipway, on the quay to the right; the pallet beside it
+export const LIVE_POSE: Pose = { position: [-7.0, 0, 1.6], rotationY: -0.22, scale: 1.3 };
 export const KEPT_POSE: Pose = { position: [7.4, 2.05, -3.4], rotationY: -0.06, scale: 1.3 };
 export const PALLET: [number, number, number] = [8.0, 1.12, 3.8];
 
@@ -24,11 +25,12 @@ type View = { position: [number, number, number]; target: [number, number, numbe
 // Both ships and the pallet, seen from the harbour mouth. On a desktop the sentence strip lies over the
 // scene's lower left, so the ships stand in its upper two thirds; on a phone the strip is above the scene.
 const VIEWS: Record<Layout, View> = {
-  desktop: { position: [2.6, 5.5, 31], target: [2.6, 1.0, 0.4], fov: 38 },
-  phone: { position: [2.6, 7.5, 26], target: [2.6, 1.4, 0.6], fov: 42 },
+  desktop: { position: [1.05, 5.5, 31], target: [1.05, 1.0, 0.4], fov: 38 },
+  phone: { position: [0.7, 7.5, 26], target: [0.7, 1.4, 0.6], fov: 42 },
 };
-// the width of the harbour that must stay in view at any aspect: from the live ship's stern to past the pallet
-const SPAN: Record<Layout, [number, number]> = { desktop: [-10.6, 16.0], phone: [-10.2, 15.6] };
+// the width of the harbour that must stay in view at any aspect: from the live ship's stern (its longest pennant
+// and plumes, at its mooring) to past the pallet; each view looks at its middle (place() assumes it)
+const SPAN: Record<Layout, [number, number]> = { desktop: [-14.4, 16.5], phone: [-14.2, 15.6] };
 
 export const home = (layout: Layout): View => VIEWS[layout];
 
@@ -195,3 +197,6 @@ const CARRIED_MIN_WORLD = 1.25;
 export const carriedScale = (largest: number): number => Math.min(1, Math.max(0.5, CARRIED_MIN_WORLD / Math.max(largest, 0.01)));
 // the kept ship's cradle (scene.ts draws it from these)
 export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));
+
+// the shore and its quay along it, behind the harbour (scene.ts draws them from these)
+export const SHORE = { x: [-55, 55], z: [-41, -6.6], top: 1.05 } as const; // its block's front at z -7, its quay's at -6.6

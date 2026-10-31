@@ -219,13 +219,15 @@ describe("the carry, step by step", () => {
     });
   }
 
-  // A waiting plank on the pallet is a plank you can see, not a speck: at least 28px across at either size.
+  // A waiting plank on the pallet is a plank you can see, not a speck: at least 28px across at 1440, 26 at 390.
   for (const [name, layout, w, h] of HARBOURS) {
     it(`sets a waiting plank on the pallet large enough to see (${name})`, () => {
       const cam = new THREE.PerspectiveCamera();
       place(cam, layout, w / h);
       const px = screenSize(cam, PALLET_SLOTS[0], PALLET_PLANK, h);
-      expect(px, `a waiting plank is ${px.toFixed(0)}px tall`).toBeGreaterThanOrEqual(28);
+      // 28px at 1440; 26 on a phone, whose view widened to hold the live ship whole at its mooring clear of the
+      // quay (the maker, 31 October)
+      expect(px, `a waiting plank is ${px.toFixed(0)}px tall`).toBeGreaterThanOrEqual(layout === "phone" ? 26 : 28);
     });
   }
 });
