@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { KeptShip, Moment } from "../kept-moment";
 import { buildShip } from "./build";
+import { ghostPart } from "./ghost";
 import { KeptStage } from "./kept-stage";
 import { LiveBody } from "./live-body";
 import { arrivalAt, carryAt, carryEnd, landsAt, newPartRed, plankColour, type Kind } from "./motion";
@@ -406,29 +407,14 @@ export class HarbourView {
     this.requestFrame();
   }
 
-  // the kept ship's gaps: a part still standing in the harbour, drawn only as a faint outline; a plank on its
-  // way there stays an outline until it arrives
+  // the kept ship's gaps: a part still standing in the harbour, drawn as a faint wooden ghost of itself (ghost.ts);
+  // a plank on its way there leaves its ghost until it arrives
   private ghost(now = performance.now()): void {
     if (!this.stage) return;
     const coming = new Map(this.stage.body.arrivals.map((a) => [a.position, a.start]));
     this.stage.body.groups.forEach((g, i) => {
       const start = coming.get(i);
-      const gap = start !== undefined ? arrivalAt(now - start, this.reduced).opacity === 0 : this.stage!.gaps[i];
-      if (gap && !g.userData.outlineLines) {
-        const m = new THREE.LineBasicMaterial({ color: 0xe9f3fb, transparent: true, opacity: 0.55, depthWrite: false });
-        const meshes: THREE.Mesh[] = [];
-        g.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
-        // beside each solid, in its own frame; added after the walk, so the walk never meets them
-        g.userData.outlineLines = meshes.map((mesh) => {
-          const l = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 35), m);
-          l.position.copy(mesh.position); l.quaternion.copy(mesh.quaternion); l.scale.copy(mesh.scale);
-          (mesh.parent ?? g).add(l);
-          return l;
-        });
-        (g.userData.materials as THREE.Material[]).push(m);
-      }
-      g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.visible = !gap; });
-      for (const l of (g.userData.outlineLines as THREE.LineSegments[]) ?? []) l.visible = gap;
+      ghostPart(g, i, start !== undefined ? arrivalAt(now - start, this.reduced).opacity === 0 : this.stage!.gaps[i]);
     });
   }
 
