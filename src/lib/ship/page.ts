@@ -49,6 +49,8 @@ export type CurrentHarbour = {
   keptApply(kept: KeptShip, moment: Moment | null): void;
   // this visitor's own kept plank (null: none shown)
   mine(position: number | null): void;
+  // the shipwrights: the stream's anonymous total of open views, drawn as figures, one of them this visitor's
+  crew(total: number): void;
 };
 
 // `own`: this visitor's own change, just made (Post/Redirect/Get), with its moment and the kept ship before it
@@ -87,7 +89,7 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
     view.show(words.map((w, i) => (i === mineNow.position ? before : w)));
     view.keptShow(ownMoment?.before ?? kept);
     requestAnimationFrame(() => {
-      if (ownMoment) fly(mineNow.position, ownMoment.moment, kept, "own");
+      if (ownMoment) fly(mineNow.position, ownMoment.moment, kept, "own", false, true);
       else { view.change(mineNow.position, words, "own", null); view.keptShow(kept); }
       arrive(mineNow, before, "own");
     });
@@ -99,9 +101,10 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
   // The old plank flies to where it's kept. The kept ship is told at once, so it sets the plank down in its gap
   // as it lands (its gap stays an outline until then); a plank for the next ship is drawn on the pallet only
   // once it has landed.
-  function fly(position: number, moment: Moment, k: KeptShip, kind: Kind, yours = false): void {
+  // `own`: this visitor's own change, carried by their own shipwright
+  function fly(position: number, moment: Moment, k: KeptShip, kind: Kind, yours = false, own = false): void {
     view!.keptApply(k, moment);
-    view!.change(position, words, kind, view!.target(moment, k), () => view!.landed(position), yours);
+    view!.change(position, words, kind, view!.target(moment, k), () => view!.landed(position), yours, own);
   }
   // Your plank (decision 0005), on your page only: it glows as it flies, and one line says where it went, in the
   // notation's slot (unless a word is in hand) and the polite live region, then goes
@@ -249,6 +252,7 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
     keptShow: (k) => view.keptShow(k),
     keptApply: (k, moment) => view.keptApply(k, moment),
     mine: (position) => view.trace(position),
+    crew: (total) => { view.crewSet(total); view.crewMine(true); },
   };
 }
 

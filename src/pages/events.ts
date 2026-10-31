@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { currentPositions, currentTrace, keptShipAt, type CurrentTrace } from "../lib/db";
-import { subscribe, type Change } from "../lib/live";
+import { joinCrew, subscribe, type Change } from "../lib/live";
 import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 
@@ -25,6 +25,10 @@ import { visitorId } from "../lib/visitor";
 // trace, it rides on every `change` event itself, since every open stream
 // already gets every change and the kept ship changes on each one — no
 // follow-up snapshot needed for it the way the trace sometimes needs one.
+//
+// `crew` ({ total }) is the shipwrights' anonymous total (docs/decisions/0005,
+// "Co-presence"): how many streams are open, sent soon after this one opens
+// and whenever it changes. Never who, and never logged.
 
 const HEARTBEAT_MS = 20_000;
 const encoder = new TextEncoder();
@@ -80,6 +84,7 @@ export const GET: APIRoute = ({ cookies, locals }) => {
       sent = traceNow();
       event("snapshot", { positions: positionsNow(), trace: sent, keptShip: keptShipNow() });
       logLine(reqId, "stream-open", { v });
+      const leaveCrew = joinCrew((total) => event("crew", { total }));
 
       // a comment line, ignored by clients, so a dead socket surfaces
       const heartbeat = setInterval(() => {
@@ -95,6 +100,7 @@ export const GET: APIRoute = ({ cookies, locals }) => {
         stopped = true;
         clearInterval(heartbeat);
         unsubscribe();
+        leaveCrew();
         logLine(reqId, "stream-close", { v });
       };
     },

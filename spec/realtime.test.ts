@@ -673,6 +673,35 @@ describe("Theseus realtime", () => {
     30_000,
   );
 
+  // The shipwrights (decision 0005, "Co-presence", amended 31 October): each open GET /events stream is one
+  // anonymous figure. The stream carries their total alone, as its own `crew` event: never who, never a list.
+  // Held in server memory only. A stream gets it soon after it opens, and again whenever the total changes.
+  localOnly("tells every open stream the shipwrights' total, alone, and keeps it current as streams open and close", async () => {
+    const crewOf = (f: Frame) => {
+      expect(keysOf(f.data), "a crew event carries more than { total }").toEqual(["total"]);
+      const { total } = f.data as { total: unknown };
+      expect(Number.isInteger(total) && (total as number) >= 1, "the crew total isn't a whole number of open streams").toBe(true);
+      return total as number;
+    };
+    const latest = (s: Stream) => s.frames.filter((f) => f.event === "crew").at(-1);
+    const ann = await arrive(), bea = await arrive();
+    const a = await connect(ann);
+    await a.snapshot();
+    await a.waitFor((f) => f.event === "crew", LIVE_MS + 500, "a crew event after the stream opened");
+    const alone = crewOf(latest(a)!);
+
+    const b = await connect(bea);
+    await b.snapshot();
+    await a.waitFor((f) => f.event === "crew" && crewOf(f) === alone + 1, LIVE_MS + 500, "the total rising when a second stream opened");
+    await b.waitFor((f) => f.event === "crew" && crewOf(f) === alone + 1, LIVE_MS + 500, "the new stream's own total");
+
+    b.close();
+    const seen = a.frames.length;
+    await a.waitFor((f) => a.frames.indexOf(f) >= seen && f.event === "crew" && crewOf(f) === alone, LIVE_MS + 500, "the total falling when the second stream closed");
+    // nothing else on the stream names anyone: the snapshot and change shapes are pinned above, unchanged
+    for (const f of a.frames) expect(["snapshot", "change", "crew"], `an unexpected event "${f.event}"`).toContain(f.event);
+  }, 15_000);
+
   // Already true of Crit 8: pinned here because the live page's Earlier link
   // will be derived from position versions instead of a count from the server.
   localOnly("derives the number of changes from position versions alone", async () => {

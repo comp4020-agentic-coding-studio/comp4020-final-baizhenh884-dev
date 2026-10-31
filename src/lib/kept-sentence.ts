@@ -59,7 +59,7 @@ export function renderWaiting(row: HTMLElement, next: readonly (string | null)[]
 // The waiting row on a live page: `show` redraws it as the kept ship says; `land` brings a word for the next ship
 // in once its part, flying toward the row, has got there (`inMs`; 0 when nothing flies). Until then that place is
 // held back, through any redraw; a place no longer waiting (the ship completed) is let go at once.
-export type WaitingRow = { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void };
+export type WaitingRow = { show(next: readonly (string | null)[]): void; land(next: readonly (string | null)[], inMs: number): void; finish(): void };
 
 export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): WaitingRow {
   const win = row.ownerDocument.defaultView!;
@@ -75,9 +75,17 @@ export function waitingRow(row: HTMLElement, next: readonly (string | null)[]): 
   return {
     show,
     land(n, inMs) {
+      this.finish();
       const arriving = n.flatMap((w, i) => (w !== null && truth[i] === null && !flying.has(i) ? [i] : []));
       if (inMs > 0) for (const i of arriving) flying.set(i, win.setTimeout(() => { flying.delete(i); draw(); }, inMs));
       show(n);
+    },
+    // a new change finishes the carry still under way (decision 0005, amended 31 October): its word lands now
+    finish() {
+      if (!flying.size) return;
+      for (const t of flying.values()) win.clearTimeout(t);
+      flying.clear();
+      draw();
     },
   };
 }

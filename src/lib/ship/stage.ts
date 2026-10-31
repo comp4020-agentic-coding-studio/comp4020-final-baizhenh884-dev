@@ -125,3 +125,73 @@ export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector
   const position = target.clone().add(offset);
   return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
 }
+
+// The carry and the shipwrights (docs/decisions/0005, amended 31 October). The quay the slipway and the rack stand
+// on (scene.ts draws it from these numbers): its deck, and its edge toward the live ship, where a tossed plank is
+// caught. A shipwright only ever stands or walks on it.
+export const QUAY = { x: [KEPT_POSE.position[0] - 7.6, KEPT_POSE.position[0] + 9.4], z: [KEPT_POSE.position[2] - 5.3, KEPT_POSE.position[2] + 10.7], deck: 1.08 } as const;
+const MARGIN = 0.35;
+export const onQuay = (x: number, z: number): boolean => x >= QUAY.x[0] + MARGIN - 1e-9 && x <= QUAY.x[1] - MARGIN + 1e-9 && z >= QUAY.z[0] + MARGIN - 1e-9 && z <= QUAY.z[1] - MARGIN + 1e-9;
+// the shipwrights stand at a toy scale (the maker, 31 October: 1.5–2× the first, so they're seen at 1440), and hold a
+// carried plank above their heads
+export const FIGURE_HEIGHT = 3.0;
+// the raised hands, where a carried plank's underside rests
+export const HOLD = FIGURE_HEIGHT * 1.1;
+// a carried plank's centre, held overhead: half its carried height above the hands (`at`, from carryPath)
+export const heldAt = (at: THREE.Vector3, height: number, scale: number): THREE.Vector3 => at.clone().add(new THREE.Vector3(0, (height * scale) / 2, 0));
+// the line they walk a plank along: the quay's front, on the camera's side of the rack and the slipway's cradle
+const FRONT = QUAY.z[1] - 0.6;
+
+// Where the plank from `position` is caught: on the quay toward the live ship, just past its bow (its ram reaches
+// x 1.8), level with where it stood, at hand height.
+export function catchPoint(position: number): THREE.Vector3 {
+  const z = Math.min(QUAY.z[1] - 1, Math.max(QUAY.z[0] + 1, partHome(position, LIVE_POSE).z - 0.6));
+  return new THREE.Vector3(2.4, QUAY.deck + HOLD, z);
+}
+
+// The toss, `k` (0..1): a short arc out of the live ship to the catch (smoothstep, so it's seen leaving and caught).
+export function tossAt(from: THREE.Vector3, to: THREE.Vector3, k: number): THREE.Vector3 {
+  const t = Math.min(1, Math.max(0, k)), e = t * t * (3 - 2 * t);
+  const p = new THREE.Vector3().lerpVectors(from, to, e);
+  p.y += Math.sin(Math.PI * e) * 2.6;
+  return p;
+}
+
+// The carry, `c` (0..1): from the catch the shipwright walks out to the quay's front and along it to stand in front of
+// the plank's place, holding it above the head, in front of the rack and the cradle all the way; then over the last
+// stretch lifts it into place (back to the kept ship's gap, or down onto the rack). Both stay over the quay.
+const WALK = 0.82;
+export function carryPath(from: THREE.Vector3, to: THREE.Vector3, c: number): { plank: THREE.Vector3; figure: THREE.Vector3 } {
+  const t = Math.min(1, Math.max(0, c));
+  const x = (v: number) => Math.min(QUAY.x[1] - MARGIN - 0.1, Math.max(QUAY.x[0] + MARGIN + 0.1, v));
+  // out to the front (the first quarter of the walk), along it, and to a stop in front of the place
+  const start = new THREE.Vector3(from.x, QUAY.deck, from.z), out = new THREE.Vector3(from.x + 0.6, QUAY.deck, FRONT), stand = new THREE.Vector3(x(to.x), QUAY.deck, FRONT);
+  const w = Math.min(1, t / WALK), e = w * w * (3 - 2 * w), legA = 0.25;
+  const figure = e < legA ? new THREE.Vector3().lerpVectors(start, out, e / legA) : new THREE.Vector3().lerpVectors(out, stand, (e - legA) / (1 - legA));
+  const held = figure.clone().add(new THREE.Vector3(0, HOLD, 0));
+  if (t <= WALK) return { plank: held, figure };
+  const s = (t - WALK) / (1 - WALK), f = s * s * (3 - 2 * s);
+  // lifted up and over, then set in place
+  const plank = new THREE.Vector3().lerpVectors(held, to, f);
+  plank.y += Math.sin(Math.PI * f) * 1.2;
+  return { plank, figure };
+}
+
+// Where the shipwrights wait, at most CREW_MAX of them: at the quay's near end, by the catch past the live ship's
+// bow. Measured, not picked: from the fixed view at 1440 and 390 it's the only part of the quay where a figure
+// stands clear of the rack's planks, the live hull and the frame's edges. The first three (the common case) stand
+// apart, every head in view: two at the back, one forward to the side; the rest fill in between, a file, and may
+// be partly hidden (found by searching the quay against those checks), a crowd (the maker, 31 October; spec/harbour-flight.test.ts). A passer-by, when no
+// other is free, walks in from the back of the quay (PASSER).
+export const CREW_MAX = 8;
+const SPOTS: THREE.Vector3[] = [[0.15, -8.0], [1.05, -8.0], [2.1, -2.4], [1.95, -7.6], [1.95, -6.4], [1.95, -5.2], [1.95, -4.0], [2.55, -3.2]].map(([x, z]) => new THREE.Vector3(x, QUAY.deck, z));
+export const crewSpots = (n: number): THREE.Vector3[] => SPOTS.slice(0, Math.max(0, Math.min(CREW_MAX, Math.floor(n)))).map((v) => v.clone());
+export const PASSER = new THREE.Vector3(2.4, QUAY.deck, -8.2);
+// A carried plank is about half its size (the maker, 31 October), and never so small it can't be seen at 1440: its
+// larger side at least CARRIED_MIN_WORLD, which is CARRIED_MIN_PX there. It grows back to its own size as it's set in
+// place.
+export const CARRIED_MIN_PX = 40;
+const CARRIED_MIN_WORLD = 1.25;
+export const carriedScale = (largest: number): number => Math.min(1, Math.max(0.5, CARRIED_MIN_WORLD / Math.max(largest, 0.01)));
+// the kept ship's cradle (scene.ts draws it from these)
+export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));

@@ -271,7 +271,7 @@ const how =
           import { lastPlank, renderKeptSentence, waitingRow as waitingRowOf } from "../lib/kept-sentence";
           import { ACK_MS, acknowledgeBelow, LINE_MS, showMomentLine } from "../lib/moment-line";
           import { BEAT_MS } from "../lib/ship/kept-stage";
-          import { duration, leavesAt } from "../lib/ship/motion";
+          import { duration, landsAt } from "../lib/ship/motion";
           import { mountHarbour } from "../lib/ship/page";
 
           // The moment of a replacement (docs/decisions/0003, 0005): a plank that flies from the live ship to its gap
@@ -327,6 +327,8 @@ const how =
           // the kept sentence and waiting row for a kept ship and the moment a change brought to it (the harbour is told separately)
           function moveKept(k: KeptShip, moment: Moment | null): void {
             clearTimeout(beat);
+            // a new change sets down whatever plank was still being carried, so its waiting word lands now
+            if (moment) waiting?.finish();
             const before = keptNow;
             if (!moment) renderKept(k);
             else if (moment.kind === "later") {
@@ -338,9 +340,9 @@ const how =
               renderKept(k);
               moveUp(before.next);
             } else if (moment.kind === "wait") {
-              // the word lands in the row when its plank lands on the pallet (only if a plank flies)
+              // the word lands in the row when its plank is set down on the rack (only if a plank is carried)
               if (keptLabel) renderKeptSentence(keptLabel, k, mine);
-              waiting?.land(k.next, drawn() ? leavesAt(reduced()) : 0);
+              waiting?.land(k.next, drawn() ? landsAt(reduced()) : 0);
             } else renderKept(k);
             if (moment) acknowledge(moment);
             keptNow = k;
@@ -403,6 +405,13 @@ const how =
           events.addEventListener("change", (e) => {
             const change = parseChange(e.data);
             if (change) page.applyChange(change);
+          });
+          // the shipwrights (decision 0005): how many views are open, drawn as figures, never written as a number
+          events.addEventListener("crew", (e) => {
+            try {
+              const { total } = JSON.parse(e.data) as { total: unknown };
+              if (Number.isInteger(total)) harbour?.crew(total as number);
+            } catch { /* a malformed event draws nothing */ }
           });
         </script>
       </>

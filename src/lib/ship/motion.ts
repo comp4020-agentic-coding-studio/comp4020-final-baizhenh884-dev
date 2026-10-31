@@ -94,15 +94,14 @@ export function leavesAt(reduced: boolean): number {
   return Math.ceil(T.exchange * (T.mark + (1 - T.mark) * (TRAVEL.from + TRAVEL.span)));
 }
 
-// when the crossing part reaches the kept house, on the crossing's own clock: after it has left the standing one
-const ARRIVE = { start: 1500, travel: 1100 };
-
+// the kept part arriving, on the change's own clock: it fades in under the plank as the shipwright sets it down
+// (the carry, below), never before
 export function arrivalAt(ms: number, reduced = false): Arrival {
   if (reduced) return { travel: 0, opacity: 1, red: 0 };
-  const a = clamp((ms - ARRIVE.start) / ARRIVE.travel);
+  const a = clamp((ms - SET) / CARRY.set);
   return {
     travel: 1 - out3(a),
-    opacity: clamp(a / 0.25),
+    opacity: a,
     // never red: the old plank arrives as itself (red is the live ship's new part alone)
     red: 0,
   };
@@ -119,3 +118,23 @@ export const newPartRed = (ms: number, reduced: boolean): number =>
 import { Color } from "three";
 export const DRIFT = new Color(0xcbb894);
 export const plankColour = (base: Color, k: number): Color => base.clone().lerp(DRIFT, 0.5 * ease(clamp((k - 0.6) / 0.4)));
+
+// The carry (docs/decisions/0005, amended 31 October): once the server has accepted a change, the old plank is
+// tossed in a short arc to the quay's edge, a shipwright catches it, carries it to the slipway or the rack and
+// sets it down, about 3 s in all. Each stretch runs 0..1 and is complete before the next begins. The plank keeps
+// its own colour until the carry's last stretch, then bleaches (plankColour). With reduced motion nothing is
+// tossed or carried: it's done at once.
+export type Carry = { phase: "toss" | "catch" | "carry" | "set" | "done"; toss: number; carry: number; set: number; bleach: number };
+export const CARRY = { toss: 700, catch: 200, carry: 1800, set: 300 };
+const CAUGHT = CARRY.toss, CARRIED = CAUGHT + CARRY.catch, SET = CARRIED + CARRY.carry, END = SET + CARRY.set;
+export const carryEnd = (reduced: boolean): number => (reduced ? 0 : END);
+export function carryAt(ms: number, reduced = false): Carry {
+  if (reduced || ms >= END) return { phase: "done", toss: 1, carry: 1, set: 1, bleach: 1 };
+  const toss = clamp(ms / CARRY.toss), carry = clamp((ms - CARRIED) / CARRY.carry), set = clamp((ms - SET) / CARRY.set);
+  const phase = ms < CAUGHT ? "toss" : ms < CARRIED ? "catch" : ms < SET ? "carry" : "set";
+  // the plank bleaches over the second half of the carry and as it's set down
+  const bleach = clamp((carry - 0.5) / 0.5) * 0.85 + set * 0.15;
+  return { phase, toss, carry, set, bleach: carry < 0.5 ? 0 : bleach };
+}
+// when the plank is set down, so its waiting word lands in the row with it; at once with reduced motion
+export const landsAt = (reduced: boolean): number => (reduced ? 0 : SET);

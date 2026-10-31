@@ -28,3 +28,35 @@ export function broadcast(change: Change): number {
   }
   return delivered;
 }
+
+// The shipwrights (docs/decisions/0005-the-ship.md, "Co-presence"): each open
+// stream is one anonymous figure. Only their total is kept, as the number of
+// streams open on this machine, in memory; never who, never stored or logged.
+// A burst of opens and closes (a reload is one of each) is told once, a
+// moment later, to every open stream.
+type CrewListener = (total: number) => void;
+const crew = new Set<CrewListener>();
+const CREW_SETTLE_MS = 400;
+let pending: ReturnType<typeof setTimeout> | null = null;
+
+function tellCrew(): void {
+  if (pending) return;
+  pending = setTimeout(() => {
+    pending = null;
+    for (const listener of crew) {
+      try {
+        listener(crew.size);
+      } catch {
+        crew.delete(listener);
+      }
+    }
+  }, CREW_SETTLE_MS);
+}
+
+export function joinCrew(listener: CrewListener): () => void {
+  crew.add(listener);
+  tellCrew();
+  return () => {
+    if (crew.delete(listener)) tellCrew();
+  };
+}
