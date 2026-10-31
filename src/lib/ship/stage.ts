@@ -195,3 +195,6 @@ const CARRIED_MIN_WORLD = 1.25;
 export const carriedScale = (largest: number): number => Math.min(1, Math.max(0.5, CARRIED_MIN_WORLD / Math.max(largest, 0.01)));
 // the kept ship's cradle (scene.ts draws it from these)
 export const CRADLE_BLOCKS: { at: [number, number, number]; size: [number, number, number] }[] = [-4, -1.4, 1.2, 3.8].map((x) => ({ at: [KEPT_POSE.position[0] + x, 1.45, KEPT_POSE.position[2]], size: [0.6, 0.95, 2] }));
+
+// the shore and its quay along it, behind the harbour (scene.ts): a stub until scene.ts draws from it
+export const SHORE = { x: [-55, 55], z: [-41, -6.6], top: 1.05 } as const;
