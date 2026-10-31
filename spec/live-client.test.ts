@@ -4,6 +4,7 @@ import { foreseen, said } from "../src/lib/ship/notation";
 import { sizeStep } from "../src/lib/sentence-step";
 import { attach, deriveTotal, DRAFT_MS, type KeptShip, type Position, type Snapshot, type SettleTrace, type Trace } from "../src/lib/live-client";
 import { waitingRow } from "../src/lib/kept-sentence";
+import { PARTS } from "../src/lib/ship/rules";
 import { carryAt, landsAt } from "../src/lib/ship/motion";
 
 // How an open current page (GET /) applies realtime state, checked against the
@@ -1280,6 +1281,31 @@ describe("live page reconciliation", () => {
   // GET / opens the realtime stream and GET /?at=N doesn't. Scripts are
   // checked for the stream itself, wherever the build puts them, so an
   // unrelated script can't trip this.
+  // The log (decision 0006): a newer change adds its line at the top, from the word the page showed there; a
+  // snapshot (a load's first, or a reconnect's) puts the record as SQLite has it, so a page that missed changes
+  // catches up, and a change it already showed isn't added twice
+  localOnly("keeps the log as the record: a newer change at the top, a reconnect snapshot catching it up", async () => {
+    const doc = await (await arrive()).page("/");
+    const page = attach(doc);
+    page.applySnapshot(snapshotOf(doc));
+    const lines = () => [...doc.querySelectorAll("#log ol > li")].map((li) => (li.textContent ?? "").replace(/\s+/g, " ").trim());
+    const [a] = positionsOf(doc);
+    const was = labelWord(doc, a.position), now = fresh();
+    page.applyChange({ position: a.position, word: now, version: a.version + 1 });
+    const place = `${String(a.position + 1).padStart(2, "0")} · `;
+    expect(lines()[0], "a newer change didn't add its line at the top").toMatch(new RegExp(`^${place}\\S+ ${was} → ${now}$`));
+    page.applyChange({ position: a.position, word: now, version: a.version + 1 }); // the same change again
+    expect(lines().filter((l) => l.endsWith(`→ ${now}`)), "a repeated change added its line twice").toHaveLength(1);
+    // a reconnect: the record as SQLite has it, with a change this page never saw
+    const missed = fresh();
+    const log = [{ position: 3, from: "that", to: missed }, { position: a.position, from: was, to: now }];
+    page.applySnapshot({ ...snapshotOf(doc), log });
+    const part = PARTS[a.position][0].toUpperCase() + PARTS[a.position].slice(1);
+    expect(lines(), "a reconnect snapshot didn't put the record").toEqual([`04 · Stern that → ${missed}`, `${place}${part} ${was} → ${now}`]);
+    expect(doc.querySelector<HTMLElement>("#log")!.hidden, "the log is hidden with lines in it").toBe(false);
+    expect(doc.querySelector("#log [aria-live]") ?? doc.querySelector("#log")!.closest("[aria-live]"), "the log announces its lines").toBeNull();
+  });
+
   localOnly("wires only the current sentence to the realtime stream, never an earlier form", async () => {
     const v = await arrive();
     const opensStream = async (path: string) => {

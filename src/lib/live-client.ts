@@ -2,6 +2,7 @@ import { classifyMoment, type KeptShip, type Moment } from "./kept-moment";
 import { foreseen, said as saidOne } from "./ship/notation";
 import { latestParts, replacedText, settleSecondsPhrase, standingLine, standingText } from "./trace-text";
 import { labelRows, sizeStep } from "./sentence-step";
+import { fromEntry, LOG_LINES, logLine, type LogLine } from "./log-record";
 
 // Keeps an open current page (GET /) true to the live sentence: it applies
 // the `snapshot` and `change` events from GET /events to the page's own
@@ -54,7 +55,9 @@ export const ANNOUNCE_MS = 2500;
 // how long typing pauses before the draft's prediction is said
 export const DRAFT_MS = 700;
 
-export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip };
+// `log`: the record of planks (decision 0006), the latest lines as place, old word and new
+export type LogEntry = { position: number; from: string; to: string };
+export type Snapshot = { positions: Position[]; trace: Trace | SettleTrace | null; keptShip?: KeptShip; log?: LogEntry[] };
 
 export interface LivePage {
   applySnapshot(snapshot: Snapshot): void;
@@ -91,7 +94,9 @@ export function parseSnapshot(raw: string): Snapshot | null {
   }
   const keptShip = asKeptShip(data.keptShip);
   if (!keptShip) return null;
-  return { positions: positions as Position[], trace, keptShip };
+  // the record of planks (decision 0006): a line that isn't place, old word and new is dropped, not the snapshot
+  const log = Array.isArray(data.log) ? data.log.flatMap((e) => (isObject(e) && isIndex(e.position, 0) && (e.position as number) <= 9 && typeof e.from === "string" && typeof e.to === "string" ? [{ position: e.position as number, from: e.from, to: e.to }] : [])) : undefined;
+  return { positions: positions as Position[], trace, keptShip, log };
 }
 
 function parse(raw: string): unknown {
@@ -616,9 +621,32 @@ export function attach(doc: Document, options: Options = {}): LivePage {
     options.onKept?.(kept, moment);
   }
 
+  // The log (decision 0006): the record as the server gave it, and each newer change at the top. Text only, never
+  // announced line by line (the polite announcement of others' changes already says what changed).
+  const logSection = doc.getElementById("log");
+  const logList = logSection?.querySelector("ol");
+  function logItem(line: LogLine): HTMLLIElement {
+    const li = doc.createElement("li");
+    const span = (cls: string, text: string) => { const s = doc.createElement("span"); s.className = cls; s.textContent = text; return s; };
+    li.append(span("place", logLine(line).place), " ", span("from", line.from), " ", span("arrow", "→"), " ", span("to", line.to));
+    return li;
+  }
+  function putLog(lines: LogLine[]): void {
+    if (!logSection || !logList) return;
+    logList.replaceChildren(...lines.map(logItem));
+    logSection.hidden = lines.length === 0;
+  }
+  function addLog(line: LogLine): void {
+    if (!logSection || !logList) return;
+    logList.prepend(logItem(line));
+    while (logList.children.length > LOG_LINES) logList.lastElementChild!.remove();
+    logSection.hidden = false;
+  }
+
   return {
     applySnapshot(snapshot) {
       for (const change of snapshot.positions) offer(change);
+      if (snapshot.log) putLog(snapshot.log.map(fromEntry));
       if (snapshot.trace && traceIsFresh(snapshot, snapshot.trace)) {
         traceChanged ||= JSON.stringify(trace) !== JSON.stringify(snapshot.trace);
         trace = snapshot.trace;
@@ -637,7 +665,10 @@ export function attach(doc: Document, options: Options = {}): LivePage {
       if (newer && isMarked(change.position)) options.onYours?.(change.position);
       if (change.keptShip) tellKept(change.keptShip, moment);
       offer(change);
-      if (newer) announce(change, was, moment?.kind === "wait");
+      if (newer) {
+        announce(change, was, moment?.kind === "wait");
+        addLog(fromEntry({ position: change.position, from: was, to: change.word }));
+      }
       render();
     },
   };

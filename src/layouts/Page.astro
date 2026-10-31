@@ -298,6 +298,12 @@ const image = new URL("/og.png", Astro.url.origin).href;
       #your-plank #how { margin: 0; }
       #your-plank section[aria-labelledby="trace-heading"] { margin: 0; }
       #how, section[aria-labelledby="trace-heading"] [role="status"] { text-wrap: pretty; }
+      /* the log (decision 0006): one line per replacement, newest first; the place as the labels draw it, the words in the sentence's face */
+      .log-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+      .log-lines li { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; min-width: 0; font: 400 clamp(18px, 1.3vw, 21px)/1.3 "Instrument Serif", serif; color: var(--ink); overflow-wrap: anywhere; }
+      .log-lines .place { flex: 0 0 8.2em; font: 500 11px/1 var(--mono); letter-spacing: 0.04em; color: var(--caption); }
+      .log-lines .from { color: var(--caption); }
+      .log-lines .arrow { color: var(--caption); }
       .page-foot { margin-top: 2rem; padding: 0.8rem 0 2.4rem; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.6rem 2rem; }
       .page-foot p, .page-foot nav { margin: 0; }
       .page-foot a, .about a { white-space: nowrap; }

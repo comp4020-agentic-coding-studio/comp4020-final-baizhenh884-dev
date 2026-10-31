@@ -1,11 +1,13 @@
 import type { APIRoute } from "astro";
-import { currentPositions, currentTrace, keptShipAt, type CurrentTrace } from "../lib/db";
+import { currentPositions, currentTrace, keptShipAt, logRows, type CurrentTrace } from "../lib/db";
+import { isBlocked } from "../lib/blocklist";
+import { logOf } from "../lib/log-record";
 import { joinCrew, subscribe, type Change } from "../lib/live";
 import { logLine, visitorTag } from "../lib/log";
 import { visitorId } from "../lib/visitor";
 
 // GET /events: the current sentence as a stream. It opens with a `snapshot`
-// of SQLite ({ positions, trace, keptShip }), then sends each successful
+// of SQLite ({ positions, trace, keptShip, log }), then sends each successful
 // replacement as a `change` ({ position, word, version, keptShip }). Changes
 // carry no trace, so when a change alters this connection's own visitor's
 // trace (their change made in another tab, or their word replaced) the
@@ -34,6 +36,8 @@ const HEARTBEAT_MS = 20_000;
 const encoder = new TextEncoder();
 
 const positionsNow = () => currentPositions().map(({ position, word, version }) => ({ position, word, version }));
+// the record of planks (decision 0006), the blocklist applied here, never on the page: place, old word, new word
+const logNow = () => logOf(logRows(), isBlocked).map(({ position, from, to }) => ({ position, from, to }));
 // the ship number is an internal derivation detail, never exposed: no
 // numeric "ship id" is part of the product contract, only which words are
 // kept vs. gaps
@@ -78,11 +82,11 @@ export const GET: APIRoute = ({ cookies, locals }) => {
         const trace = traceNow();
         if (sameTrace(trace, sent)) return;
         sent = trace;
-        event("snapshot", { positions: positionsNow(), trace, keptShip: keptShipNow() });
+        event("snapshot", { positions: positionsNow(), trace, keptShip: keptShipNow(), log: logNow() });
         logLine(reqId, "stream-resnapshot", { v });
       });
       sent = traceNow();
-      event("snapshot", { positions: positionsNow(), trace: sent, keptShip: keptShipNow() });
+      event("snapshot", { positions: positionsNow(), trace: sent, keptShip: keptShipNow(), log: logNow() });
       logLine(reqId, "stream-open", { v });
       const leaveCrew = joinCrew((total) => event("crew", { total }));
 
