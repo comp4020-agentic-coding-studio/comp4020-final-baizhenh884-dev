@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { JSDOM } from "jsdom";
 import { labelRows, sizeStep } from "../src/lib/sentence-step";
 import { renderKeptSentence, renderWaiting } from "../src/lib/kept-sentence";
+import { STORY_KEY } from "../src/lib/story";
 
 // Layout checks: jsdom has no layout, so these build a page from the app's own
 // served markup and stylesheet and measure it in headless Chrome.
@@ -50,7 +51,10 @@ function chrome(): string {
 // first, its promise awaited after `then`), so the page watches while the change happens.
 // `wheel`: after the steps, a real wheel gesture at this point (CSS px in the viewport), through Chrome's input
 // pipeline as a visitor's mouse or trackpad sends it, so default actions (scrolling) run unless a page handler stops them
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number } };
+// `firstVisit`: the browser of someone who has never been here. Every other check's browser has seen the opening
+// story (decision 0007), as a returning visitor's has, so it never covers the page they measure; only the story's
+// own checks (spec/opening-story.test.ts) open a first visit. `init`: a script run in the page before its own.
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number }; firstVisit?: boolean; init?: string };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -109,6 +113,9 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     // navigated only once the device is set, so the page loads as this device would load it
     const page = live ? new URL(file).href : new URL(`file://${file}`).href;
     await send("Page.enable");
+    // a returning visitor has seen the story: the same flag the page sets when it opens (src/lib/story.ts)
+    const seen = opts.firstVisit ? "" : `try { localStorage.setItem(${JSON.stringify(STORY_KEY)}, "seen"); } catch {}`;
+    if (seen || opts.init) await send("Page.addScriptToEvaluateOnNewDocument", { source: `${seen}\n${opts.init ?? ""}` });
     // a foreground tab, as a visitor's is: without it a headless tab opened this way never has focus, so
     // :focus and :focus-visible match nothing (the focus-outline check failed on every word until this)
     await send("Emulation.setFocusEmulationEnabled", { enabled: true });

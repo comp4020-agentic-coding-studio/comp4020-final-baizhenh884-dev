@@ -128,6 +128,10 @@ export function followView(layout: Layout, from: THREE.Vector3, to: THREE.Vector
   return { position: position.toArray() as [number, number, number], target: target.toArray() as [number, number, number], fov: h.fov };
 }
 
+// The opening story's shots (decision 0007): not built yet.
+export function storyView(_layout: Layout, _shot: "wide" | "live" | "kept"): View { throw new Error("the story's camera isn't built"); }
+export function storyBetween(_a: View, _b: View, _k: number): View { throw new Error("the story's camera isn't built"); }
+
 // The carry and the shipwrights (docs/decisions/0005, amended 31 October). The quay the slipway and the rack stand
 // on (scene.ts draws it from these numbers): its deck, and its edge toward the live ship, where a tossed plank is
 // caught. A shipwright only ever stands or walks on it.
