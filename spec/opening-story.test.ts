@@ -21,6 +21,20 @@ const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(baseUr
 const changesTheSentence = (name: string, fn: () => Promise<void>, timeout?: number) =>
   it.skipIf(!local)(local ? name : `${name} [skipped: APP_URL is not local]`, fn, timeout);
 
+// each position takes its word from a fresh visitor, as a browser would (test data, local only); a position
+// already holding its word is left
+async function stageSentence(words: string[]): Promise<void> {
+  for (const [position, word] of words.entries()) {
+    const r0 = await fetch(new URL("/", baseUrl));
+    const cookie = r0.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+    const html = await r0.text();
+    if (html.includes(`<label for="word-${position}">${word}</label>`)) continue;
+    const v = html.match(new RegExp(`name="position" value="${position}"><input type="hidden" name="version" value="([0-9]+)"`))![1];
+    const res = await fetch(new URL("/replace", baseUrl), { method: "POST", redirect: "manual", headers: { cookie, origin: new URL(baseUrl).origin, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ position: String(position), version: v, word }) });
+    expect(res.status, `staging ${word} at ${position} was refused`).toBe(303);
+  }
+}
+
 const DESKTOP: [number, number] = [1440, 900];
 const PHONE: [number, number] = [390, 844];
 
@@ -207,7 +221,11 @@ describe("the story on a first visit", () => {
     expect(m.closed, "the story couldn't be skipped with storage failing").toBe(true);
   }, 60_000);
 
-  it("in beat 2, three parts turn red one after another, in different places, never together, and none stays red", async () => {
+  changesTheSentence("in beat 2, three parts turn red one after another, in different places, never together, and none stays red", async () => {
+    // The check stages its own sentence: a part painted vowel a's colour (shields, sail stripes) or a reddish hull
+    // paint reads as red here too, and grows on screen as the camera moves in, so a sentence an earlier file left
+    // could add a run the story never drew. These words paint nothing near red (test data, local only).
+    await stageSentence(["three", "timber", "prow", "stern", "tide", "spire", "linen", "steer", "quill", "pennon"]);
     // red as the rebuilt part draws it (motion.ts's RED through the renderer): strongly red, little green or blue.
     // The canvas sampled through the beat: where the red is (its centre), and how much of it.
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
@@ -229,7 +247,9 @@ describe("the story on a first visit", () => {
     const runs: { start: number; end: number; x: number; y: number }[] = [];
     for (const s of m.samples) {
       const last = runs.at(-1);
-      if (on(s)) { if (last && s.t - last.end < 200) { last.end = s.t; } else runs.push({ start: s.t, end: s.t, x: s.x!, y: s.y! }); }
+      // one run while red samples come less than 450 ms apart: reading a software-rendered canvas back takes up to
+      // ~230 ms a sample, and the dark between the story's rebuilds lasts over 600 ms
+      if (on(s)) { if (last && s.t - last.end < 450) { last.end = s.t; } else runs.push({ start: s.t, end: s.t, x: s.x!, y: s.y! }); }
     }
     expect(runs.length, `beat 2 doesn't rebuild three parts one by one (red runs at ${runs.map((r) => Math.round(r.start)).join(", ")} ms)`).toBe(3);
     // in turn, after the camera arrives, each ending before the next begins and the last within the beat
