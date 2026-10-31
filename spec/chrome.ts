@@ -91,7 +91,11 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     await send("Emulation.setDeviceMetricsOverride", { width: size[0], height: size[1], deviceScaleFactor: 1, mobile });
     if (mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     if (opts.noScript) await send("Emulation.setScriptExecutionDisabled", { value: true });
-    if (opts.reducedMotion) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+    // the pointer the size stands for, whatever machine runs the check: a desktop's mouse (fine, hovers), a phone's
+    // finger (coarse, no hover). Without it a desktop check follows the machine: a Mac's headless Chrome reports its
+    // trackpad, CI's Linux reports no pointer, and the zoom buttons (shown for a fine pointer) failed only in CI.
+    const pointer = mobile ? [{ name: "pointer", value: "coarse" }, { name: "hover", value: "none" }] : [{ name: "pointer", value: "fine" }, { name: "hover", value: "hover" }];
+    await send("Emulation.setEmulatedMedia", { features: [...pointer, ...(opts.reducedMotion ? [{ name: "prefers-reduced-motion", value: "reduce" }] : [])] });
     // navigated only once the device is set, so the page loads as this device would load it
     const page = live ? new URL(file).href : new URL(`file://${file}`).href;
     await send("Page.enable");
