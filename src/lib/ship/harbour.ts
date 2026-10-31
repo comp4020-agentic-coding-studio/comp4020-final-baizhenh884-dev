@@ -214,7 +214,8 @@ export class HarbourView {
       c.enableZoom = false;
       c.target.copy(this.homeTarget());
       c.addEventListener("change", () => this.requestFrame());
-      c.addEventListener("start", () => { if (!this.moved) { this.moved = true; this.onMoved(true); } });
+      // a drag during Reset view's ease takes the camera from where it is
+      c.addEventListener("start", () => { if (this.shot?.release) this.shot = null; if (!this.moved) { this.moved = true; this.onMoved(true); } });
       c.update();
     } else if (!on && this.controls) {
       this.controls.dispose();
@@ -226,6 +227,7 @@ export class HarbourView {
   // a step nearer (-1) or farther (1), within the orbit's limits (a desktop, with the orbit on)
   zoom(dir: -1 | 1): void {
     if (!this.controls) return;
+    if (this.shot?.release) { this.shot = null; this.settle(); }
     this.camera.position.copy(zoomBy(this.camera.position, this.controls.target, dir));
     this.controls.update();
     if (!this.moved) { this.moved = true; this.onMoved(true); }
@@ -249,11 +251,27 @@ export class HarbourView {
     this.paint();
   }
 
+  // Reset view: back to the fixed view from an orbit or a zoom, eased as the story's camera moves (at once with
+  // reduced motion), and the way back hides
   home(): void {
-    this.resize();
-    if (this.controls) { this.controls.target.copy(this.homeTarget()); this.controls.update(); }
     if (this.moved) { this.moved = false; this.onMoved(false); }
+    if (!this.reduced && !this.shot) {
+      const now = this.camera.position.toArray() as [number, number, number];
+      this.shot = { from: { position: now, target: (this.controls?.target ?? this.homeTarget()).toArray() as [number, number, number], fov: this.camera.fov }, to: storyView(this.layout(), "wide"), start: performance.now(), release: true };
+    } else if (!this.shot) this.settle();
     this.requestFrame();
+  }
+
+  // the fixed view, held: the orbit's target and its leftover drift reset with it, so nothing carries on turning
+  private settle(): void {
+    this.resize();
+    if (this.controls) {
+      this.controls.target.copy(this.homeTarget());
+      this.controls.enableDamping = false;
+      this.controls.update();
+      this.controls.enableDamping = true;
+      place(this.camera, this.layout(), this.host.clientWidth / this.host.clientHeight);
+    }
   }
 
   destroy(): void {
@@ -504,8 +522,7 @@ export class HarbourView {
       shotMoving = k < 1;
       if (!shotMoving && this.shot.release) {
         this.shot = null;
-        if (this.controls) { this.controls.target.copy(this.homeTarget()); }
-        this.resize();
+        this.settle();
       }
     } else if (followed) {
       const w = this.host.clientWidth, h = this.host.clientHeight;
