@@ -146,7 +146,11 @@ function asIfNoChanges(doc: Document): void {
   for (const form of doc.querySelectorAll('form[action="/replace"]')) {
     form.querySelector<HTMLInputElement>('input[name="version"]')!.value = "1";
   }
-  doc.querySelector('a[rel~="prev"]')?.closest("p")?.remove();
+  // the served Earlier link alone, and its separator in the page's foot (the foot itself stays)
+  const prev = doc.querySelector('a[rel~="prev"]');
+  if (prev?.previousElementSibling?.classList.contains("sep-form")) prev.previousElementSibling.remove();
+  if (prev?.parentElement?.matches("p.earlier")) prev.parentElement.remove();
+  else prev?.remove();
 }
 const traceStatus = (doc: Document) => doc.querySelector('section [role="status"], aside [role="status"]');
 
