@@ -567,9 +567,11 @@ describe("the harbour on GET /", () => {
       expect(b!.getAttribute("aria-label"), `the ${name} button isn't named`).toBe(name);
       expect(b!.closest('[aria-hidden="true"]'), `${name} is hidden from assistive technology`).toBeNull();
     }
-    const shown = async (size: [number, number]) => (await measureIn(await staged(), `(async () => { await document.fonts.ready; const b = document.querySelector('#zoom-in'); return !!b && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().width > 0; })()`, size)) as boolean;
-    expect(await shown([1440, 900]), "a desktop doesn't show the zoom buttons at rest").toBe(true);
-    expect(await shown([390, 844]), "a phone shows the zoom buttons").toBe(false);
+    // on the live page, once its harbour is drawn (they're dead without one: no script or no WebGL shows none)
+    const SHOWN = `(() => { const b = document.querySelector('#zoom-in'); return !!b && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().width > 0; })()`;
+    expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [1440, 900], { steps: [DRAWN] }), "a desktop doesn't show the zoom buttons at rest").toBe(true);
+    expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [390, 844], { steps: [DRAWN] }), "a phone shows the zoom buttons").toBe(false);
+    expect(await liveIn(new URL("/", baseUrl).href, SHOWN, [1440, 900], { noScript: true }), "the zoom buttons show with nothing to zoom (no script)").toBe(false);
   }, 90_000);
   it("offers a way back to the harbour's fixed view, a real button hidden at rest", async () => {
     const doc = new JSDOM(await (await fetch(new URL("/", baseUrl))).text()).window.document;
