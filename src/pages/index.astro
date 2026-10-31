@@ -143,7 +143,12 @@ const how =
           {/* each ship's tag for the part pointed at or chosen (a desktop; never at rest) */}
           <p class="part-tag caps" data-ship="live" aria-hidden="true" hidden></p>
           <p class="part-tag caps" data-ship="kept" aria-hidden="true" hidden></p>
-          <button id="home" class="caps" type="button" hidden>Back to the harbour</button>
+          {/* the camera's controls on a desktop: zoom by buttons (the wheel scrolls the page), and the way back */}
+          <div class="view-controls">
+            <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+            <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+            <button id="home" class="caps" type="button" hidden>Back to the harbour</button>
+          </div>
           <div id="sentence" class="sentence-strip strip">
             <div class="head-row">
               <p class="caps strip-label">Ten words · ten planks</p>

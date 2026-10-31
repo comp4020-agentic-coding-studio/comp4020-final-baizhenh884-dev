@@ -229,6 +229,8 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
   orbitIf();
   view.onMoved = (moved) => { if (homeButton) homeButton.hidden = !moved; };
   homeButton?.addEventListener("click", () => view.home());
+  doc.getElementById("zoom-in")?.addEventListener("click", () => view.zoom(-1));
+  doc.getElementById("zoom-out")?.addEventListener("click", () => view.zoom(1));
 
   return {
     latest({ position, word }, flight) {
