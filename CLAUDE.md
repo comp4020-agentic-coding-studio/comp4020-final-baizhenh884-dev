@@ -41,9 +41,11 @@ from what `README.md` argues "good" means (see "Product contract").
   current sentence: the words, the visitor's own trace, and the link to the
   immediately previous whole sentence. Nothing else goes live: no presence,
   no online/visitor counts, no activity or change feed, no chat, no rooms.
-  The one exception is the shipwrights (decision 0005, "Scope (Final
-  Project: the ship, in one harbour)"): an anonymous total of open streams,
-  drawn as figures, never shown as a number.
+  Two exceptions: the shipwrights (decision 0005, "Scope (Final Project:
+  the ship, in one harbour)"): an anonymous total of open streams, drawn as
+  figures, never shown as a number; and the log (decision 0006): each
+  change adds its line to the record of planks, from the change event the
+  stream already sends, nothing new on the wire.
   Catch-up after a disconnect is a fresh read from SQLite, never a replay
   log, a queue, or any durable pub/sub.
 
@@ -524,8 +526,23 @@ What the code must hold to. The README says why; don't restate it here.
   existing stale rule applies exactly as before.
 - No presence, online/visitor counts, visitor identity, or activity/change
   feed is added for realtime, except the shipwrights' anonymous total
-  (above); the existing no-who/when/counts rule extends to whatever the
-  realtime channel carries.
+  (above) and the log, which is a record of planks, not of people (below);
+  the existing no-who/when/counts rule extends to whatever the realtime
+  channel carries.
+- The log (decision 0006, partly superseding 0001's rejection of option C):
+  on `GET /`, below "Your plank", every successful replacement, newest
+  first, one line each: the place and its part, old word → new word
+  ("07 · Sail  whether → wonder"). Nothing that says when or who: no times
+  or ages, no names, no visitor marks (the visitor's own included), no
+  counts, no numbering beyond the 01–10 place. The latest 50 lines; the
+  rest stays reachable one form at a time under Earlier form. A line whose
+  old or new word is on the maker's blocklist isn't shown (decision 0004's
+  match). Finished ships are never listed: they stay one at a time under
+  Earlier ship. Live from the change event for every open `GET /`; a load,
+  snapshot or reconnect shows the record from SQLite. Derived from
+  `changes`, nothing stored. No log on `?at=N` or `?kept=k`. Read as a list
+  of lines, not announced line by line (the polite announcement of others'
+  changes already says it) (`spec/the-log.test.ts`).
 - The realtime layer never weakens an existing server-enforced product rule.
   Existing server-side validation, persistence and output-safety guarantees
   remain authoritative; stale, invalid, or ineligible replacements (whatever
@@ -611,7 +628,7 @@ hold.
   sentence, its one caption, the last plank, the waiting row, Earlier
   ship); your plank (the rule in a sentence or two, and your trace; under
   settle mode the hold is said only in a holding word's own line); the
-  log; then the foot: How the planks are made · Earlier form, then About.
+  log (decision 0006, below); then the foot: How the planks are made · Earlier form, then About.
   No side column; the question is asked once, in the band
   (`spec/harbour-layout.test.ts`, `spec/trace.test.ts`).
 - Your plank (decision 0005): when another visitor replaces a word that is
