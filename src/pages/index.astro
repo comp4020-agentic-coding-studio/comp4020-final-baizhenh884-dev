@@ -19,7 +19,7 @@ const visitor = ensureVisitor(Astro.cookies, Astro.locals);
 // GET /?kept=k: completed kept ship k on its own (an earlier ship), or 404
 const keptParam = Astro.url.searchParams.get("kept");
 const lone = keptParam !== null && /^[1-9][0-9]{0,14}$/.test(keptParam) ? completedShipAt(Number(keptParam)) : null;
-if (keptParam !== null && !lone) return new Response("Not found", { status: 404 });
+if (keptParam !== null && !lone) return Astro.rewrite("/404");
 const loneK = Number(keptParam);
 const lonePrev = lone && loneK > 1 ? loneK - 1 : null;
 const loneNext = lone && completedShipAt(loneK + 1) ? loneK + 1 : null;
@@ -28,7 +28,7 @@ const at = Astro.url.searchParams.get("at");
 let earlier: string[] | null = null;
 if (at !== null) {
   earlier = /^[0-9]{1,15}$/.test(at) ? sentenceAt(Number(at)) : null;
-  if (!earlier) return new Response("Not found", { status: 404 });
+  if (!earlier) return Astro.rewrite("/404");
 }
 const current = earlier ? [] : currentPositions();
 const changes = changeCount();
@@ -88,7 +88,7 @@ const how =
         {/* an earlier form: its own ship alone on the water, built from its own words, never live */}
         <div id="harbour" class="harbour" data-scene="earlier" aria-hidden="true"></div>
         <div class="sentence-strip strip earlier-strip">
-          <p class="form-state caps">An earlier form (read-only)</p>
+          <p class="form-state caps">{n === changes ? "The sentence as it stands (read-only here)" : "An earlier form (read-only)"}</p>
           <p class="sentence past">
             {earlier.map((w, i) => (
               <>

@@ -65,7 +65,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
       a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
       .mast { display: flex; align-items: baseline; gap: 1.1rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.7rem; margin: 0 0 3vh; max-width: 46vw; }
-      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; }
+      .mast .name { font: italic 400 1.55rem/1 "Instrument Serif", serif; margin: 0; white-space: nowrap; flex-shrink: 0; }
       .mast .sub { color: var(--soft); }
       /* the captions are read, not glanced at: 15px (14px on a phone), in --caption, 6.5:1 on the field */
       #how { margin: 1.3rem 0 0; font-size: 15px; line-height: 1.5; color: var(--caption); max-width: 52ch; }
@@ -261,14 +261,15 @@ const image = new URL("/og.png", Astro.url.origin).href;
       .stage:not(:has(#harbour[data-ready])) .view-controls { display: none; }
       @media not ((hover: hover) and (pointer: fine)) { .view-controls { display: none; } }
 
-      /* the opening story (decision 0007): a parchment card over the harbour's upper left, clear of the sentence
-         strip; the last beat lights the strip. The masthead's way back to it, as quiet as How the planks are made */
+      /* the opening story (decision 0007): a parchment card over the harbour's upper right, in the same place for
+         every beat, clear of the sentence strip and of the ship each beat shows; the last beat lights the strip.
+         The masthead's way back to it, as quiet as How the planks are made */
       #question .band-story { margin-left: 1.2rem; padding: 0; border: 0; background: none; color: var(--soft); cursor: pointer; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--hair); text-underline-offset: 0.2em; }
       #question .band-story[hidden] { display: none; }
-      .story { position: absolute; z-index: 5; top: 3.2vh; left: 3.6vw; width: min(520px, 40vw); cursor: pointer; }
+      .story { position: absolute; z-index: 5; top: 3.2vh; right: 3.6vw; width: min(520px, 40vw); cursor: pointer; }
       .story[hidden] { display: none; }
-      /* in on the live ship (left of the harbour), the card stands right of it, under the camera's controls */
-      .story[data-shot="live"] { left: auto; right: 3.6vw; }
+      /* the line's room is the longest beat's (three lines and the source), so Skip and Next never move between beats */
+      .story-card [aria-live] { font-size: clamp(22px, 1.9vw, 30px); min-height: calc(3 * 1.18em + 1.7rem); }
       /* no harbour drawn: the story is text above the sentence, in the page's flow */
       .stage:has(> .harbour.no-webgl) .story { position: static; width: auto; margin: 1rem auto; max-width: min(1180px, calc(100% - 2 * 3.6vw)); }
       .story-card { background: var(--parchment); color: var(--brown); border: 1px solid var(--parchment-edge); border-radius: 6px; box-shadow: 0 18px 50px rgb(40 25 10 / 0.28); padding: 1.3rem 1.5rem 1rem; }
@@ -300,10 +301,10 @@ const image = new URL("/og.png", Astro.url.origin).href;
       #part.yours { color: var(--brown); }
       .kept-sentence { counter-reset: kept; }
       .kept-sentence .w { position: relative; display: inline-block; padding-top: 12px; counter-increment: kept; }
-      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; position: absolute; left: 1px; top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); pointer-events: none; white-space: nowrap; text-decoration: none; }
+      .kept-sentence .w::before { content: counter(kept, decimal-leading-zero) / ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0; font: 500 10px/1 var(--mono); font-style: normal; letter-spacing: 0.04em; color: var(--brown-soft); pointer-events: none; white-space: nowrap; text-decoration: none; }
       /* a gap stands as tall as a word over the baseline, so its number is level with the words' on its line */
       .kept-sentence .gap { box-sizing: content-box; height: calc(0.907em - 2px); }
-      .kept-sentence .gap::before { left: 0; }
+      .kept-sentence .gap::before { left: 50%; }
       /* the next ship's waiting words, each with its place small above it, drawn, never read */
       .waiting { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1.1rem; row-gap: 0.2rem; border-top: 1px solid var(--parchment-edge); padding-top: 0.6rem; }
       .waiting[hidden] { display: none; }
@@ -322,7 +323,9 @@ const image = new URL("/og.png", Astro.url.origin).href;
       #your-plank section[aria-labelledby="trace-heading"] { margin: 0; }
       #how, section[aria-labelledby="trace-heading"] [role="status"] { text-wrap: pretty; }
       /* the log (decision 0006): one line per replacement, newest first; the place as the labels draw it, the words in the sentence's face */
-      .log-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+      /* in columns as wide as the strips above (newest first, down each column), so the record fills the page's width */
+      .log-lines { list-style: none; margin: 0; padding: 0; columns: 19rem; column-gap: clamp(1.5rem, 3vw, 3rem); }
+      .log-lines li { break-inside: avoid; padding: 0.075rem 0; }
       .log-lines li { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; min-width: 0; font: 400 clamp(18px, 1.3vw, 21px)/1.3 "Instrument Serif", serif; color: var(--ink); overflow-wrap: anywhere; }
       .log-lines .place { flex: 0 0 8.2em; font: 500 11px/1 var(--mono); letter-spacing: 0.04em; color: var(--caption); }
       .log-lines .from { color: var(--caption); }
@@ -380,7 +383,7 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .mast { max-width: none; flex-wrap: wrap; gap: 0.2rem 0.9rem; margin-bottom: 1.1rem; }
         /* the question first, stacked: the masthead, the question, Theseus's ship, then how to play */
         #question { display: block; padding: 0.8rem 1rem 0.9rem; }
-        #question .mast { margin: 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--rule); flex-wrap: nowrap; }
+        #question .mast { margin: 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--rule); flex-wrap: wrap; row-gap: 0.35rem; }
         #question .mast .sub { display: none; }
         #question .band-ship { margin-left: auto; }
         #question .question-line { margin-top: 0.6rem; font-size: 23px; line-height: 1.1; }
@@ -415,7 +418,8 @@ const image = new URL("/og.png", Astro.url.origin).href;
         .part-tag { display: none !important; }
         .view-controls { display: none !important; }
         /* the story is a sheet on the screen's foot: the harbour (scrolled to the top) or the sentence above it */
-        .story, .story[data-shot="live"] { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; }
+        .story { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; }
+        .story-card [aria-live] { min-height: 0; }
         .story-card { border-radius: 10px 10px 0 0; border-width: 1px 0 0; padding: 1.1rem 1.1rem calc(0.8rem + env(safe-area-inset-bottom)); }
         .story-card p { font-size: 24px; }
         /* a phone's strip runs edge to edge: lit as a ring inside it */

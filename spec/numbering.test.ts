@@ -56,7 +56,9 @@ describe("the numbering", () => {
           // an index is its element's ::before, laid out against the element's own box
           const index = (el, half, words) => {
             const s = getComputedStyle(el, '::before'), r = el.getBoundingClientRect();
-            const top = r.top + parseFloat(s.top), left = r.left + parseFloat(s.left), height = parseFloat(s.height);
+            // where it's drawn: its offset, and any shift its transform adds ("matrix(1, 0, 0, 1, x, y)")
+            const shift = (s.transform.match(/matrix\\(([^)]+)\\)/)?.[1].split(',').map(Number) ?? [1, 0, 0, 1, 0, 0]).slice(4);
+            const top = r.top + parseFloat(s.top) + shift[1], left = r.left + parseFloat(s.left) + shift[0], height = parseFloat(s.height);
             const [flat, line] = ground(half), fg = over(rgb(s.color), flat);
             const box = { top, bottom: top + height, left, right: left + parseFloat(s.width) };
             // the words this index would sit on, its own included: any word's letters it crosses, with 1px clear
@@ -176,4 +178,28 @@ describe("the numbering", () => {
     expect((await measureIn(doc, show, [390, 844])) as boolean, "a phone draws a part tag").toBe(false);
     expect((await measureIn(doc, show, [1440, 900])) as boolean, "a desktop draws no part tag").toBe(true);
   }, 60_000);
+
+  // Each kept number stands centred over its own word or gap (a first-visit review, 1 November: set at each
+  // word's left edge, "02 03" and "08 09 10" bunched over short words, and on a phone "09 10" read as both over
+  // "it", with nothing over "disappeared"). The kept sentence as GET / serves it, with short words among long.
+  for (const [name, size] of [["1440×900", [1440, 900]], ["phone 390×844", [390, 844]]] as const) {
+    it(`centres each kept number over its own word or gap (${name})`, async () => {
+      const doc = await servedPage(baseUrl);
+      doc.querySelectorAll(".kept-sentence .w").forEach((w, i) => {
+        w.className = i % 3 === 1 ? "w gap" : "w";
+        w.textContent = ["Make", "a", "website", "that", "people", "would", "miss", "if", "it", "disappeared"][i];
+      });
+      const m = (await measureIn(doc, `(async () => {
+        await document.fonts.ready;
+        return [...document.querySelectorAll('.kept-strip .kept-sentence .w')].map((w) => {
+          const r = w.getBoundingClientRect(), s = getComputedStyle(w, '::before');
+          const shift = (s.transform.match(/matrix\\(([^)]+)\\)/)?.[1].split(',').map(Number) ?? [1, 0, 0, 1, 0, 0])[4];
+          const left = r.left + parseFloat(s.left) + shift;
+          return { word: w.textContent.trim(), centre: r.left + r.width / 2, number: left + parseFloat(s.width) / 2 };
+        });
+      })()`, [size[0], size[1]])) as { word: string; centre: number; number: number }[];
+      expect(m, "not ten kept words or gaps").toHaveLength(10);
+      for (const [i, x] of m.entries()) expect(Math.abs(x.number - x.centre), `kept number ${i + 1} isn't centred over “${x.word}”`).toBeLessThanOrEqual(1);
+    }, 90_000);
+  }
 });
