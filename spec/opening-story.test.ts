@@ -102,6 +102,14 @@ const IN_PAGE = `
   const button = (words) => [...story().querySelectorAll('button')].find((b) => b.textContent.trim() === words && shown(b)) ?? null;
   const key = (k, at = document.activeElement || document.body) => at.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
   const inView = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.width > 0; };
+  // until the page has drawn its scroll: at least min ms, then five painted frames in a row at the same scroll.
+  // Counted in frames, not time: in software WebGL a frame can take most of a second, and a smooth scroll moves
+  // only as frames are painted (seen in CI on 1 November: at 900 ms the harbour was still where the page opened)
+  const settle = async (min = 900, max = 8000) => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const t0 = performance.now(); let y = scrollY, still = 0;
+    while (performance.now() - t0 < max) { await frame(); if (scrollY === y) still++; else { still = 0; y = scrollY; } if (still >= 5 && performance.now() - t0 >= min) return; }
+  };
 `;
 
 describe("the story on a first visit", () => {
@@ -123,7 +131,7 @@ describe("the story on a first visit", () => {
           remembered: (() => { try { return localStorage.getItem(${JSON.stringify(STORY_KEY)}); } catch { return 'unreadable'; } })(), beats: [] };
         for (let i = 0; i < 5; i++) {
           // a phone scrolls the harbour (or, at the end, the sentence) into view: measured once it has
-          await sleep(900);
+          await settle();
           const card = s;
           const harbour = document.querySelector('#harbour'), strip = document.querySelector('#sentence');
           const cr = card.getBoundingClientRect(), hr = harbour.getBoundingClientRect(), sr = strip.getBoundingClientRect();
