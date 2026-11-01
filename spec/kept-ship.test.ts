@@ -198,8 +198,8 @@ class Visitor {
     const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
     return { ...(cookie ? { cookie } : {}), ...extra };
   }
-  async page(): Promise<Document> {
-    const res = await fetch(new URL("/", baseUrl), { headers: this.headers() });
+  async page(path = "/"): Promise<Document> {
+    const res = await fetch(new URL(path, baseUrl), { headers: this.headers() });
     this.remember(res);
     return new JSDOM(await res.text()).window.document;
   }
@@ -368,7 +368,12 @@ describe("Kept ship markup on GET /", () => {
   // gap: it reads the kept ship's own rendered gaps, picks one, replaces
   // exactly that position (the word a gap waits for is always the word
   // standing there right now — docs/decisions/0003), and checks that gap
-  // alone closes with that word, text content only.
+  // closes with that word, text content only. When it was the ship's last
+  // gap, filling it completes the ship, and GET / rightly moves on to the
+  // next one, where the same place may be a gap again: the check then reads
+  // the ship it filled where a completed ship lives, alone at its Earlier
+  // ship link. (Until 1 November it always read GET /, so it failed whenever
+  // an earlier spec file had left the shown ship one gap short.)
   changesTheSentence("fills a gap with the word that stood there, the moment it's replaced", async () => {
     const v = new Visitor();
     const doc1 = await v.page();
@@ -376,6 +381,8 @@ describe("Kept ship markup on GET /", () => {
     expect(spans, "the kept ship has no ten word spans").toHaveLength(10);
     const gapIndex = spans.findIndex((s) => s.classList.contains("gap"));
     expect(gapIndex, "no gap to fill: every position is already kept").toBeGreaterThanOrEqual(0);
+    const lastGap = spans.filter((s) => s.classList.contains("gap")).length === 1;
+    const earlierBefore = doc1.querySelector(".earlier-ship")?.getAttribute("href") ?? null;
 
     const before = await v.sentence();
     const slot = before[gapIndex];
@@ -383,9 +390,19 @@ describe("Kept ship markup on GET /", () => {
     expect(await v.replace(slot, word)).toBe(303);
 
     const doc2 = await v.page();
-    const after = [...doc2.querySelectorAll<HTMLElement>(".kept-sentence .w")];
-    expect(after[gapIndex].classList.contains("gap"), "the replaced gap is still a gap").toBe(false);
-    expect(after[gapIndex].textContent?.trim(), "the kept ship doesn't show the word that stood there").toBe(slot.word);
+    let filled: HTMLElement[];
+    if (lastGap) {
+      // the ship is whole now: it's the latest completed ship, no longer the one GET / shows
+      const href = doc2.querySelector(".earlier-ship")?.getAttribute("href") ?? null;
+      expect(href, "filling the last gap didn't complete the ship: GET / has no way to it").not.toBeNull();
+      expect(href, "filling the last gap didn't complete a new ship").not.toBe(earlierBefore);
+      filled = [...(await v.page(new URL(href!, new URL("/", baseUrl)).href)).querySelectorAll<HTMLElement>(".kept-sentence .w")];
+      expect(filled.map((w) => w.textContent?.trim()), "the completed ship isn't the ship that was filled").toEqual(
+        spans.map((s, i) => (i === gapIndex ? slot.word : s.textContent?.trim())),
+      );
+    } else filled = [...doc2.querySelectorAll<HTMLElement>(".kept-sentence .w")];
+    expect(filled[gapIndex].classList.contains("gap"), "the replaced gap is still a gap").toBe(false);
+    expect(filled[gapIndex].textContent?.trim(), "the kept ship doesn't show the word that stood there").toBe(slot.word);
   });
 });
 
