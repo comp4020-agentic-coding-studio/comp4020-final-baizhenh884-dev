@@ -1,0 +1,29 @@
+---
+// Anything that isn't a page: the site's own shell, with the way back to the sentence. Also what GET / renders for an
+// ?at=N or ?kept=k that names no form or ship (still a 404).
+import Page from "../layouts/Page.astro";
+
+Astro.response.status = 404;
+---
+
+<Page title="Not found · Theseus" description="There's nothing at this address. The sentence and its ship are on the front page.">
+  <div class="not-found">
+    <header class="mast">
+      <h1 class="name">Theseus</h1><span class="sub caps">Not found</span>
+    </header>
+    <article>
+      <p class="lede">There's no plank here.</p>
+      <p>Nothing stands at this address. The sentence and its ship are where they always are.</p>
+    </article>
+    <nav class="caps" aria-label="site"><a href="/">Back to the sentence</a> · <a href="/ship/">How the planks are made</a></nav>
+  </div>
+</Page>
+
+<style is:global>
+  .not-found { max-width: 36rem; }
+  .not-found .mast { max-width: none; margin-bottom: clamp(36px, 9vh, 88px); }
+  .not-found article > p { font: 400 clamp(20px, 1.55vw, 24px)/1.4 "Instrument Serif", serif; color: var(--ink); margin: 0 0 1.15em; }
+  .not-found article > p.lede { font-size: clamp(27px, 2.5vw, 38px); line-height: 1.2; letter-spacing: -0.01em; }
+  .not-found nav { color: var(--soft); }
+  .not-found a { text-decoration-color: var(--hair); }
+</style>

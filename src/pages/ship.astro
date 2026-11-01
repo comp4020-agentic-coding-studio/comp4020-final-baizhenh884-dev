@@ -46,7 +46,8 @@ const EXAMPLES: [number, string, string][] = [
               <tr data-part={PARTS[p]}>
                 <td class="num" data-n>{n(p)}</td>
                 <th scope="row">{Name(p)}</th>
-                <td data-reads>{r.reads}</td>
+                <td data-reads>{/* a letter list in brackets stays on one line, so a line never starts with a lone "s)" */}
+                  {r.reads.split(/(\([^)]*\))/).map((part) => (part.startsWith("(") ? <span class="keep">{part}</span> : part))}</td>
                 <td data-makes>{r.makes}</td>
               </tr>
             ))}
@@ -94,6 +95,7 @@ const EXAMPLES: [number, string, string][] = [
      sections share a desktop screen; the masthead and the intro keep its 36rem reading measure. */
   .ship-doc { max-width: none; }
   .ship-doc .mast { max-width: 36rem; margin-bottom: clamp(36px, 9vh, 88px); }
+  .ship-doc .keep { white-space: nowrap; }
   .ship-doc .mast nav { margin-left: auto; color: var(--soft); }
   .ship-doc .mast nav a { text-decoration-color: var(--hair); }
   .ship-doc article { max-width: 36rem; }
