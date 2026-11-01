@@ -162,6 +162,32 @@ describe("the story on a first visit", () => {
     }, 90_000);
   }
 
+  // The card and its buttons stay in one place through all five beats (a first-visit review, 1 November: on a
+  // desktop the card swapped sides with the shot, so Next moved every beat and had to be found again), and the
+  // card never covers the sentence. A phone's sheet sits at the screen's foot already.
+  it("keeps the card, Skip and Next in one place through all five beats (1440×900)", async () => {
+    const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
+      await wait(() => shown(story()));
+      const at = (el) => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; };
+      const beats = [];
+      for (let i = 0; i < 5; i++) {
+        await sleep(i ? 1900 : 900);
+        const go = button('Next') || button('Begin');
+        beats.push({ card: at(story().querySelector('.story-card') || story()), skip: at(button('Skip')), go: at(go) });
+        go.click();
+      }
+      return beats;
+    })()`, DESKTOP, { firstVisit: true })) as { card: number[]; skip: number[]; go: number[] }[];
+    expect(m, "the story didn't play five beats").toHaveLength(5);
+    for (const [i, b] of m.entries()) {
+      const [first] = m;
+      // the card's top-left and right edge, Skip, and Next's right end (Begin may be wider than Next) stay put
+      expect([b.card[0], b.card[1], b.card[2]], `the card moves on beat ${i + 1}`).toEqual([first.card[0], first.card[1], first.card[2]]);
+      expect(b.skip, `Skip moves on beat ${i + 1}`).toEqual(first.skip);
+      expect([b.go[1], b.go[2], b.go[3]], `Next moves on beat ${i + 1}`).toEqual([first.go[1], first.go[2], first.go[3]]);
+    }
+  }, 90_000);
+
   it("skips with Skip or Escape, advances with a click, Enter, Space and →, and goes back with ←", async () => {
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
       await wait(() => shown(story()));

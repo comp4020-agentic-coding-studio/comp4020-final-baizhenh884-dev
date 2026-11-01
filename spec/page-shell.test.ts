@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, inject, it } from "vitest";
+import { measureIn, servedPage } from "./chrome";
 
 // Every page's shell: one visible h1 (the masthead's "Theseus", in its own
 // look), a main landmark and a header, a meta description, the Open Graph
@@ -47,4 +48,38 @@ describe("every page's shell", () => {
       expect(icon.headers.get("content-type"), "the favicon isn't an image").toMatch(/^image\//);
     }
   });
+
+  // A page that isn't there (a first-visit review, 1 November: /nope, ?at=abc and ?kept=0 fell to Astro's own
+  // black page, with no way back): still a 404, in the site's own shell, with the way back to the sentence.
+  for (const path of ["/nope", "/?at=abc", "/?kept=0"]) {
+    it(`answers a page that isn't there with a 404 in the site's own shell, and the way back (${path})`, async () => {
+      const res = await fetch(new URL(path, baseUrl));
+      expect(res.status, `GET ${path}`).toBe(404);
+      const doc = new JSDOM(await res.text()).window.document;
+      const h1s = [...doc.querySelectorAll("h1")];
+      expect(h1s.map((h) => h.textContent?.trim()), `${path} isn't in the site's shell`).toEqual(["Theseus"]);
+      expect(h1s[0].closest("header"), `${path}'s h1 isn't in its header`).not.toBeNull();
+      expect(doc.querySelectorAll("main"), `${path} has no single main`).toHaveLength(1);
+      const back = [...doc.querySelectorAll("a[href]")].some((a) => new URL(a.getAttribute("href")!, new URL(path, baseUrl)).pathname === "/" && !new URL(a.getAttribute("href")!, new URL(path, baseUrl)).search);
+      expect(back, `${path} has no way back to the sentence`).toBe(true);
+    });
+  }
+
+  // The masthead's name is one word on one line: on a phone the band's links once squeezed it to "These / us"
+  // (a first-visit review, 1 November, at 360–390 px wide).
+  for (const path of ["/", "/ship/", "/readme/"]) {
+    for (const width of [360, 390]) {
+      it(`keeps the masthead's name on one line on a phone (${path}, ${width} px)`, async () => {
+        const m = (await measureIn(await servedPage(baseUrl, path), `(async () => {
+          await document.fonts.ready;
+          // as the page's script shows it: GET /'s way to replay the opening story, beside How the planks are made
+          document.querySelector('#story-open')?.removeAttribute('hidden');
+          const n = document.querySelector('header .name'), s = getComputedStyle(n);
+          return { height: n.getBoundingClientRect().height, font: parseFloat(s.fontSize), scroll: document.documentElement.scrollWidth, vw: innerWidth };
+        })()`, [width, 800])) as { height: number; font: number; scroll: number; vw: number };
+        expect(m.height, `the name breaks onto a second line (${Math.round(m.height)} px tall)`).toBeLessThan(1.5 * m.font);
+        expect(m.scroll, "the page scrolls sideways").toBeLessThanOrEqual(m.vw);
+      }, 60_000);
+    }
+  }
 });
