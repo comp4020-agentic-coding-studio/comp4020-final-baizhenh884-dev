@@ -618,7 +618,10 @@ hold.
 - The visual treatment is judged, not specified. Its direction is the
   prototype's sunlit harbour: Athens on the shore, the live ship painted on
   teal water, the kept ship bleached like driftwood on its slipway, a part
-  still standing drawn as an outline, the next ship's planks on a pallet;
+  still standing drawn as a faint, translucent wooden ghost of itself, the
+  hull most present, so a ship still being gathered reads as a ship (maker,
+  1 November: as an outline, a ship with no hull yet read as parts floating
+  in the air; `spec/ship-ghost.test.ts`), the next ship's planks on a pallet;
   parchment strips for the sentence and the kept sentence. The sentence is
   the protagonist and the ship its body; red is only a part being rebuilt
   now.
