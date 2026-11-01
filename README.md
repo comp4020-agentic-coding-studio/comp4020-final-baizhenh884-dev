@@ -4,27 +4,28 @@ The Ship of Theseus asks whether something remains the same thing when each of
 its parts has been replaced, one by one.
 
 Here, that question takes two forms at once: a sentence of ten words, and a
-house of ten parts. Each place in the sentence corresponds to a part of the
-house. The position of a word determines where it acts; the way the word is
-written helps determine the architectural character of that part. Its meaning
-does not.
+ship of ten planks. Each place in the sentence always builds the same part of
+the ship: the first the ram, the second the hull, and so on to the pennant.
+How a word is spelled decides what its plank looks like. Its meaning does not.
 
 I wrote the first sentence: *Make a website that people would miss if it
-disappeared.* After that, any visitor may replace a word, and its part of the
-house is rebuilt. Replaced words are kept, and built back into a second sentence
-and a second house.
+disappeared.* After that, any visitor may replace a word, and its plank is
+rebuilt. The old plank is carried across the quay by a shipwright and built
+into a second ship, from the replaced words, beside a second sentence.
 
 Nothing is permanent, and nobody owns what they leave behind.
 
-*If every word and every part is replaced, is it still the same thing?*
+*If every plank is replaced, is it still the same ship?*
 
-The page opens on that question and three steps on how to play; once you have
-made a change, only the question stays.
+A first visit opens with the story in five short beats: Plutarch's ship, and
+Hobbes's question about the old planks. Then the page asks the question and
+gives three steps on how to play; once you have made a change, only the
+question stays.
 
 ## The rule
 
 - You may replace any word with one of your own. Your word then holds your
-  place: until someone replaces it, or it has stood about five minutes, you
+  place: until someone replaces it, or it has stood 20 seconds, you
   can't make another, and your next word has to go somewhere else. No undo.
 - Anyone after you may replace any word, including yours.
 - You can only replace a word you saw: if it changes first, yours fails and
@@ -50,55 +51,72 @@ A change never lands on a sentence you didn't see. `ENFORCED`, word by word.
 Nothing is protected, not even my starting sentence. Later changes alter what
 yours says even while it stands. `ENFORCED`: no word can be locked.
 
-### The sentence keeps its past without becoming a feed
+### The sentence keeps its past without becoming a feed of people
 
 The present shows only what stands now; earlier whole forms are reached one at
-a time (`?at=0` is my sentence, `?at=N` the sentence after N changes). No
-names, times, counts or activity stream; only you see which word was yours, and
-the numbers 01–10 name positions, not counts. `ENFORCED` for what's hidden;
+a time (`?at=0` is my sentence, `?at=N` the sentence after N changes). Below
+the harbour, a log records every plank that was swapped, old word → new word:
+newest first, the latest fifty, never who swapped it or when. No names, times
+or counts; only you see which word was yours, and the numbers 01–10 name
+positions, not counts.
+`ENFORCED` for what's hidden
+([decision 0006](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0006-the-log.md));
 `JUDGED` for depth over clutter.
 
 ### What is replaced is kept, as a second Theseus
 
 Hobbes asked what happens if the old planks are rebuilt into a second ship.
-Here the first kept sentence is mine, gathered back as each word is replaced;
-its gaps are words still standing. Finished houses are revisited one at a time,
-never as a list. `ENFORCED`: derived from the record, never stored. `JUDGED`:
-whether a stranger reads the two houses as the question.
+Here the first ship of old planks is mine, gathered back as each word is
+replaced; a plank not yet replaced stands as a faint ghost of itself, and its
+word stays faint in the kept sentence. Finished ships are revisited one at a
+time, never as a list. `ENFORCED`: derived from the record, never stored.
+`JUDGED`: whether a stranger reads the two ships as the question.
 
 ### Only the present is live; the past stays frozen
 
-Others' changes appear as they happen; no presence, online count or chat.
-`ENFORCED`: earlier forms never go live, and the stream carries words, not
-people, times or counts. `JUDGED`: whether a changing sentence reads as company
+Others' changes appear as they happen, and others are present only as
+shipwrights on the quay: every figure alike, never named, counted or
+listed ([decision 0005](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0005-the-ship.md)).
+No chat. `ENFORCED`: earlier forms never go live, and the stream carries words
+and an anonymous total drawn as figures, not people or times. `JUDGED`:
+whether a changing sentence reads as company
 ([decision 0001](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0001-live-present-frozen-past.md)).
 
 ## How it works
 
 SQLite is the only record, the server decides every replacement, and an open
-page receives updates through a live stream. The house is built in the browser
-from each word's written form, never stored, and rebuilt only after the server
-accepts a change; [How the house reads a
-word](https://comp4020-final-baizhenh884-dev.fly.dev/house/) sets out its rules.
+page receives updates through a live stream. Both ships are built in the
+browser from the words, never stored, and a plank is rebuilt only after the
+server accepts a change; [How the planks are
+made](https://comp4020-final-baizhenh884-dev.fly.dev/ship/) sets out the rules.
 
 ## What I looked at
 
-- **The Ship of Theseus** ([summary](https://en.wikipedia.org/wiki/Ship_of_Theseus)): the name, the question, and Hobbes's second ship.
+- **The Ship of Theseus** ([summary](https://en.wikipedia.org/wiki/Ship_of_Theseus)): the name, the question (Plutarch, *Life of Theseus* 23), and Hobbes's second ship.
 - **Reddit, ["How We Built r/Place"](https://www.redditinc.com/blog/how-we-built-rplace)** (2017): anyone over anyone, under a server limit; Theseus limits by place as well as time.
 - **Clay Shirky, ["Situated Software"](https://gwern.net/doc/technology/2004-03-30-shirky-situatedsoftware.html)** (2004): software for one group can lean on it, so a cookie is enough.
 - **A five-person probe** ([record](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/exploration/theseus-probe-2026-10-01.md)), me among them: words beneath each position couldn't recover the sentence, so earlier forms exist.
+- **An informal playtest** ([record](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/exploration/playtest-2026-10-28.md)), three classmates: they couldn't tell what the page was or where to act, and left after a change or two.
 
 These shaped the decisions; they don't prove them.
 
 ## What I'm deliberately not building
 
-No accounts or profiles; no chat, comments, likes or scores; no presence or
-counts; no rooms; no feed, editing or undo; no fake visitors; no user-facing
-moderation. The one maker-only fix, a blocklist of exact words, gives nobody
-ownership and is not moderation
+No accounts or profiles; no chat, comments, likes or scores; no names or
+counts of who is here; no rooms; no activity feed, editing or undo; no fake
+visitors; no user-facing moderation. The one maker-only fix, a blocklist of
+exact words, gives nobody ownership and is not moderation
 ([decision 0004](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0004-maker-blocklist.md)).
 
 At the 21 October crit, two or three classmates tried it informally, under the
 old one-change rule, and wanted to try many words (no notes were kept). I didn't
 add a private sandbox or shorten the wait; I made the rule legible instead: the
-question band, the 01–10 numbers and /house/.
+question band, the 01–10 numbers and the notes on how each part reads a word.
+
+At the 28 October playtest the page, then a house, didn't explain itself, and
+visits were short: a change or two, then they left. I didn't add more
+instructions to the same page; I changed what the page is: the house became a
+ship, a replaced plank is carried visibly to the second ship, and a first
+visit opens with the story the question comes from
+([decision 0005](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0005-the-ship.md),
+[decision 0007](https://github.com/comp4020-agentic-coding-studio/comp4020-final-baizhenh884-dev/blob/main/docs/decisions/0007-the-opening-story.md)).
