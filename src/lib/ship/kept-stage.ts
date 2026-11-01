@@ -20,7 +20,7 @@ const same = (a: readonly string[], b: readonly string[]) => a.length === b.leng
 
 export class KeptStage {
   readonly body: LiveBody;
-  // which positions the kept body shows as gaps (a faint outline) right now
+  // which positions the kept body shows as gaps (a faint wooden ghost of the part, ghost.ts) right now
   gaps: boolean[] = [];
   // the newest kept ship told: what the body settles on
   target: KeptShip | null = null;

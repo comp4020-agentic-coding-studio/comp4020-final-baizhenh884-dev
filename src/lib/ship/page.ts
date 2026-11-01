@@ -103,7 +103,7 @@ export function mountHarbour(doc: Document, kept: KeptShip, own: (position: numb
   }
 
   // The old plank flies to where it's kept. The kept ship is told at once, so it sets the plank down in its gap
-  // as it lands (its gap stays an outline until then); a plank for the next ship is drawn on the pallet only
+  // as it lands (its gap stays a ghost until then); a plank for the next ship is drawn on the pallet only
   // once it has landed.
   // `own`: this visitor's own change, carried by their own shipwright
   function fly(position: number, moment: Moment, k: KeptShip, kind: Kind, yours = false, own = false): void {
