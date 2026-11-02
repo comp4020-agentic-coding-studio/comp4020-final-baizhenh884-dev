@@ -37,6 +37,8 @@ async function stageSentence(words: string[]): Promise<void> {
 
 const DESKTOP: [number, number] = [1440, 900];
 const PHONE: [number, number] = [390, 844];
+// on a phone, beats 1–4 bring the harbour into view above the story's card: more than this share of it shows
+const HARBOUR_SHOWN = 0.6;
 
 describe("the story's beats", () => {
   it("are the five fixed lines, in order, with Plutarch cited on the third", () => {
@@ -102,13 +104,23 @@ const IN_PAGE = `
   const button = (words) => [...story().querySelectorAll('button')].find((b) => b.textContent.trim() === words && shown(b)) ?? null;
   const key = (k, at = document.activeElement || document.body) => at.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
   const inView = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.width > 0; };
-  // until the page has drawn its scroll: at least min ms, then five painted frames in a row at the same scroll.
-  // Counted in frames, not time: in software WebGL a frame can take most of a second, and a smooth scroll moves
-  // only as frames are painted (seen in CI on 1 November: at 900 ms the harbour was still where the page opened)
-  const settle = async (min = 900, max = 8000) => {
+  // where the story's view stands: how much of the harbour shows above the card, and the sentence in view, clear of it
+  const view = () => {
+    const cr = story().getBoundingClientRect(), hr = document.querySelector('#harbour').getBoundingClientRect(), sr = document.querySelector('#sentence').getBoundingClientRect();
+    return { harbourAboveCard: Math.max(0, Math.min(hr.bottom, cr.top, innerHeight) - Math.max(hr.top, 0)) / hr.height,
+      stripInView: sr.top >= -1 && sr.top < innerHeight && sr.bottom > 0,
+      cardOverStrip: !(cr.right <= sr.left || cr.left >= sr.right || cr.bottom <= sr.top || cr.top >= sr.bottom) };
+  };
+  // until the view has arrived where the beat takes it and the scroll is still (five painted frames in a row), after
+  // at least min ms; at max it's measured as it stands, so a view that never arrives fails on what it shows. Waited
+  // for, not timed: in software WebGL (CI's) no frame is painted for 0.8–1.6 s after the story opens, and a smooth
+  // scroll only moves once frames are, so at a fixed 900 ms the page still stood where it opened (CI, 1 November:
+  // 0.44 of the harbour; 0.457 reproduced locally with the CPU slowed, never with WebGL off). Five still frames
+  // alone held only because the scroll happened to start within them.
+  const settle = async (arrived = () => true, min = 900, max = 10000) => {
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
     const t0 = performance.now(); let y = scrollY, still = 0;
-    while (performance.now() - t0 < max) { await frame(); if (scrollY === y) still++; else { still = 0; y = scrollY; } if (still >= 5 && performance.now() - t0 >= min) return; }
+    while (performance.now() - t0 < max) { await frame(); if (scrollY === y) still++; else { still = 0; y = scrollY; } if (still >= 5 && performance.now() - t0 >= min && arrived()) return; }
   };
 `;
 
@@ -131,14 +143,8 @@ describe("the story on a first visit", () => {
           remembered: (() => { try { return localStorage.getItem(${JSON.stringify(STORY_KEY)}); } catch { return 'unreadable'; } })(), beats: [] };
         for (let i = 0; i < 5; i++) {
           // a phone scrolls the harbour (or, at the end, the sentence) into view: measured once it has
-          await settle();
-          const card = s;
-          const harbour = document.querySelector('#harbour'), strip = document.querySelector('#sentence');
-          const cr = card.getBoundingClientRect(), hr = harbour.getBoundingClientRect(), sr = strip.getBoundingClientRect();
-          out.beats.push({ line: line(), source: source(), skip: !!button('Skip') && inView(button('Skip')), next: button('Next') ? 'Next' : button('Begin') ? 'Begin' : null,
-            harbourAboveCard: Math.max(0, Math.min(hr.bottom, cr.top, innerHeight) - Math.max(hr.top, 0)) / hr.height,
-            stripInView: sr.top >= -1 && sr.top < innerHeight && sr.bottom > 0,
-            cardOverStrip: !(cr.right <= sr.left || cr.left >= sr.right || cr.bottom <= sr.top || cr.top >= sr.bottom) });
+          await settle(i === 4 ? () => view().stripInView && !view().cardOverStrip : ${size === PHONE} ? () => view().harbourAboveCard > ${HARBOUR_SHOWN} : undefined);
+          out.beats.push({ line: line(), source: source(), skip: !!button('Skip') && inView(button('Skip')), next: button('Next') ? 'Next' : button('Begin') ? 'Begin' : null, ...view() });
           (button('Next') || button('Begin')).click();
         }
         await sleep(1200);
@@ -162,7 +168,7 @@ describe("the story on a first visit", () => {
       expect(m.beats[4].stripInView, "the sentence isn't in view on the last beat").toBe(true);
       expect(m.beats[4].cardOverStrip, "the story covers the sentence on the last beat").toBe(false);
       // beats 1–4 are over the harbour: on a phone it's scrolled into view, above the story's card
-      if (size === PHONE) for (const i of [0, 1, 2, 3]) expect(m.beats[i].harbourAboveCard, `the harbour isn't in view above the story on beat ${i + 1}`).toBeGreaterThan(0.6);
+      if (size === PHONE) for (const i of [0, 1, 2, 3]) expect(m.beats[i].harbourAboveCard, `the harbour isn't in view above the story on beat ${i + 1}`).toBeGreaterThan(HARBOUR_SHOWN);
       expect(m.closed, "Begin doesn't close the story").toBe(true);
       expect(m.focus, "Begin doesn't put focus on the sentence strip").toBe(true);
       expect(m.wordField, "Begin takes a word in hand").toBe(false);
