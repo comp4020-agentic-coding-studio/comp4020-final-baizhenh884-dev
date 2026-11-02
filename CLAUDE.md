@@ -271,6 +271,14 @@ A check at one layer doesn't verify another. Say which layer a claim rests on.
 - A layout check stages its whole state (`stageHarbour` in `spec/chrome.ts`):
   every server-derived element it measures is set by the check, never left
   to whatever an earlier spec file left in the shared container.
+- A check that measures the end of a motion (a scroll, a camera move, a
+  flight) waits for the state the contract promises, bounded by a timeout,
+  then measures; a fixed time or a run of still frames is never enough on
+  its own. At the timeout it measures what stands, so a motion that never
+  arrives still fails. (The opening story's beat 1 failed in CI at a fixed
+  900 ms, and #36's five still frames only held because the scroll happened
+  to start within them: in software WebGL a frame can be 0.8–1.6 s late;
+  #37.)
 - Never weaken or skip a local/CI check because production can't run it.
 - New checks go in `spec/*.test.ts` (`spec/README.md` covers the shipped
   ones), assert the contract rather than the implementation, and are written
