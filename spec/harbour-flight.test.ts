@@ -4,6 +4,7 @@ import { classifyMoment, type KeptShip } from "../src/lib/kept-moment";
 import { buildShip } from "../src/lib/ship/build";
 import { CARRIED_MIN_PX, carriedScale, FIGURE_HEIGHT, heldAt, carryPath, catchPoint, CRADLE_BLOCKS, CREW_MAX, crewSpots, followView, flightTarget, home, KEPT_POSE, LIVE_POSE, onQuay, ORBIT, PALLET_PLANK, PALLET_SLOTS, partHome, place, posed, tossAt, zoomBy } from "../src/lib/ship/stage";
 import { arrivalAt, carryAt, landsAt } from "../src/lib/ship/motion";
+import { JSDOM } from "jsdom";
 import { liveIn } from "./chrome";
 
 // The plank's carry (docs/decisions/0005-the-ship.md, amended 31 October):
@@ -370,6 +371,11 @@ describe("a plank flying on a real page, for another visitor's change", () => {
   // visitor's change 600 ms into that carry. The first plank is set down at once, so its waiting word is in the
   // row right after the second change (it lands only with its plank), while the second plank is on its way
   // (data-flying names its place), and everything is set down in the end.
+  // Each moment is taken when the page gets there, never at a time: an observer reads the row each time data-flying
+  // changes, called before any later event, so the first carry and the second change are each read as they begin;
+  // the end is waited for, up to a bound. Polled, the first carry was read only once the page had also taken the
+  // second change on a slow machine (CI, 2 November: '5' for '4'; reproduced locally with the page held 800 ms
+  // after the first carry began).
   localOnly("finishes a carry still under way at once when a second change arrives", async () => {
     if ((await moments()).waiting! < 0) {
       const { crossing } = await moments();
@@ -377,31 +383,38 @@ describe("a plank flying on a real page, for another visitor's change", () => {
     }
     const { waiting, crossing } = await moments();
     expect(waiting !== null && waiting >= 0 && crossing !== null && crossing >= 0 && waiting !== crossing, "no waiting and crossing pair to stage").toBe(true);
+    // the word the first change replaces, as the server shows it before the change: it's the one that waits for the next ship
+    const page = new JSDOM(await (await fetch(new URL("/", baseUrl))).text()).window.document;
+    const old = page.querySelector(`label[for="word-${waiting}"]`)!.textContent!.trim();
     const a = fresh("earlycarry"), b = fresh("nextcarry");
     const ok = [false, false];
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => {
       const harbour = document.querySelector('#harbour');
-      const label = (p) => document.querySelectorAll('.sentence-strip .sentence label')[p].textContent.trim();
       const row = () => [...document.querySelectorAll('.kept-strip .waiting .ws .w')].map((w) => w.textContent.trim());
-      // the word the first change replaces: it's the one that waits for the next ship
-      const old = label(${waiting});
-      for (let i = 0; i < 500 && label(${waiting}) !== ${JSON.stringify(a)}; i++) await new Promise((r) => setTimeout(r, 20));
-      const during = { flying: harbour.getAttribute('data-flying'), row: row() };
-      for (let i = 0; i < 500 && label(${crossing}) !== ${JSON.stringify(b)}; i++) await new Promise((r) => setTimeout(r, 20));
-      await new Promise((r) => setTimeout(r, 150));
-      const after = { flying: harbour.getAttribute('data-flying'), row: row() };
-      await new Promise((r) => setTimeout(r, 4200));
-      return { old, during, after, end: harbour.getAttribute('data-flying') };
+      const until = async (f, ms = 10000) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 20)); };
+      // what's flying each time that changes (null: everything set down), with the row as it stood then
+      const seen = [];
+      const o = new MutationObserver(() => seen.push({ flying: harbour.getAttribute('data-flying'), row: row() }));
+      o.observe(harbour, { attributes: true, attributeFilter: ['data-flying'] });
+      const carries = () => seen.filter((s) => s.flying !== null);
+      await until(() => carries().length >= 2);
+      await until(() => !harbour.hasAttribute('data-flying'));
+      o.disconnect();
+      const [during = null, after = null] = carries();
+      // the first plank still on its way when the second change came: nothing set down between the two carries
+      const between = during && after ? seen.slice(seen.indexOf(during) + 1, seen.indexOf(after)).some((s) => s.flying === null) : null;
+      return { during, after, landedBetween: between, end: harbour.getAttribute('data-flying') };
     })()`, [1440, 900], { steps: [READY], then: async () => {
       ok[0] = await secondVisitor(waiting!, a);
       await new Promise((r) => setTimeout(r, 600));
       ok[1] = await secondVisitor(crossing!, b);
-    } })) as { old: string; during: { flying: string | null; row: string[] }; after: { flying: string | null; row: string[] }; end: string | null };
+    } })) as { during: { flying: string; row: string[] } | null; after: { flying: string; row: string[] } | null; landedBetween: boolean | null; end: string | null };
     expect(ok, "a change was refused").toEqual([true, true]);
-    expect(m.during.flying, "the first plank was never carried").toBe(String(waiting! + 1));
-    expect(m.during.row, "the first word landed before its plank was set down").not.toContain(m.old);
-    expect(m.after.row, "the second change didn't finish the first carry: its word isn't in the row").toContain(m.old);
-    expect(m.after.flying, "the second plank isn't on its way").toBe(String(crossing! + 1));
+    expect(m.during?.flying, "the first plank was never carried").toBe(String(waiting! + 1));
+    expect(m.during?.row, "the first word landed before its plank was set down").not.toContain(old);
+    expect(m.after?.flying, "the second plank isn't on its way").toBe(String(crossing! + 1));
+    expect(m.landedBetween, "the first plank was set down before the second change came: no carry was under way to finish").toBe(false);
+    expect(m.after?.row, "the second change didn't finish the first carry: its word isn't in the row").toContain(old);
     expect(m.end, "a plank was still on its way long after it should have been set down").toBeNull();
   }, 120_000);
 
