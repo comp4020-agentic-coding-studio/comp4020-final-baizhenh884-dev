@@ -280,6 +280,32 @@ describe("the story on a first visit", () => {
     }, 60_000);
   }
 
+  // The page's web fonts swap in (font-display: swap) when they arrive, and the band's lines rewrap: the harbour
+  // moves up by a line or more. When they arrived after beat 1 had aimed its scroll but before it ran (software
+  // WebGL paints nothing for 0.8–1.6 s after the story opens), the scroll went to where the harbour had been and
+  // stayed there: CI, 5 November, 0.106 of the harbour shown; locally 0.78 (Linux Chromium) and 0.83 (macOS Chrome),
+  // the harbour 60–78 px above the view. Here the fonts are held until the story has opened, every time; the page
+  // is long enough below the harbour (its log) that the scroll isn't stopped by the page's end, as in CI; and the
+  // text waits in a wide fallback, as on Linux (DejaVu Sans, CI's), so the band's lines rewrap when the fonts swap
+  // in on any machine (macOS's own fallback happens to keep its line count at this width).
+  changesTheSentence("brings the harbour wholly into view on beat 1 when the fonts arrive after the story opens (390×844)", async () => {
+    await stageSentence(["oar", "keel", "mast", "sail", "hull", "deck", "rope", "plank", "tide", "port"]);
+    await stageSentence(["oars", "keels", "masts", "sails", "hulls", "decks", "ropes", "planks", "tides", "ports"]);
+    const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
+      await wait(() => shown(story()));
+      const whole = () => { const h = document.querySelector('#harbour').getBoundingClientRect(), c = story().getBoundingClientRect();
+        return { top: Math.round(h.top), bottom: Math.round(h.bottom), cardTop: Math.round(c.top) }; };
+      const wholly = () => { const w = whole(); return w.top >= -1 && w.bottom <= w.cardTop + 1; };
+      await settle(() => document.fonts.status === 'loaded' && wholly());
+      return { fonts: document.fonts.status, beat: story().dataset.beat, room: document.documentElement.scrollHeight - innerHeight - scrollY, ...whole() };
+    })()`, PHONE, { firstVisit: true, hold: { urls: "*.woff2*", until: "document.querySelector('#story')?.hidden === false" }, fallback: process.platform === "darwin" ? "Verdana" : "DejaVu Sans" })) as any;
+    expect(m.fonts, "the web fonts never arrived").toBe("loaded");
+    expect(m.room, "the page ends at the view: the scroll couldn't go further").toBeGreaterThan(0);
+    expect(m.beat, "the story left beat 1").toBe("1");
+    expect(m.top, `beat 1 scrolled past the harbour's top (${m.top} px)`).toBeGreaterThanOrEqual(-1);
+    expect(m.bottom, `the story's card covers the harbour on beat 1 (harbour ends at ${m.bottom} px, the card begins at ${m.cardTop} px)`).toBeLessThanOrEqual(m.cardTop + 1);
+  }, 60_000);
+
   it("shows once per load when storage fails, and never blocks the page", async () => {
     const broken = `(() => { const no = () => { throw new Error('storage blocked'); }; Storage.prototype.getItem = no; Storage.prototype.setItem = no; })();`;
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}

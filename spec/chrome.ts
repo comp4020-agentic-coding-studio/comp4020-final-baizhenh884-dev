@@ -56,7 +56,11 @@ function chrome(): string {
 // own checks (spec/opening-story.test.ts) open a first visit. `init`: a script run in the page before its own.
 // `drag`: after the steps (and the wheel), a real left-button drag between two points, as a visitor's mouse makes it,
 // and the expression runs once it has been let go.
-export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number }; drag?: { from: [number, number]; to: [number, number] }; firstVisit?: boolean; init?: string };
+// `hold`: the page's requests whose URL matches `urls` (a CDP URL pattern, `*` wildcards) are held back until the
+// in-page expression `until` is true, then let through: a slow resource arriving at a chosen moment, every time,
+// where a network delay would only make that moment likely. `fallback`: the font the generic families (serif,
+// sans-serif) stand for in this browser, what a page's text is drawn in until its web fonts arrive.
+export type LiveOptions = { flags?: string[]; noScript?: boolean; reducedMotion?: boolean; steps?: string[]; settleMs?: number; then?: () => Promise<unknown>; wheel?: { x: number; y: number; dy: number }; drag?: { from: [number, number]; to: [number, number] }; firstVisit?: boolean; init?: string; hold?: { urls: string; until: string }; fallback?: string };
 
 // Opens the page (a file, or the app's URL) in headless Chrome over its debugging port, runs the expression in it, returns its value.
 async function inChrome(file: string, expression: string, dir: string, size: [number, number], opts: LiveOptions = {}): Promise<unknown> {
@@ -89,7 +93,15 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     await new Promise((r) => (ws.onopen = r));
     let id = 0;
     const pending = new Map<number, (m: any) => void>();
-    ws.onmessage = (m) => { const x = JSON.parse(String(m.data)); if (x.id && pending.has(x.id)) { pending.get(x.id)!(x); pending.delete(x.id); } };
+    // requests held back (`hold`) until its expression is true, then every one let through, and any later at once
+    const held: string[] = [];
+    let released = false;
+    const letThrough = (requestId: string) => ws.send(JSON.stringify({ id: ++id, method: "Fetch.continueRequest", params: { requestId } }));
+    ws.onmessage = (m) => {
+      const x = JSON.parse(String(m.data));
+      if (x.method === "Fetch.requestPaused") { if (released) letThrough(x.params.requestId); else held.push(x.params.requestId); return; }
+      if (x.id && pending.has(x.id)) { pending.get(x.id)!(x); pending.delete(x.id); }
+    };
     // Every call to Chrome is bounded: one that never answers (a stalled headless Chrome, seen locally) throws here,
     // so the finally below still closes Chrome. Unbounded, the test runner's own timeout abandoned the check with
     // Chrome left running, and later checks slowed behind it. Well above any one measurement's own wait.
@@ -115,6 +127,18 @@ async function inChrome(file: string, expression: string, dir: string, size: [nu
     // navigated only once the device is set, so the page loads as this device would load it
     const page = live ? new URL(file).href : new URL(`file://${file}`).href;
     await send("Page.enable");
+    if (opts.fallback) await send("Page.setFontFamilies", { fontFamilies: { standard: opts.fallback, serif: opts.fallback, sansSerif: opts.fallback } });
+    if (opts.hold) {
+      await send("Fetch.enable", { patterns: [{ urlPattern: opts.hold.urls, requestStage: "Request" }] });
+      const until = opts.hold.until;
+      void (async () => {
+        while (!released && socket?.readyState === WebSocket.OPEN) {
+          const r = await send("Runtime.evaluate", { expression: `(() => { try { return !!(${until}); } catch { return false; } })()`, returnByValue: true }).catch(() => null);
+          if (r?.result?.result?.value === true) { released = true; for (const h of held.splice(0)) letThrough(h); break; }
+          await sleep(20);
+        }
+      })();
+    }
     // a returning visitor has seen the story: the same flag the page sets when it opens (src/lib/story.ts)
     const seen = opts.firstVisit ? "" : `try { localStorage.setItem(${JSON.stringify(STORY_KEY)}, "seen"); } catch {}`;
     if (seen || opts.init) await send("Page.addScriptToEvaluateOnNewDocument", { source: `${seen}\n${opts.init ?? ""}` });
