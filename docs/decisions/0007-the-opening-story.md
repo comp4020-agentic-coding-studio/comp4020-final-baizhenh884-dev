@@ -75,7 +75,14 @@ playtest's "what is this?", built ahead of the informal try that would test it.
   arrow advance; the left arrow goes back a beat. It never traps focus:
   moving focus out of the story ends it, as Skip does. Begin or Skip puts
   focus on the sentence (the strip, not a word field, so no word is taken in
-  hand).
+  hand). Nor does it open over a word already in hand (a word field focused
+  or holding a draft when the story's script runs): that visitor is already
+  playing, so it counts as seen, and "The story" still replays it. (Added 5
+  November: on Slow 3G, by hand in a local container, the sentence was usable
+  at 0.15 s and the story opened at about 20 s, over a word being typed; it
+  took the focus, the next keys were lost, and on a phone the page scrolled
+  away from the word. Waiting until the visitor let go was rejected: the
+  submit's reload would then open it over their own plank's flight.)
 - **Replayable.** "The story" in the masthead on `GET /` (a button: it plays
   the story again; it goes nowhere). Not on `?at=N`, `?kept=k` or `/ship/`.
 - **Reduced motion:** no camera moves and no flash; the text beats over the
