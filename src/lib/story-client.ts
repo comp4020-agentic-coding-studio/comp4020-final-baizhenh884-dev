@@ -1,8 +1,9 @@
 // The opening story on GET / (docs/decisions/0007-the-opening-story.md). A labelled, non-modal dialog over the
 // harbour: five beats, Skip always shown, Escape skips; a click on the story, Enter, Space or → advance, ← goes
 // back; focus leaving it ends it. Begin or Skip puts focus on the sentence strip. Played once in this browser
-// (localStorage; if storage fails, once per load), and again from "The story" in the masthead. The harbour, when
-// there is one, moves its camera and rebuilds one part as it stands; without it the beats are the same text.
+// (localStorage; if storage fails, once per load), never over a word already in hand (counted as seen then),
+// and again from "The story" in the masthead. The harbour, when there is one, moves its camera and rebuilds one
+// part as it stands; without it the beats are the same text.
 // It never touches the sentence, its forms or the stream: live changes go on underneath.
 
 import { BEATS, REBUILDS, STORY_KEY, type Shot } from "./story";
@@ -97,5 +98,10 @@ export function mountStory(doc: Document, stage: () => StoryStage): void {
 
   let seen = false;
   try { seen = localStorage.getItem(STORY_KEY) !== null; } catch { /* storage fails: show it once per load */ }
-  if (!seen) open();
+  // a visitor who took a word in hand before this script ran (a slow connection) is already playing: the story
+  // would take their focus and keys, so it counts as seen instead, and "The story" still replays it
+  const inHand = [...strip.querySelectorAll<HTMLInputElement>('input[name="word"]')].some((f) => f.value !== "" || doc.activeElement === f);
+  if (seen) return;
+  if (inHand) { try { localStorage.setItem(STORY_KEY, "seen"); } catch { /* once per load, then */ } }
+  else open();
 }
