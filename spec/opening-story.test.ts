@@ -248,6 +248,38 @@ describe("the story on a first visit", () => {
     expect(m.focus, "ending the story took focus from the word").toBe(true);
   }, 60_000);
 
+  // On a slow connection the sentence is there long before the script that plays the story (Slow 3G, by hand,
+  // 5 November: the sentence at 0.15 s, the story at about 20 s). A visitor who has already taken a word in hand
+  // by then is playing: the story opening over them took the focus, so their next keys were lost, and on a phone
+  // scrolled the page away from the word. The word is taken in hand here before the page's scripts run.
+  for (const [name, size] of [["1440×900", DESKTOP], ["390×844", PHONE]] as const) {
+    it(`doesn't open over a word already in hand, counts as seen, and still replays (${name})`, async () => {
+      const early = `document.addEventListener('readystatechange', () => {
+        if (document.readyState !== 'interactive') return;
+        const f = document.getElementById('word-3'); f.focus(); f.value = 'compass';
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+      });`;
+      const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
+        const field = document.getElementById('word-3');
+        // the story's script has run once "The story" in the masthead shows
+        const ran = await wait(() => shown(document.querySelector('#story-open')));
+        await settle();
+        const out = { ran, opened: shown(story()), focus: document.activeElement === field, draft: field.value, fieldInView: inView(field),
+          remembered: (() => { try { return localStorage.getItem(${JSON.stringify(STORY_KEY)}); } catch { return 'unreadable'; } })() };
+        document.querySelector('#story-open').click();
+        out.replays = await wait(() => shown(story()));
+        return out;
+      })()`, size, { firstVisit: true, init: early })) as any;
+      expect(m.ran, "the story's script never ran").toBe(true);
+      expect(m.opened, "the story opened over a word in hand").toBe(false);
+      expect(m.focus, "the word in hand lost the focus").toBe(true);
+      expect(m.draft, "the draft changed").toBe("compass");
+      expect(m.fieldInView, "the page moved away from the word in hand").toBe(true);
+      expect(m.remembered, "the story isn't counted as seen").not.toBeNull();
+      expect(m.replays, "\"The story\" doesn't replay it").toBe(true);
+    }, 60_000);
+  }
+
   it("shows once per load when storage fails, and never blocks the page", async () => {
     const broken = `(() => { const no = () => { throw new Error('storage blocked'); }; Storage.prototype.getItem = no; Storage.prototype.setItem = no; })();`;
     const m = (await liveIn(new URL("/", baseUrl).href, `(async () => { ${IN_PAGE}
