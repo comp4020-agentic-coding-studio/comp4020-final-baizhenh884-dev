@@ -28,8 +28,13 @@ export function mountStory(doc: Document, stage: () => StoryStage): void {
   // beat 2's rebuilds still to come: a beat left early cancels them
   let rebuilds: number[] = [];
 
+  // aimed once the web fonts are in: a smooth scroll keeps the target it was given, so one aimed while the fallback
+  // still sets the band's lines ended past the harbour when the fonts swapped in (CI, 5 November). Only for the beat
+  // still shown: one left meanwhile scrolls nowhere
   const scrollTo = (el: HTMLElement | null, block: ScrollLogicalPosition) => {
-    if (el && phone()) el.scrollIntoView({ block, behavior: reduced() ? "auto" : "smooth" });
+    if (!el || !phone()) return;
+    const at = beat;
+    void doc.fonts.ready.then(() => { if (beat === at) el.scrollIntoView({ block, behavior: reduced() ? "auto" : "smooth" }); });
   };
 
   function show(i: number): void {
