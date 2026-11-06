@@ -583,7 +583,9 @@ What the code must hold to. The README says why; don't restate it here.
   stern), each exactly as it was and red only while it's rebuilt, so the
   ship still represents the sentence. Remembered in
   `localStorage` only (the server never knows); if storage fails, once
-  per load, never blocking the page. Skip is always visible, Escape skips;
+  per load, never blocking the page. Never over a word already in hand
+  (a word field focused or holding a draft when its script runs, as on a
+  slow connection): that counts as seen. Skip is always visible, Escape skips;
   click, tap, Enter, Space or → advance, ← goes back; it never traps
   focus (focus leaving it ends it). Begin or Skip puts focus on the
   sentence strip, never a word field. "The story" in `GET /`'s masthead
